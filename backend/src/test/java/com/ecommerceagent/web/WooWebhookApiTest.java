@@ -52,9 +52,9 @@ class WooWebhookApiTest {
              "date_modified_gmt":"2026-11-14T10:00:00","date_paid_gmt":"2026-11-14T10:00:00",
              "billing":{"first_name":"Jan","email":"jan.kowalski@example.com","phone":"+48600100200"},
              "shipping":{"address_1":"ul. Prosta 1"},"customer_ip_address":"203.0.113.7",
-             "customer_user_agent":"Mozilla","customer_note":"Proszę dzwonić",
+             "customer_user_agent":"Mozilla","customer_note":"Please call me",
              "line_items":[{"id":9,"product_id":14,"variation_id":0,"sku":"MUG","quantity":1,"total":"64.23",
-                            "total_tax":"14.77","meta_data":[{"key":"Dedykacja","value":"Dla Jana"}]}]}
+                            "total_tax":"14.77","meta_data":[{"key":"Dedication","value":"For John"}]}]}
             """;
 
     @Autowired
@@ -134,7 +134,7 @@ class WooWebhookApiTest {
         assertThat(payloads.getFirst()).contains("\"line_items\"").contains("\"date_created_gmt\"")
                 .doesNotContain("billing").doesNotContain("jan.kowalski").doesNotContain("+48600100200")
                 .doesNotContain("Prosta").doesNotContain("203.0.113.7").doesNotContain("Mozilla")
-                .doesNotContain("dzwonić").doesNotContain("Dedykacja").doesNotContain("Dla Jana");
+                .doesNotContain("Please call").doesNotContain("Dedication").doesNotContain("For John");
         assertThat(jdbc.sql("SELECT last_webhook_at FROM integration_connection WHERE store_id = ?")
                 .params(STORE_A).query(java.sql.Timestamp.class).single()).isNotNull();
     }
