@@ -14,6 +14,8 @@ import com.ecommerceagent.integration.ConnectionStatus;
 import com.ecommerceagent.integration.ConnectionWarning;
 import com.ecommerceagent.integration.IntegrationConnection;
 import com.ecommerceagent.integration.IntegrationConnections;
+import com.ecommerceagent.integration.IntegrationHealth;
+import com.ecommerceagent.integration.IntegrationHealthService;
 import com.ecommerceagent.integration.IntegrationNotFoundException;
 import com.ecommerceagent.integration.IntegrationProvider;
 import com.ecommerceagent.integration.InvalidIntegrationRequestException;
@@ -40,13 +42,15 @@ class IntegrationController {
     private final WooCommerceImport imports;
     private final StoreSync sync;
     private final WooWebhooks webhooks;
+    private final IntegrationHealthService health;
 
     IntegrationController(IntegrationConnections connections, WooCommerceImport imports, StoreSync sync,
-            WooWebhooks webhooks) {
+            WooWebhooks webhooks, IntegrationHealthService health) {
         this.connections = connections;
         this.imports = imports;
         this.sync = sync;
         this.webhooks = webhooks;
+        this.health = health;
     }
 
     @GetMapping("/integrations")
@@ -113,7 +117,8 @@ class IntegrationController {
 
     private IntegrationResponse response(IntegrationConnection connection, TrustedStoreScope scope) {
         return IntegrationResponse.from(connection, imports.latestRun(scope, connection.id()).orElse(null),
-                WebhookResponse.from(connection, webhooks.deliveryUrl(connection).orElse(null)), scope);
+                WebhookResponse.from(connection, webhooks.deliveryUrl(connection).orElse(null)),
+                health.health(scope, connection), scope);
     }
 
     /** A malformed id is reported like a missing one, as for store ids. */
@@ -216,10 +221,11 @@ class IntegrationController {
             String sourceCurrency,
             SyncJobResponse lastSync,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) WebhookResponse webhook,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) HealthResponse health,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<IntegrationAction> allowedActions) {
 
         static IntegrationResponse from(IntegrationConnection connection, SyncRun lastSync, WebhookResponse webhook,
-                TrustedStoreScope scope) {
+                IntegrationHealth health, TrustedStoreScope scope) {
             List<IntegrationAction> actions = new ArrayList<>();
             if (scope.has(StorePermission.STORE_MANAGE)) {
                 actions.add(IntegrationAction.SAVE_CREDENTIALS);
@@ -235,7 +241,25 @@ class IntegrationController {
             return new IntegrationResponse(connection.id(), connection.provider(), connection.storeUrl().toString(),
                     connection.status(), connection.keyHint(), connection.lastCheckAt(), connection.lastSuccessAt(),
                     connection.lastErrorCode(), connection.lastCheckWarnings(), connection.sourceCurrency(),
-                    lastSync == null ? null : SyncJobResponse.from(lastSync), webhook, List.copyOf(actions));
+                    lastSync == null ? null : SyncJobResponse.from(lastSync), webhook, HealthResponse.from(health),
+                    List.copyOf(actions));
+        }
+    }
+
+    /** Computed when read (ADR-0010). {@code STALE} blocks analysis that depends on current data. */
+    record HealthResponse(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) IntegrationHealth.Status status,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<IntegrationHealth.Reason> reasons,
+            Instant lastPollAt,
+            Instant lastReconcileAt,
+            @Schema(description = "Orders are known to be complete up to this moment") Instant ordersCompleteUntil,
+            Instant lastWebhookAt,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int missedWebhooks24h) {
+
+        static HealthResponse from(IntegrationHealth health) {
+            return new HealthResponse(health.status(), health.reasons(), health.lastPollAt(),
+                    health.lastReconcileAt(), health.ordersCompleteUntil(), health.lastWebhookAt(),
+                    health.missedWebhooks24h());
         }
     }
 

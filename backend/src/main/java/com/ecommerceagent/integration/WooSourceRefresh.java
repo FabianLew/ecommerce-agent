@@ -10,15 +10,10 @@ import com.ecommerceagent.commerce.CatalogRepository;
 import com.ecommerceagent.commerce.StockTracking;
 import com.ecommerceagent.commerce.Variant;
 import com.ecommerceagent.identity.TrustedStoreScope;
-import com.ecommerceagent.integration.woocommerce.WooClientException;
-import com.ecommerceagent.integration.woocommerce.WooCommerceClient;
-import com.ecommerceagent.integration.woocommerce.WooCredentials;
-import com.ecommerceagent.integration.woocommerce.WooResponse;
+import com.ecommerceagent.integration.WooReader.Source;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Fresh, authoritative reads of single products and variants from WooCommerce (ADR-0010): settle a request for
@@ -28,21 +23,15 @@ import tools.jackson.databind.node.ObjectNode;
 public class WooSourceRefresh {
 
     static final String PRODUCT_FIELDS = String.join(",", WooPayloads.PRODUCT_FIELDS);
-    private static final JsonMapper JSON = JsonMapper.builder().build();
 
-    private final IntegrationConnections connections;
-    private final IntegrationConnectionRepository connectionRepository;
-    private final WooCommerceClient client;
+    private final WooReader reader;
     private final CatalogRepository catalog;
     private final WooPayloadNormalizer normalizer;
     private final TransactionTemplate transactions;
 
-    WooSourceRefresh(IntegrationConnections connections, IntegrationConnectionRepository connectionRepository,
-            WooCommerceClient client, CatalogRepository catalog, WooPayloadNormalizer normalizer,
+    WooSourceRefresh(WooReader reader, CatalogRepository catalog, WooPayloadNormalizer normalizer,
             TransactionTemplate transactions) {
-        this.connections = connections;
-        this.connectionRepository = connectionRepository;
-        this.client = client;
+        this.reader = reader;
         this.catalog = catalog;
         this.normalizer = normalizer;
         this.transactions = transactions;
@@ -62,7 +51,7 @@ public class WooSourceRefresh {
             return "SOURCE_NOT_FOUND";
         }
         if (!ownProduct) {
-            payload = asVariation(payload, productId, variant.name());
+            payload = WooReader.asVariation(payload, productId, variant.name());
         }
         String readId = "read:" + UUID.randomUUID();
         JsonNode read = payload;
@@ -92,7 +81,7 @@ public class WooSourceRefresh {
                     }
                     String parentName = WooPayloads.text(product, "name");
                     items.forEach(item -> variations.add(
-                            asVariation(item, productId, WooPayloads.variationName(parentName, item))));
+                            WooReader.asVariation(item, productId, WooPayloads.variationName(parentName, item))));
                     if (items.size() < 100) {
                         break;
                     }
@@ -110,55 +99,17 @@ public class WooSourceRefresh {
         return outcomes;
     }
 
-    /** The REST variations endpoint omits type and parent, which the normalizer needs. */
-    private static JsonNode asVariation(JsonNode variation, String productId, String name) {
-        ObjectNode copy = WooPayloads.minimizeProduct(variation);
-        copy.put("type", "variation");
-        copy.put("parent_id", Long.parseLong(productId));
-        if (!copy.hasNonNull("name")) {
-            copy.put("name", name);
-        }
-        return copy;
-    }
-
-    private Source source(TrustedStoreScope scope) {
-        IntegrationConnection connection = connectionRepository.findByProvider(scope, IntegrationProvider.WOOCOMMERCE)
-                .filter(found -> found.status() == ConnectionStatus.CONNECTED)
-                .orElseThrow(() -> new WooImportException(ConnectionCheckError.AUTH_FAILED,
-                        "No connected WooCommerce integration"));
-        return new Source(connection, connections.wooCredentials(scope, connection));
-    }
-
     private JsonNode get(Source source, String resource) {
         return get(source, resource, Map.of());
     }
 
-    /** The JSON body of a successful read, or null when the resource no longer exists in the store. */
     private JsonNode get(Source source, String resource, Map<String, String> extra) {
         Map<String, String> query = new LinkedHashMap<>(extra);
         query.put("_fields", PRODUCT_FIELDS);
-        WooResponse response;
-        try {
-            response = client.get(source.connection().storeUrl(), source.credentials(), resource, query);
-        } catch (WooClientException e) {
-            throw new WooImportException(switch (e.kind()) {
-                case ADDRESS_NOT_ALLOWED -> ConnectionCheckError.ADDRESS_NOT_ALLOWED;
-                case UNREACHABLE, TIMEOUT -> ConnectionCheckError.UNREACHABLE;
-                case TLS_ERROR -> ConnectionCheckError.TLS_ERROR;
-                case RESPONSE_TOO_LARGE -> ConnectionCheckError.UNEXPECTED_RESPONSE;
-            }, e.getMessage());
-        }
-        if (response.status() == 404 && response.isJson()) {
-            return null;
-        }
-        if (!response.isSuccess() || !response.isJson()) {
-            ConnectionCheckError error = WooConnectionChecker.classifyList(response);
-            throw new WooImportException(error == null ? ConnectionCheckError.UNEXPECTED_RESPONSE : error,
-                    "GET " + resource + " returned " + response.status());
-        }
-        return JSON.readTree(response.body());
+        return reader.json(source, resource, query);
     }
 
-    private record Source(IntegrationConnection connection, WooCredentials credentials) {
+    private Source source(TrustedStoreScope scope) {
+        return reader.source(scope);
     }
 }

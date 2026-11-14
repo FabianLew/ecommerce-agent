@@ -453,6 +453,24 @@ nav ul {
   border-color: var(--error);
 }
 
+.badge-health-healthy {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.badge-health-stale {
+  background: var(--error-soft);
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.badge-health-degraded {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
 .badge-sync-running {
   background: var(--warning-soft);
   color: var(--warning);

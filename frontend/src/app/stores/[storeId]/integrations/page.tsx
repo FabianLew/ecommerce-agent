@@ -9,6 +9,8 @@ import { checkConnection, startSync } from "./actions";
 import {
   ERROR_HELP,
   formatInstant,
+  HEALTH_LABELS,
+  HEALTH_REASON_HELP,
   type Integration,
   STATUS_LABELS,
   SYNC_STATUS_LABELS,
@@ -124,8 +126,40 @@ function ConnectionDetails({ integration, timezone }: { integration: Integration
         <dt>Waluta w WooCommerce</dt>
         <dd>{integration.sourceCurrency ?? "—"}</dd>
       </dl>
+      <HealthDetails integration={integration} timezone={timezone} />
       <SyncDetails integration={integration} timezone={timezone} />
     </>
+  );
+}
+
+function HealthDetails({ integration, timezone }: { integration: Integration; timezone: string }) {
+  const health = integration.health;
+  return (
+    <section className="sync" aria-labelledby="health-title" data-testid="woocommerce-health">
+      <h3 id="health-title" className="subheading">Stan integracji</h3>
+      <p className={`badge badge-health-${health.status.toLowerCase()}`} role="status" data-testid="health-status">
+        {HEALTH_LABELS[health.status]}
+      </p>
+      {health.reasons.map((reason) => (
+        <p
+          key={reason}
+          className={`form-message ${health.status === "STALE" ? "error" : "warning"}`}
+          data-testid={`health-reason-${reason}`}
+        >
+          {HEALTH_REASON_HELP[reason]}
+        </p>
+      ))}
+      {health.status === "NOT_READY" ? null : (
+        <dl className="details">
+          <dt>Ostatni odczyt zmian</dt>
+          <dd>{formatInstant(health.lastPollAt, timezone)}</dd>
+          <dt>Zamówienia kompletne do</dt>
+          <dd>{formatInstant(health.ordersCompleteUntil, timezone)}</dd>
+          <dt>Zgubione webhooki (24 h)</dt>
+          <dd>{health.missedWebhooks24h}</dd>
+        </dl>
+      )}
+    </section>
   );
 }
 

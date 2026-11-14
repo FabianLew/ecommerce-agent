@@ -32,28 +32,33 @@ odczyt stanu, semantyka watermarków i kiedy integracja blokuje analizę jako ni
    nadrzędny przy `PARENT`) prosto z Woo i zapisuje obserwację `POLL`. Odczyt świeży jest prawdą w chwili
    odczytu, więc zapisujemy go także przy tej samej sekundzie co ostatni zapis (rozstrzyga `AMBIGUOUS`). Nie
    zapisujemy tylko identycznego stanu. Kilka próśb w oknie 60 s daje jeden odczyt.
-4. **Polling (B-16).** Temporal Schedule `woo-poll-{connectionId}` co 5 min uruchamia `WooPollWorkflow`:
+4. **Polling (B-16).** Temporal Schedule `woo-poll-{connectionId}` co 5 min uruchamia `IncrementalSyncWorkflow` (rodzaj `POLL`):
    `products?modified_after={watermark − 2 min}` oraz wariacje zmienionych produktów zmiennych. Zmiany zapisuje jak
    odczyt autorytatywny. Watermark `PRODUCTS` (największy `date_modified_gmt`) przesuwa się dopiero po
    przejściu wszystkich stron.
-5. **Rekonsyliacja (B-16).** Schedule `woo-reconcile-{connectionId}` co godzinę: zamówienia
-   `modified_after={watermark ORDERS − 2 min}` aż do startu przebiegu, z porównaniem `X-WP-Total` jak w
-   ADR-0008. Przy zgodności przedłuża `order_sync_coverage` do startu przebiegu i przesuwa watermark. Przy
-   niezgodności nic nie przesuwa, a health pokazuje rosnące opóźnienie kompletności. Nocny przegląd całego
-   katalogu (pełny stan) zostaje na później.
+5. **Rekonsyliacja (B-16).** Schedule `woo-reconcile-{connectionId}` co godzinę: wszystkie zamówienia
+   `modified_after={watermark ORDERS − 2 min}`, bez górnej granicy, z porównaniem `X-WP-Total` jak w ADR-0008.
+   Zamówienie złożone przed startem przebiegu ma datę modyfikacji nie wcześniejszą niż złożenia, więc pełny
+   odczyt obejmuje wszystkie zamówienia złożone do startu. Górna granica (`modified_before`) zrobiłaby dziurę:
+   zamówienie złożone przed startem i zmienione w trakcie przebiegu wypadłoby z odczytu. Przy zgodności
+   licznika przedłużamy `order_sync_coverage` do startu przebiegu i przesuwamy tam watermark. Przy niezgodności
+   nic nie przesuwamy, a health pokazuje rosnące opóźnienie kompletności. Nocny przegląd całego katalogu (pełny
+   stan) zostaje na później.
 6. **Zgubiony webhook.** Polling porównuje każdą zmianę z ostatnią obserwacją. Jeśli połączenie ma zapisany
    sekret webhooków, a zmiana z Woo jest nowsza od naszego stanu i starsza niż 2 minuty, liczymy ją jako
-   `MISSED_WEBHOOK` (`integration_sync_event`). Zamówienia z rekonsyliacji, których nie było w bazie, liczą się
-   tak samo.
-7. **Integration Health** (pole `health` w `GET B/integrations`), liczone przy odczycie:
+   zgubiony webhook. Liczba trafia do przebiegu (`sync_check.missed_webhooks`). Zamówienia z rekonsyliacji,
+   których nie było w bazie albo były w starszym stanie, liczą się tak samo. Zmiana sprzed zapisania sekretu
+   się nie liczy.
+7. **Integration Health** (pole `health` w `GET /stores/{storeId}/integrations`), liczone przy odczycie:
    - `NOT_READY`: brak udanego importu początkowego;
    - `STALE`: polling bez sukcesu od 15 min albo kompletność zamówień starsza niż 2 h. Blokuje analizę (03 §11);
    - `DEGRADED`: zgubione webhooki w ostatnich 24 h, brak sekretu webhooków, wpisy `FAILED` w inbox albo
      zaległy outbox starszy niż 5 min;
    - `HEALTHY`: pozostałe przypadki.
    Każdy powód ma kod i krok naprawy w UI.
-8. **Harmonogramy.** Schedule powstają (idempotentnie) po udanym imporcie początkowym i przy starcie workera
-   dla połączeń `CONNECTED` z udanym importem. Polityka nakładania: `SKIP`, okno nadrabiania 10 min. Interwały
+8. **Harmonogramy.** Worker przy starcie i co minutę tworzy (idempotentnie) brakujące Schedule dla połączeń
+   `CONNECTED` z udanym importem, więc sklep dostaje polling najpóźniej minutę po imporcie. Kontekst sklepu
+   (aktor `woo-sync`) jest zapisany w nagłówku akcji Schedule, a pierwszy przebieg startuje od razu. Polityka nakładania: `SKIP`, okno nadrabiania 10 min. Interwały
    są parametrami pilota (`operator.integration.woocommerce.poll-interval`, `reconcile-interval`).
 9. **Aktor.** Workflow działają jako aktor systemowy `woo-sync` z zakresem `STORE_READ` (ADR-0004). Zakres
    pochodzi z nagłówków startu, a interceptor aktywności weryfikuje go w bazie.
@@ -83,6 +88,6 @@ odczyt stanu, semantyka watermarków i kiedy integracja blokuje analizę jako ni
   sygnał; `order.changed` trafia do workflow każdego wariantu; błąd Temporal odkłada zdarzenie.
 - `VariantInventoryWorkflowTest`: debounce weryfikacji, odczyt autorytatywny rozstrzyga `AMBIGUOUS`,
   `continueAsNew` zachowuje identyfikatory, test replay z zapisaną historią.
-- `WooPollTest` i `WooReconcileTest` z atrapą Woo: watermark tylko po komplecie stron, wykrycie zgubionego
+- `IncrementalSyncTest` z atrapą Woo: watermark tylko po komplecie stron, wykrycie zgubionego
   webhooka, przedłużenie pokrycia tylko przy zgodnym liczniku.
-- `IntegrationHealthTest`: każdy stan i powód.
+- `IncrementalSyncTest`: przejścia health `NOT_READY` → `STALE` → `DEGRADED` → `HEALTHY` → `DEGRADED` → `STALE`.
