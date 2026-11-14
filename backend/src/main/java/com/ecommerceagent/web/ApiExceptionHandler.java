@@ -7,6 +7,7 @@ import com.ecommerceagent.integration.IntegrationConflictException;
 import com.ecommerceagent.integration.IntegrationNotFoundException;
 import com.ecommerceagent.integration.InvalidIntegrationRequestException;
 import com.ecommerceagent.integration.SyncInProgressException;
+import com.ecommerceagent.integration.WebhookRejectedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,6 +56,19 @@ class ApiExceptionHandler {
     ResponseEntity<ApiError> syncInProgress(HttpServletRequest request) {
         return error(request, HttpStatus.CONFLICT, "SYNC_IN_PROGRESS",
                 "An import for this integration is already running.", true);
+    }
+
+    /** Webhook rejections carry no detail beyond the code (ADR-0009). */
+    @ExceptionHandler(WebhookRejectedException.class)
+    ResponseEntity<ApiError> webhookRejected(HttpServletRequest request, WebhookRejectedException exception) {
+        return switch (exception.reason()) {
+            case NOT_FOUND -> error(request, HttpStatus.NOT_FOUND, "NOT_FOUND",
+                    "The resource does not exist or is not available.", false);
+            case SIGNATURE_INVALID -> error(request, HttpStatus.UNAUTHORIZED, "WEBHOOK_SIGNATURE_INVALID",
+                    "The webhook signature does not match the saved secret.", false);
+            case PAYLOAD_TOO_LARGE -> error(request, HttpStatus.CONTENT_TOO_LARGE, "PAYLOAD_TOO_LARGE",
+                    "The webhook body is too large.", false);
+        };
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

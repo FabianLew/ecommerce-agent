@@ -458,3 +458,25 @@ nav ul {
   color: var(--warning);
   border-color: var(--warning);
 }
+
+.plain-list {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.webhook-setup code {
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+}
+
+.webhook-setup .inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 0;
+}
+
+.webhook-setup .inline-form input {
+  flex: 1 1 16rem;
+  min-width: 0;
+}

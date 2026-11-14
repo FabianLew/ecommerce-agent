@@ -59,3 +59,11 @@ export function syncHelp(job: SyncJob): string | null {
   }
   return null;
 }
+
+/** WooCommerce webhook topics as named in the Woo admin (ADR-0009). */
+export const TOPIC_LABELS: Record<string, string> = {
+  "order.created": "Zamówienie utworzone (Order created)",
+  "order.updated": "Zamówienie zaktualizowane (Order updated)",
+  "product.created": "Produkt utworzony (Product created)",
+  "product.updated": "Produkt zaktualizowany (Product updated)",
+};

@@ -88,6 +88,19 @@ np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_A
 - Lokalnie: API (`api,local`) i worker (`worker,local --server.port=8090`), potem przycisk „Importuj dane z
   ostatnich 14 dni” w Integracjach.
 
+## Webhooki WooCommerce (B-14)
+
+- Publiczny `POST /api/v1/webhooks/woocommerce/{endpointKey}` (bez OIDC, ADR-0009): losowy klucz w adresie
+  wskazuje połączenie, podpis `X-WC-Webhook-Signature` (HMAC-SHA256 surowego body) uwierzytelnia sklep.
+  Ping Woo (`webhook_id=N`) dostaje 200 bez zapisu, zły podpis 401, nieznany klucz 404, body > 1 MiB 413.
+- Sekret: `POST /api/v1/stores/{storeId}/integration-connections/{id}/webhook-secret` `{secret}` (generuje go
+  przeglądarka, backend go nie zwraca). Adres dostawy w `webhook.deliveryUrl` z `WEBHOOK_BASE_URL`.
+- `webhook_inbox` przechowuje zminimalizowany payload (bez danych klientów), deduplikacja po SHA-256 body.
+  Worker co 2 s normalizuje wpisy (`WebhookInboxProcessor`), w tej samej transakcji zapisuje `outbox_event`.
+- Stan nie cofa się (IG-04): `InventoryRepository.recordIfNewer` porównuje `date_modified_gmt` z ostatnią
+  obserwacją (`STALE`, `DUPLICATE`, `AMBIGUOUS` → prośba o weryfikację, `RECORDED`).
+- Testy: `WooWebhookApiTest`, `WebhookNormalizationTest`.
+
 ## Metrics Engine v1 (B-17)
 
 - `InventoryMetrics.coverage(scope, variantId, asOf)` liczy `UNITS_SOLD@v1`, `SALES_VELOCITY_7_FULL_LOCAL_DAYS@v1`

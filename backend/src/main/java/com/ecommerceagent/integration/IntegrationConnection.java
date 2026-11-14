@@ -16,7 +16,10 @@ public record IntegrationConnection(
         Instant lastSuccessAt,
         ConnectionCheckError lastErrorCode,
         List<ConnectionWarning> lastCheckWarnings,
-        String sourceCurrency) {
+        String sourceCurrency,
+        String webhookEndpointKey,
+        Instant webhookSecretSetAt,
+        Instant lastWebhookAt) {
 
     public IntegrationConnection {
         lastCheckWarnings = List.copyOf(lastCheckWarnings);
