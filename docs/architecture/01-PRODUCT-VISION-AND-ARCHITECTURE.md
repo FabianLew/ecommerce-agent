@@ -1,150 +1,150 @@
-# Autonomous E-commerce Operator — koncepcja produktu i architektura MVP
+# Autonomous E-commerce Operator — product concept and MVP architecture
 
-Wersja: 1.2 · Data: 14 listopada 2026 · Status: projekt do przeglądu
+Version: 1.2 · Date: 14 November 2026 · Status: draft for review
 
-Dokument nadrzędny dla zakresu produktu. Szczegóły techniczne zawiera [architektura AI](02-AI-AGENT-ARCHITECTURE.md), referencyjną realizację — [Inventory Guardian end-to-end](03-INVENTORY-GUARDIAN-E2E.md), a widoki i kontrakty frontend–backend — [specyfikacja UI/UX](04-UI-UX-SPECIFICATION.md). Zalecana kolejność lektury: produkt → AI → proces → UI.
+The parent document for the product scope. Technical details are in the [AI architecture](02-AI-AGENT-ARCHITECTURE.md), the reference implementation in [Inventory Guardian end-to-end](03-INVENTORY-GUARDIAN-E2E.md), and the views and frontend–backend contracts in the [UI/UX specification](04-UI-UX-SPECIFICATION.md). Recommended reading order: product → AI → process → UI.
 
-## 1. Podstawa i sposób czytania
+## 1. Basis and how to read
 
-Podstawą jest rozmowa „Brainstorming agenta ecommerce”, identyfikator `6af84827-e08c-83ed-a972-76644325952c`, oraz bieżące zamówienie trzech dokumentów. Odczytano cztery dostępne tury, w tym wcześniejszy brainstorming i wybór DTC. Narzędzie zwróciło dwie dłuższe odpowiedzi asystenta ucięte do 20 000 znaków każda; ich niewidocznych zakończeń nie uznajemy za znane ustalenia. Niedostępne wartości dawnych suwaków i przełączników nie stanowią konfiguracji polityk.
+The basis is the conversation "E-commerce agent brainstorming", identifier `6af84827-e08c-83ed-a972-76644325952c`, and the current request for three documents. Four available turns were read, including the earlier brainstorming and the choice of DTC. The tool returned two longer assistant answers cut to 20,000 characters each; we do not treat their invisible endings as known findings. Unavailable values of former sliders and switches are not a policy configuration.
 
-Aktualizacja 1.1 uwzględnia nowe decyzje użytkownika o MVP, analityce, Customer Support i UI/UX oraz pięć dostępnych tur dalszej rozmowy. Dwie odpowiedzi z tej części odczytu są ucięte; brakujących fragmentów nie traktujemy jako znanych ustaleń. Bieżące polecenie użytkownika jest podstawą zmian zakresu.
+Update 1.1 takes into account the user's new decisions about the MVP, analytics, Customer Support and UI/UX, and five available turns of the further conversation. Two answers from that part of the read are cut; we do not treat the missing parts as known findings. The user's current instruction is the basis for scope changes.
 
-Aktualizacja 1.2 dodaje Business Knowledge & Decision Intelligence na podstawie bieżącego polecenia i pełnej dostępnej odpowiedzi o czterech źródłach wiedzy z dalszej rozmowy. Szczegóły są skupione w [05 — Decision Intelligence Architecture](05-DECISION-INTELLIGENCE-ARCHITECTURE.md).
+Update 1.2 adds Business Knowledge & Decision Intelligence based on the current instruction and the full available answer about the four knowledge sources from the further conversation. The details are gathered in [05 — Decision Intelligence Architecture](05-DECISION-INTELLIGENCE-ARCHITECTURE.md).
 
-We wszystkich pięciu plikach obowiązuje wspólna legenda:
+All five files use a common legend:
 
-| Oznaczenie | Znaczenie |
+| Marker | Meaning |
 |---|---|
-| **[D] Decyzja** | Kierunek wybrany przez użytkownika albo przyjęty w aktualnym zamówieniu dokumentacji. |
-| **[U] Uzgodniony kierunek** | Konkretna propozycja z rozmowy przyjęta jako baza projektu, bez sugerowania formalnego zatwierdzenia każdego detalu. |
-| **[P] Propozycja** | Doprecyzowanie projektowe dodane w tym pakiecie; wymaga przeglądu przed implementacją. |
-| **[Z] Założenie** | Hipoteza rynkowa, przykładowe dane, limity lub parametr do walidacji. |
-| **[O] Pytanie otwarte** | Rozstrzygnięcie potrzebne do wdrożenia lub kolejnej fazy. |
+| **[D] Decision** | A direction chosen by the user or adopted in the current documentation request. |
+| **[U] Agreed direction** | A concrete proposal from the conversation adopted as the basis of the design, without implying formal approval of every detail. |
+| **[P] Proposal** | A design refinement added in this package; it needs review before implementation. |
+| **[Z] Assumption** | A market hypothesis, sample data, limits or a parameter to validate. |
+| **[O] Open question** | A resolution needed for implementation or the next phase. |
 
-Jeżeli sekcja ma oznaczenie, dotyczy ono jej treści, chyba że wskazano inaczej. Wspólne identyfikatory `D-*`, `U-*`, `P-*`, `Z-*`, `O-*` ułatwiają śledzenie decyzji. Dokumenty są projektem, a nie deklaracją istniejącej implementacji. Zewnętrzne źródła wyjaśniają możliwości technologii; nie dowodzą potrzeb rynku ani skuteczności produktu.
+If a section has a marker, it applies to its content unless stated otherwise. The common identifiers `D-*`, `U-*`, `P-*`, `Z-*`, `O-*` make decisions easier to trace. The documents are a design, not a statement of an existing implementation. External sources explain the capabilities of technologies; they do not prove market needs or product effectiveness.
 
-## 2. Wizja i wartość produktu [D, U]
+## 2. Product vision and value [D, U]
 
-**D-01:** Pierwszym segmentem są małe i średnie sklepy DTC. Autonomous E-commerce Operator działa w tle: obserwuje sklep, wykrywa problemy i szanse, przygotowuje decyzje, realizuje dozwolone działania i sprawdza rezultat. Rozmowa z agentem jest interfejsem pomocniczym. Podstawowe procesy uruchamiają zdarzenia i harmonogramy.
+**D-01:** The first segment is small and medium DTC stores. Autonomous E-commerce Operator works in the background: it observes the store, detects problems and opportunities, prepares decisions, carries out allowed actions and checks the result. Conversation with the agent is a supporting interface. The core processes are triggered by events and schedules.
 
-**D-04:** Obsługujemy wyłącznie istniejące sklepy. Tworzenie sklepu, generowanie storefrontu i jego uruchamianie pozostają poza MVP. Onboarding oznacza podłączenie źródeł, konfigurację danych i polityk oraz uruchomienie monitoringu.
+**D-04:** We support existing stores only. Creating a store, generating a storefront and launching it stay outside the MVP. Onboarding means connecting sources, configuring data and policies and starting monitoring.
 
-**D-05:** Zaawansowana analityka sprzedaży, rentowności, reklam i produktów jest pełnoprawną częścią MVP. **D-06:** Jeden interfejs dla początkujących i zaawansowanych stosuje progressive disclosure: proste podsumowanie → uzasadnienie → dane analityczne. Bez osobnych trybów użytkownika. Zasada „Simple by default. Powerful by design.” i szczegóły widoków mają jedno miejsce opisu: [UI/UX](04-UI-UX-SPECIFICATION.md).
+**D-05:** Advanced analytics of sales, profitability, ads and products is a full part of the MVP. **D-06:** One interface for beginners and advanced users uses progressive disclosure: simple summary → rationale → analytical data. No separate user modes. The principle "Simple by default. Powerful by design." and the view details are described in one place: [UI/UX](04-UI-UX-SPECIFICATION.md).
 
-Właściciel otrzymuje historię wykonanej pracy i kolejkę wyjątków. Wartość produktu mierzymy czasem odzyskanym przez zespół, skutecznością reakcji oraz wpływem na ekonomikę sklepu. Liczba wiadomości z modelem i liczba uruchomień agenta są kosztami lub metrykami diagnostycznymi, a nie wartością dla klienta.
+The owner gets a history of the work done and a queue of exceptions. We measure product value by the time recovered by the team, the effectiveness of reactions and the impact on store economics. The number of messages with the model and the number of agent runs are costs or diagnostic metrics, not value for the customer.
 
-**U-01:** Produkt łączy trzy mechanizmy: deterministyczne obliczenia i wykrywanie sygnałów, interpretację sytuacji przez AI oraz kontrolowane wykonanie przez backend. Każdy ma osobny kontrakt i testy. Proste obliczenie liczby dni zapasu nie wymaga modelu.
+**U-01:** The product combines three mechanisms: deterministic computation and signal detection, interpretation of the situation by AI, and controlled execution by the backend. Each has a separate contract and tests. A simple calculation of days of stock does not need a model.
 
-**D-08:** Podstawą jakości decyzji jest Decision Intelligence System: Domain Knowledge (Skills/Playbooks), Store Knowledge (cele i ekonomia sklepu), Operational Data (metryki i dowody) i Decision Experience (historia oraz obserwowane wyniki). Źródła pozostają niezależne od LLM i zasilają dotychczasowy bounded runtime. Model interpretuje, a Metrics & Evidence Engine wykonuje obliczenia finansowe i weryfikuje ich podstawy. Rekomendacja musi wskazywać dowody; cel wzrostu nie nadaje dodatkowych uprawnień.
+**D-08:** The basis of decision quality is the Decision Intelligence System: Domain Knowledge (Skills/Playbooks), Store Knowledge (the store's goals and economics), Operational Data (metrics and evidence) and Decision Experience (history and observed results). The sources stay independent of the LLM and feed the existing bounded runtime. The model interprets, and the Metrics & Evidence Engine performs financial calculations and verifies their basis. A recommendation must point to evidence; a growth goal does not grant additional permissions.
 
-**D-09:** W MVP utrwalamy wiedzę, profil sklepu, metryki/dowody, historię decyzji, podstawowe rezultaty i ewaluację offline. Agent może zalecić obserwację albo brak działania. Nie modyfikuje sam Skills, strategii ani polityk na podstawie wyników. Fine-tuning i autonomiczna adaptacja strategii są poza MVP; RAG/Vector DB są opcją po wykazaniu potrzeby.
+**D-09:** In the MVP we persist knowledge, the store profile, metrics/evidence, decision history, basic outcomes and offline evaluation. The agent may recommend monitoring or no action. It does not modify Skills, strategies or policies on its own based on results. Fine-tuning and autonomous strategy adaptation are outside the MVP; RAG/Vector DB are an option once a need is shown.
 
-## 3. Klient i walidacja segmentu [Z]
+## 3. Customer and segment validation [Z]
 
-| Cecha | Roboczy profil klienta |
+| Trait | Working customer profile |
 |---|---|
-| Platforma pierwszej integracji | WooCommerce |
-| Katalog | 10–500 SKU, z wariantami traktowanymi jako osobne jednostki magazynowe |
-| Skala | 100–3000 zamówień miesięcznie |
-| Reklama | 5–100 tys. PLN miesięcznie, głównie Meta Ads |
-| Zespół | 1–10 osób, właściciel łączy funkcje operacyjne i marketingowe |
-| Problem | Rozproszone dane, ręczne kontrole, opóźnione reakcje, ograniczony czas |
-| Warunek udziału w pilocie | Dostęp do integracji i osoby odpowiedzialnej za polityki, mapowania oraz akceptacje |
+| First integration platform | WooCommerce |
+| Catalog | 10–500 SKUs, with variants treated as separate stock units |
+| Scale | 100–3,000 orders per month |
+| Advertising | PLN 5–100 thousand per month, mostly Meta Ads |
+| Team | 1–10 people; the owner combines operational and marketing functions |
+| Problem | Scattered data, manual checks, delayed reactions, limited time |
+| Condition for joining the pilot | Access to integrations and a person responsible for policies, mappings and approvals |
 
-To zakres do rozmów z klientami, nie potwierdzony opis rynku. **O-01:** Czy klient faktycznie chce delegować pauzowanie reklam i czy ma dostatecznie wiarygodne dane magazynowe? **O-02:** Czy WooCommerce zapewnia wystarczająco szybki onboarding wobec różnic wtyczek, hostingu i źródeł zapasu?
+This is a scope for customer conversations, not a confirmed market description. **O-01:** Does the customer actually want to delegate pausing ads, and does it have sufficiently reliable stock data? **O-02:** Does WooCommerce allow fast enough onboarding given the differences in plugins, hosting and stock sources?
 
-**[P] Walidacja:** kilka sklepów projektowych, obserwacja ich codziennej pracy, historyczny replay i shadow mode. Rejestrujemy czas ręcznej obsługi, fałszywe alarmy, brakujące dane oraz to, czy właściciel wybrałby proponowaną akcję. Model abonamentu według skali sklepu lub obsługiwanych procesów pozostaje hipotezą; cena nie jest ustalona.
+**[P] Validation:** a few design-partner stores, observation of their daily work, historical replay and shadow mode. We record the time of manual handling, false alarms, missing data and whether the owner would choose the proposed action. A subscription model by store scale or supported processes remains a hypothesis; the price is not set.
 
-## 4. Mapa procesów i zakres pierwszego wydania [U]
+## 4. Process map and first release scope [U]
 
-| Domena | Procesy | Zakres autonomii MVP / dalszy rozwój |
+| Domain | Processes | MVP autonomy scope / further development |
 |---|---|---|
-| Marketing | Monitoring kosztów, anomalii i wyników, kontrola reklam niedostępnych produktów | L0–L1; L2 dla jawnie dopuszczonej ochrony zapasu. Budżety i nowe kampanie później. |
-| Zapasy i katalog | Zapas, tempo sprzedaży, ryzyko braku, mapowania SKU–reklama | L0–L2. Ceny, publikacja opisów i zakupy towaru poza MVP. |
-| Zamówienia | Przekroczenie obiecanego czasu realizacji, brak zmiany statusu, eskalacje | L2 dla wewnętrznych zadań i alertów; anulowania i zwroty wymagają osobnej polityki. |
-| Finanse i BI | Pełna analityka Sales, Profitability, Ads, Products, marża kontrybucyjna i diagnozy | W MVP, L0–L1 dla rekomendacji. Filtry, porównania, drill-down oraz jawna jakość metryk. |
-| Customer Support | Konwersacje e-mail, standardowe odpowiedzi, powiązania z zamówieniami, eskalacje i przejęcie | W MVP: L1 dla szkiców, wybrane L2 dla zweryfikowanych odpowiedzi informacyjnych; pełny audyt. |
-| CRM i retencja | Segmenty, follow-up, porzucone koszyki | Kolejna faza przez istniejący CRM/ESP; potrzebne zdarzenia koszyka i zgody. |
+| Marketing | Monitoring costs, anomalies and results, checking ads for unavailable products | L0–L1; L2 for explicitly allowed stock protection. Budgets and new campaigns later. |
+| Stock and catalog | Stock, sales velocity, stockout risk, SKU–ad mappings | L0–L2. Prices, publishing descriptions and purchasing goods outside the MVP. |
+| Orders | Exceeding the promised fulfillment time, no status change, escalations | L2 for internal tasks and alerts; cancellations and refunds require a separate policy. |
+| Finance and BI | Full Sales, Profitability, Ads, Products analytics, contribution margin and diagnoses | In the MVP, L0–L1 for recommendations. Filters, comparisons, drill-down and explicit metric quality. |
+| Customer Support | E-mail conversations, standard replies, links to orders, escalations and takeover | In the MVP: L1 for drafts, selected L2 for verified informational replies; full audit. |
+| CRM and retention | Segments, follow-up, abandoned carts | A later phase through an existing CRM/ESP; cart events and consents are needed. |
 
-### Siedem procesów korzystających ze wspólnego rdzenia
+### Seven processes using the shared core
 
-| Proces | Wyzwalacz | Wynik | Tryb pierwszego wdrożenia |
+| Process | Trigger | Result | First deployment mode |
 |---|---|---|---|
-| Profit Monitor | Harmonogram, zmiana KPI | Diagnoza rentowności i rekomendacja | L0–L1 |
-| Ad Spend Guardian | Anomalia wydatków, zbliżenie do limitu | Alert i propozycja reakcji | L1; L2 dopiero po walidacji osobnej polityki |
-| Inventory Guardian | Ryzyko braku zapasu | Alert lub pauza dedykowanej reklamy | L1 → wybrane L2 |
-| Order Watchdog | Przekroczenie SLA realizacji | Zadanie i eskalacja wewnętrzna | L2 w granicach zatwierdzonych powiadomień |
-| Integration Health | Błąd, opóźnienie, brak danych | Resynchronizacja i blokada zależnych akcji | L2 |
-| Daily Business Briefing | Harmonogram w strefie sklepu | Podsumowanie i lista decyzji | L2 dla zatwierdzonego kanału wewnętrznego |
-| Customer Support | Nowa wiadomość w skrzynce sklepu | Odpowiedź informacyjna lub podsumowanie, szkic i eskalacja do człowieka | L1 → wybrane L2 po konfiguracji zasad odpowiedzi |
+| Profit Monitor | Schedule, KPI change | Profitability diagnosis and recommendation | L0–L1 |
+| Ad Spend Guardian | Spend anomaly, approaching a limit | Alert and a proposed reaction | L1; L2 only after a separate policy is validated |
+| Inventory Guardian | Stockout risk | Alert or pause of a dedicated ad | L1 → selected L2 |
+| Order Watchdog | Fulfillment SLA exceeded | Task and internal escalation | L2 within approved notifications |
+| Integration Health | Error, delay, missing data | Resynchronization and blocking of dependent actions | L2 |
+| Daily Business Briefing | Schedule in the store time zone | Summary and list of decisions | L2 for an approved internal channel |
+| Customer Support | New message in the store mailbox | Informational reply or summary, draft and escalation to a human | L1 → selected L2 after reply rules are configured |
 
-**P-01:** Pierwszy pionowy wycinek implementacji obejmuje Inventory Guardian wraz z Integration Health i audytem. Pozostałe pięć procesów dokładamy po sprawdzeniu tego samego rdzenia. To kolejność dostarczania siedmiu procesów MVP, bez budowania osobnego systemu dla każdego.
+**P-01:** The first vertical slice of the implementation covers Inventory Guardian together with Integration Health and the audit. The other five processes are added after the same core is verified. This is the delivery order of the seven MVP processes, without building a separate system for each.
 
-### Customer Support w MVP [D, P]
+### Customer Support in the MVP [D, P]
 
-**D-07:** Osobna domena obsługuje jeden kanał — e-mail istniejącego sklepu. Zakres obejmuje listę konwersacji i historię wiadomości, rozróżnienie odpowiedzi AI i człowieka, powiązania klient–zamówienie, standardowe odpowiedzi AI, eskalację z podsumowaniem i szkicem oraz przejęcie konwersacji przez operatora. Customer Support ma własną kolejkę spraw; Decision Inbox służy decyzjom biznesowym. Messenger, WhatsApp, Instagram i live chat pozostają poza MVP.
+**D-07:** A separate domain handles one channel — the existing store's e-mail. The scope covers the conversation list and message history, distinguishing AI and human replies, customer–order links, standard AI replies, escalation with a summary and a draft, and conversation takeover by an operator. Customer Support has its own case queue; the Decision Inbox is for business decisions. Messenger, WhatsApp, Instagram and live chat stay outside the MVP.
 
-**[P] Granice:** L2 dotyczy odpowiedzi informacyjnych opartych na potwierdzonych danych, np. statusie zamówienia i katalogu. Reklamacje, niepewna tożsamość, brak danych i nietypowe żądania trafiają do człowieka. Szkic nie oznacza wysłanej wiadomości. Zmiany adresu, anulowania i zwroty nie zyskują automatyzacji przez samo dodanie Support; wymagają odrębnej akcji i polityki. Kompetencje, model domenowy i niezawodna wysyłka: [Customer Support Agent](02-AI-AGENT-ARCHITECTURE.md#14-customer-support-agent-d-p).
+**[P] Boundaries:** L2 applies to informational replies based on confirmed data, e.g. order status and catalog. Complaints, uncertain identity, missing data and unusual requests go to a human. A draft does not mean a sent message. Address changes, cancellations and refunds do not become automated just because Support was added; they require a separate action and policy. Competences, the domain model and reliable sending: [Customer Support Agent](02-AI-AGENT-ARCHITECTURE.md#14-customer-support-agent-d-p).
 
-### Analityka w MVP [D, P]
+### Analytics in the MVP [D, P]
 
-Użytkownik ma dostęp do trendów i porównań okresów, tabel kampanii i SKU, kosztów oraz szczegółów obliczeń. Przy braku kosztów nadal działa analityka sprzedaży; rentowność pokazuje brakujące składniki. MVP nie obejmuje kreatora dowolnych raportów BI. Definicje metryk pozostają w sekcji 6; prezentacja, filtry i kontrakty są opisane w [widoku Analytics](04-UI-UX-SPECIFICATION.md#7-analytics-sales-profitability-ads-products).
+The user has access to trends and period comparisons, campaign and SKU tables, costs and calculation details. Without costs, sales analytics still works; profitability shows the missing components. The MVP does not include a builder for arbitrary BI reports. Metric definitions stay in section 6; presentation, filters and contracts are described in the [Analytics view](04-UI-UX-SPECIFICATION.md#7-analytics-sales-profitability-ads-products).
 
-## 5. Autonomia i odpowiedzialność [U]
+## 5. Autonomy and responsibility [U]
 
-| Poziom | Znaczenie | Przykład |
+| Level | Meaning | Example |
 |---|---|---|
-| L0 Observe | Analiza bez zmian w systemach zewnętrznych | Wykrycie ryzyka zapasu |
-| L1 Recommend | Wykonanie konkretnej propozycji po akceptacji | Pauza wskazanej reklamy po sprawdzeniu zakresu |
-| L2 Bounded Autonomy | Wykonanie w jawnej polityce, limitach i warunkach | Pauza jednej, zweryfikowanej reklamy danego SKU |
-| L3 Delegated Autonomy | Planowanie i realizacja wieloetapowej strategii | Docelowa koordynacja zapasu i marketingu; poza MVP |
+| L0 Observe | Analysis without changes in external systems | Detecting a stock risk |
+| L1 Recommend | Executing a specific proposal after approval | Pausing the indicated ad after checking the scope |
+| L2 Bounded Autonomy | Execution within an explicit policy, limits and conditions | Pausing one verified ad of a given SKU |
+| L3 Delegated Autonomy | Planning and carrying out a multi-step strategy | Target coordination of stock and marketing; outside the MVP |
 
-Poziom przypisujemy do typu akcji, zasobu i sklepu. Uprawnienie do raportowania nie daje uprawnienia do zmiany reklam. System rozpoczyna od L0/L1; właściciel osobno aktywuje L2 i określa zakres. Techniczny zapis audytu jest dozwolony także w L0; wysyłka powiadomienia to odrębna, uprzednio skonfigurowana operacja.
+The level is assigned to the action type, the resource and the store. Permission to report does not grant permission to change ads. The system starts at L0/L1; the owner separately activates L2 and defines its scope. A technical audit record is allowed in L0 as well; sending a notification is a separate, previously configured operation.
 
-**D-02:** Model zwraca `DecisionProposal`. Backend tworzy `AuthorizedAction` dopiero po walidacji decyzji, polityki i aktualnego stanu. W MVP model widzi narzędzia odczytu; akcje wykonuje osobna warstwa. Akceptacja człowieka dotyczy dokładnej wersji propozycji i nie omija izolacji tenantów, utraty uprawnień, wygaśnięcia danych ani kill switcha.
+**D-02:** The model returns a `DecisionProposal`. The backend creates an `AuthorizedAction` only after validating the decision, the policy and the current state. In the MVP the model sees read tools; actions are executed by a separate layer. Human approval applies to the exact version of the proposal and does not bypass tenant isolation, loss of permissions, data expiry or the kill switch.
 
-**[P] Zasady działania:** przy nieaktualnym zapasie, niepewnym mapowaniu lub konflikcie system wstrzymuje zmianę zewnętrzną, zapisuje przyczynę i eskaluje. Kill switch zatrzymuje nowe mutacje globalnie, dla tenanta lub integracji; nie cofnie operacji już przyjętej przez zewnętrzne API. Przywrócenie reklamy jest nową decyzją. Nie stosujemy automatycznego „undo” po każdym błędzie procesu.
+**[P] Operating rules:** with stale stock, an uncertain mapping or a conflict, the system holds the external change, records the reason and escalates. The kill switch stops new mutations globally, for a tenant or for an integration; it does not undo an operation already accepted by an external API. Restoring an ad is a new decision. We do not use an automatic "undo" after every process error.
 
-Poza autonomią MVP pozostają zwiększanie budżetów, masowe zmiany cen, zwroty środków, zobowiązania zakupowe, usuwanie danych i masowa komunikacja marketingowa. Można rozwijać je później jako osobne kontrakty, polityki i workflow.
+Increasing budgets, bulk price changes, refunds, purchase commitments, deleting data and bulk marketing communication stay outside MVP autonomy. They can be developed later as separate contracts, policies and workflows.
 
-## 6. Model biznesowy danych [U, P]
+## 6. Business data model [U, P]
 
-Centralnym obiektem jest `Opportunity`: wykryty problem lub szansa z dowodami, propozycją, decyzją polityki, przebiegiem wykonania i wynikiem. Dla czytelności rozdzielamy problemy biznesowe od prób ich obsługi:
+The central object is the `Opportunity`: a detected problem or opportunity with evidence, a proposal, a policy decision, the execution and the result. For clarity we separate business problems from attempts to handle them:
 
-| Obiekt | Odpowiedzialność |
+| Object | Responsibility |
 |---|---|
-| `Opportunity` | Jeden epizod problemu, np. ryzyko braku konkretnego wariantu |
-| `Evidence` / `ContextSnapshot` | Wersjonowane obserwacje, źródła, jakość i czas |
-| `AgentRun` | Konkretny przebieg analizy, model, skill, narzędzia, koszt |
-| `DecisionProposal` | Typowane zalecenie, referencje do dowodów, ważność |
-| `PolicyEvaluation` / `Approval` | Wynik reguł oraz ewentualna zgoda na konkretny zakres |
-| `AuthorizedAction` / `ActionExecution` | Zaufane upoważnienie i trwały rejestr prób wykonania |
-| `Outcome` | Potwierdzony stan techniczny i osobno obserwowany efekt biznesowy |
+| `Opportunity` | One episode of a problem, e.g. the stockout risk of a specific variant |
+| `Evidence` / `ContextSnapshot` | Versioned observations, sources, quality and time |
+| `AgentRun` | A specific analysis run, model, skill, tools, cost |
+| `DecisionProposal` | A typed recommendation, evidence references, validity |
+| `PolicyEvaluation` / `Approval` | The result of the rules and any approval for a specific scope |
+| `AuthorizedAction` / `ActionExecution` | A trusted authorization and a durable register of execution attempts |
+| `Outcome` | The confirmed technical state and, separately, the observed business effect |
 
-Customer Support dodaje własne `Conversation`, `Message`, `SupportCase`, `CustomerContext`, `Escalation`, `ResponseDraft`, `HumanAssignment` i `SupportPolicy`; ich odpowiedzialności i powiązania z kontraktami wspólnymi opisuje [architektura agenta Support](02-AI-AGENT-ARCHITECTURE.md#14-customer-support-agent-d-p). Każda wiadomość nie tworzy automatycznie nowej Opportunity; powiązana decyzja biznesowa może ją utworzyć.
+Customer Support adds its own `Conversation`, `Message`, `SupportCase`, `CustomerContext`, `Escalation`, `ResponseDraft`, `HumanAssignment` and `SupportPolicy`; their responsibilities and links to the shared contracts are described in the [Support agent architecture](02-AI-AGENT-ARCHITECTURE.md#14-customer-support-agent-d-p). A message does not automatically create a new Opportunity; a related business decision may create one.
 
-**P-02:** `Opportunity.status`: `DETECTED → ANALYZED → PROPOSED → APPROVED → EXECUTING → VERIFIED → CLOSED`. Obsługujemy także `WAITING_APPROVAL`, `WAITING_DATA`, `NO_ACTION`, `REJECTED`, `EXPIRED`, `CONFLICT`, `FAILED`, `UNKNOWN` i `CANCELLED`. Szczegółowe przejścia opisuje [dokument AI](02-AI-AGENT-ARCHITECTURE.md#9-decyzje-polityki-i-akcje). Oczekiwanie na akceptację dotyczy propozycji, a nie dowolnego przyszłego działania w ramach problemu.
+**P-02:** `Opportunity.status`: `DETECTED → ANALYZED → PROPOSED → APPROVED → EXECUTING → VERIFIED → CLOSED`. We also support `WAITING_APPROVAL`, `WAITING_DATA`, `NO_ACTION`, `REJECTED`, `EXPIRED`, `CONFLICT`, `FAILED`, `UNKNOWN` and `CANCELLED`. The detailed transitions are described in the [AI document](02-AI-AGENT-ARCHITECTURE.md#9-decisions-policies-and-actions). Waiting for approval applies to a proposal, not to any future action within the problem.
 
-Ponawiany sygnał aktualizuje istniejący aktywny epizod. Nowa dostawa może zamknąć epizod, a kolejne ryzyko otworzyć następny. Unikalność aktywnego problemu egzekwuje baza. Identyfikatory zewnętrzne zawsze mają kontekst integracji i tenanta.
+A repeated signal updates the existing active episode. A new delivery may close the episode, and further risk may open the next one. The database enforces the uniqueness of the active problem. External identifiers always carry the integration and tenant context.
 
-### Rentowność i jakość
+### Profitability and quality
 
-**U-02:** Przybliżony model: `ContributionProfit = NetSales − COGS − Fulfillment − PaymentFees − AdSpend − OtherVariableCosts`. `NetSales` uwzględnia rabaty i zwroty; podatki i koszty muszą mieć spójną podstawę. To marża kontrybucyjna, nie zysk księgowy firmy. Nie odejmujemy zwrotów ponownie, jeśli uwzględniono je już w sprzedaży netto.
+**U-02:** Approximate model: `ContributionProfit = NetSales − COGS − Fulfillment − PaymentFees − AdSpend − OtherVariableCosts`. `NetSales` accounts for discounts and refunds; taxes and costs must have a consistent basis. This is a contribution margin, not the company's accounting profit. We do not subtract refunds again if they are already included in net sales.
 
-Dane oznaczamy jako `CONFIRMED`, `ESTIMATED` lub `UNAVAILABLE`. To informacja niezależna od świeżości i kompletności. Sumowanie konwersji raportowanych przez Meta i Google nie tworzy liczby unikalnych zamówień. Kosztu reklamowego SKU nie traktujemy jako potwierdzonego, gdy wynika z umownej alokacji wydatku kampanii wieloproduktowej. Brak COGS uniemożliwia rzetelną diagnozę marży, ale nie musi blokować Inventory Guardian, jeżeli jego reguły nie zależą od marży.
+Data is marked as `CONFIRMED`, `ESTIMATED` or `UNAVAILABLE`. This information is independent of freshness and completeness. Summing conversions reported by Meta and Google does not give the number of unique orders. We do not treat the ad cost of a SKU as confirmed when it comes from a conventional allocation of the spend of a multi-product campaign. Missing COGS makes a reliable margin diagnosis impossible, but it does not have to block Inventory Guardian if its rules do not depend on margin.
 
-**[P] Kontrakty danych:** pieniądze jako liczby całkowite w jednostkach najmniejszych z walutą albo `BigDecimal`; czas w UTC, prezentacja i granice okresów w strefie sklepu. Osobno `sourceUpdatedAt`, `observedAt`, `ingestedAt`; brak zmiany źródłowego zasobu przez tydzień nie dowodzi, że jego odczyt jest nieaktualny. Każda metryka ma definicję, okres i wersję obliczenia.
+**[P] Data contracts:** money as integers in minor units with a currency, or `BigDecimal`; time in UTC, presentation and period boundaries in the store time zone. Separate `sourceUpdatedAt`, `observedAt`, `ingestedAt`; a source resource that has not changed for a week does not prove that its read is stale. Every metric has a definition, a period and a calculation version.
 
-Store Business Profile przechowuje wersjonowane cele `PROFITABILITY`, `GROWTH`, `BALANCED`, ekonomię i preferencje sklepu, z pochodzeniem i brakami danych. Twarde uprawnienia nadal egzekwuje Policy Engine. Szczegółowe definicje KPI, break-even ROAS, provenance oraz model profilu rozwija [05 — wiedza i metryki](05-DECISION-INTELLIGENCE-ARCHITECTURE.md#b-store-business-profile).
+The Store Business Profile stores versioned goals `PROFITABILITY`, `GROWTH`, `BALANCED`, the store's economics and preferences, with provenance and data gaps. Hard permissions are still enforced by the Policy Engine. Detailed KPI definitions, break-even ROAS, provenance and the profile model are developed in [05 — knowledge and metrics](05-DECISION-INTELLIGENCE-ARCHITECTURE.md#b-store-business-profile).
 
-## 7. Architektura wysokopoziomowa [U]
+## 7. High-level architecture [U]
 
 ```mermaid
 flowchart TD
-  Sources[WooCommerce / Meta Ads / e-mail] --> Integrations[Adaptery / webhooki / polling]
-  Integrations --> Data[PostgreSQL: model commerce / inbox / outbox]
-  Data --> Signals[Detektory sygnałów]
+  Sources[WooCommerce / Meta Ads / e-mail] --> Integrations[Adapters / webhooks / polling]
+  Integrations --> Data[PostgreSQL: commerce model / inbox / outbox]
+  Data --> Signals[Signal detectors]
   Signals --> Opportunity[Opportunity]
   Opportunity --> Temporal[Temporal Workflow]
   Temporal --> Context[Knowledge & Context Builder]
@@ -153,156 +153,156 @@ flowchart TD
   Runtime --> Gateway[ModelGateway / Spring AI]
   Runtime --> ReadTools[Read Tools]
   Runtime --> Proposal[DecisionProposal]
-  Proposal --> Policy[Walidacja / Policy Engine / Approval]
+  Proposal --> Policy[Validation / Policy Engine / Approval]
   Policy --> Executor[Action Executor]
-  Executor --> Meta[Meta Ads API / wysyłka e-mail]
-  Meta --> Verify[Weryfikacja / Outcome / audyt]
-  Verify --> UI[Control Center / powiadomienia]
+  Executor --> Meta[Meta Ads API / e-mail sending]
+  Meta --> Verify[Verification / Outcome / audit]
+  Verify --> UI[Control Center / notifications]
 ```
 
-**U-03:** Modularny monolit Spring Boot, z osobno uruchamianymi workerami Temporal, jeśli wymaga tego skalowanie lub izolacja. Jeden kod domenowy i granice modułów; osobny worker nie oznacza osobnego mikroserwisu dla każdego agenta. Nie zakładamy sieci stale rozmawiających agentów.
+**U-03:** A Spring Boot modular monolith, with Temporal workers run separately if scaling or isolation requires it. One domain codebase and module boundaries; a separate worker does not mean a separate microservice per agent. We do not assume a network of agents constantly talking to each other.
 
-| Moduł | Zakres |
+| Module | Scope |
 |---|---|
-| Identity / Tenants | Użytkownicy, role, sklepy, powiązania integracji |
-| Integrations | WooCommerce, Meta Ads, skrzynka e-mail Support, opcjonalny Slack, zdrowie synchronizacji |
-| Commerce | Katalog, warianty, zamówienia, zapasy, finanse i metryki |
-| Customer Support | Konwersacje, wiadomości, kontekst klienta, szkice, eskalacje i przypisania |
-| Intelligence | Sygnały, kontekst, runtime, skills, proposals i routing modeli |
-| Automation | Polityki, akceptacje, akcje, Temporal i blokady konfliktów |
-| Reporting / Audit | Historia decyzji, statusy, efekty, briefing i telemetria |
+| Identity / Tenants | Users, roles, stores, integration links |
+| Integrations | WooCommerce, Meta Ads, the Support e-mail mailbox, optional Slack, synchronization health |
+| Commerce | Catalog, variants, orders, stock, finance and metrics |
+| Customer Support | Conversations, messages, customer context, drafts, escalations and assignments |
+| Intelligence | Signals, context, runtime, skills, proposals and model routing |
+| Automation | Policies, approvals, actions, Temporal and conflict locks |
+| Reporting / Audit | Decision history, statuses, effects, briefing and telemetry |
 
-Reporting udostępnia modele odczytu analityki i trzy poziomy informacji z tych samych dowodów, bez niezależnego wyliczania liczb przez LLM. Integracja e-mail obejmuje odbiór, wysyłkę i uzgadnianie statusów. Dostawcę wybieramy w O-11; kanał korespondencji z klientami jest odrębny od wewnętrznych powiadomień operatora.
+Reporting provides analytics read models and three levels of information from the same evidence, without the LLM computing numbers independently. The e-mail integration covers receiving, sending and reconciling statuses. The provider is chosen in O-11; the customer correspondence channel is separate from the operator's internal notifications.
 
-Integracje tłumaczą API dostawcy na kontrakty domenowe. `InventoryService` ani skill nie znają formatu odpowiedzi WooCommerce. Zewnętrzne tokeny pozostają w adapterach. Panel komunikuje się z backendem, a nie bezpośrednio z modelem w celu wykonywania akcji.
+Integrations translate the provider's API into domain contracts. Neither `InventoryService` nor a skill knows the WooCommerce response format. External tokens stay in the adapters. The panel communicates with the backend, not directly with the model, to execute actions.
 
-### Decision Intelligence jako rozszerzenie istniejących modułów [D, P]
+### Decision Intelligence as an extension of existing modules [D, P]
 
-| Komponent | Miejsce i zakres rozszerzenia |
+| Component | Place and scope of the extension |
 |---|---|
-| Knowledge Registry | Intelligence: wspólny rejestr Skills, Playbooks i referencji; obecny SkillRegistry jest jego częścią |
-| Store Business Profile | Business Context: wersjonowana strategia, ekonomia i ograniczenia sklepu |
-| Metrics & Evidence Engine | Commerce/Reporting: wspólne obliczenia, jakość, aktualność i lineage dowodów |
-| Knowledge & Context Builder | Rozwinięcie obecnego Context Builder o cztery źródła wiedzy |
-| Decision History | Decisions/Audit: spójna projekcja rekomendacji, zgód, akcji i rewizji |
-| Outcome Evaluator | Reporting/Evaluation: obserwowane rezultaty, okna i ograniczenia interpretacji |
-| Offline Evaluation Framework | Intelligence/Evaluation: historyczne scenariusze i porównywanie wersji przed wydaniem |
+| Knowledge Registry | Intelligence: a shared registry of Skills, Playbooks and references; the current SkillRegistry is part of it |
+| Store Business Profile | Business Context: the versioned strategy, economics and constraints of the store |
+| Metrics & Evidence Engine | Commerce/Reporting: shared calculations, quality, freshness and lineage of evidence |
+| Knowledge & Context Builder | An extension of the current Context Builder with the four knowledge sources |
+| Decision History | Decisions/Audit: a consistent projection of recommendations, approvals, actions and revisions |
+| Outcome Evaluator | Reporting/Evaluation: observed results, windows and limits of interpretation |
+| Offline Evaluation Framework | Intelligence/Evaluation: historical scenarios and comparing versions before release |
 
-To odpowiedzialności w modularnym monolicie, nie nowe usługi. Temporal nadal realizuje procesy. Spadek ROAS/zmiana CPA uruchamia analizę uwzględniającą próbę, opóźnienia konwersji, atrybucję, fazę uczenia i historię zmian, a nie automatyczne cięcie kampanii. Rezultat po akcji jest obserwacją, dopóki odpowiedni projekt pomiaru nie uzasadni wniosku przyczynowego. Kontrakty i pełna ścieżka: [05 — Decision Intelligence](05-DECISION-INTELLIGENCE-ARCHITECTURE.md).
+These are responsibilities in the modular monolith, not new services. Temporal still runs the processes. A ROAS drop or a CPA change starts an analysis that accounts for sample size, conversion delays, attribution, the learning phase and the change history, not an automatic campaign cut. A result after an action is an observation until an appropriate measurement design justifies a causal conclusion. Contracts and the full path: [05 — Decision Intelligence](05-DECISION-INTELLIGENCE-ARCHITECTURE.md).
 
-### Synchronizacja i niezawodność [P]
+### Synchronization and reliability [P]
 
-Webhook zostaje zweryfikowany i trwale zapisany w inbox przed potwierdzeniem odbioru. Normalizacja danych i zapis zdarzenia outbox następują w jednej transakcji PostgreSQL. Dispatcher przekazuje zdarzenia do Temporal z trwałym identyfikatorem; powtórka jest spodziewana i deduplikowana. Nie ma transakcji obejmującej jednocześnie PostgreSQL, Temporal i Meta.
+A webhook is verified and durably stored in the inbox before receipt is acknowledged. Data normalization and writing the outbox event happen in one PostgreSQL transaction. The dispatcher forwards events to Temporal with a durable identifier; a redelivery is expected and deduplicated. There is no transaction spanning PostgreSQL, Temporal and Meta at the same time.
 
-WooCommerce: webhooki zamówień i produktów, uzupełniający polling wariantów i okresowe reconciliation. Meta: polling konfiguracji i Insights z kontrolą limitów oraz oknem ponownego pobierania zmieniających się historycznych wyników. Harmonogramy są parametrami pilota, nie obietnicą natychmiastowości. Oficjalne kontrakty dostępne są w [WooCommerce REST API](https://woocommerce.github.io/woocommerce-rest-api-docs/).
+WooCommerce: order and product webhooks, complementary variant polling and periodic reconciliation. Meta: polling of configuration and Insights with limit control and a re-fetch window for historical results that keep changing. Schedules are pilot parameters, not a promise of immediacy. The official contracts are available in the [WooCommerce REST API](https://woocommerce.github.io/woocommerce-rest-api-docs/).
 
-Temporal utrzymuje stan procesów, oczekiwania i retry. Własne inbox/outbox utrzymują granicę integracji i spójność danych. **Nie zakładamy exactly-once dla zewnętrznego skutku:** Activity może wykonać się ponownie, dlatego rejestr akcji i odczyt stanu są częścią projektu. Zob. [Temporal — idempotencja Activities](https://docs.temporal.io/activity-definition#idempotency).
+Temporal keeps the process state, waits and retries. Our own inbox/outbox keep the integration boundary and data consistency. **We do not assume exactly-once for an external effect:** an Activity may run again, so the action register and the state read are part of the design. See [Temporal — Activity idempotency](https://docs.temporal.io/activity-definition#idempotency).
 
-## 8. Technologie [U, P]
+## 8. Technologies [U, P]
 
-| Obszar | Kierunek | Status |
+| Area | Direction | Status |
 |---|---|---|
-| Backend | Java + Spring Boot | Uzgodnione; dokładna para wersji do testu kompatybilności |
-| AI | Własny runtime → `ModelGateway` → Spring AI → adapter modelu | Decyzja D-03 z bieżącego zakresu |
-| Dane | PostgreSQL, migracje schematu, transakcje, inbox/outbox | Uzgodnione |
-| Workflow | Temporal + Java SDK | Uzgodnione |
-| Panel | Next.js / React | Uzgodniony kierunek |
-| Telemetria | OpenTelemetry, metryki i dashboardy Grafana | Uzgodniony kierunek |
-| Pliki | S3-compatible storage dla większych snapshotów i artefaktów | Opcjonalne w pilocie |
-| Sekrety | Zarządzany magazyn sekretów, szyfrowanie i rotacja | Propozycja wdrożeniowa |
-| Redis | Cache i limity, jeśli potrzebne | Opcjonalny; nie jedyne źródło poprawności blokad |
-| RabbitMQ / Kafka | Bez nich w MVP | Uzgodnione; dodać po wykazaniu potrzeby |
-| n8n | Poza core MVP | Uzgodnione; późniejsze integracje wymagają oceny produktu i licencji |
-| MCP | Opcjonalny adapter narzędzi | Bez obowiązkowego serwera MCP w pierwszym wdrożeniu |
+| Backend | Java + Spring Boot | Agreed; the exact version pair to be checked in a compatibility test |
+| AI | Our own runtime → `ModelGateway` → Spring AI → model adapter | Decision D-03 from the current scope |
+| Data | PostgreSQL, schema migrations, transactions, inbox/outbox | Agreed |
+| Workflow | Temporal + Java SDK | Agreed |
+| Panel | Next.js / React | Agreed direction |
+| Telemetry | OpenTelemetry, Grafana metrics and dashboards | Agreed direction |
+| Files | S3-compatible storage for larger snapshots and artifacts | Optional in the pilot |
+| Secrets | A managed secret store, encryption and rotation | Deployment proposal |
+| Redis | Cache and limits, if needed | Optional; not the only source of lock correctness |
+| RabbitMQ / Kafka | Not in the MVP | Agreed; add once a need is shown |
+| n8n | Outside the core MVP | Agreed; later integrations need a product and license assessment |
+| MCP | Optional tool adapter | No mandatory MCP server in the first deployment |
 
-W rozmowie rozważano Java 21/25 oraz Spring AI/LangChain4j. Aktualny pakiet wybiera Spring AI, a wersji Javy i Spring Boot nie zamraża bez sprawdzenia zgodności wybranej stabilnej linii. Dokumentacja Spring AI jest wersjonowana; nie kopiujemy ustawień między liniami bez testu. Niezależność od dostawcy oznacza własne kontrakty i testy zachowania, nie identyczną jakość wszystkich modeli. Szczegóły: [gateway i runtime](02-AI-AGENT-ARCHITECTURE.md#4-modelgateway-i-spring-ai).
+The conversation considered Java 21/25 and Spring AI/LangChain4j. The current package chooses Spring AI, and it does not freeze the Java and Spring Boot versions without checking the compatibility of the chosen stable line. The Spring AI documentation is versioned; we do not copy settings between lines without a test. Provider independence means our own contracts and behavior tests, not identical quality of all models. Details: [gateway and runtime](02-AI-AGENT-ARCHITECTURE.md#4-modelgateway-and-spring-ai).
 
-## 9. Wymagania MVP i warunki odbioru [P]
+## 9. MVP requirements and acceptance conditions [P]
 
-| ID | Wymaganie | Sprawdzalny warunek |
+| ID | Requirement | Verifiable condition |
 |---|---|---|
-| F-01 | Onboarding istniejącego WooCommerce, Meta, skrzynki Support i kanału wewnętrznego | Test połączenia, zakresów dostępu, synchronizacji i właściciela konta; brak tworzenia sklepu |
-| F-02 | Ujednolicone dane i mapowania | Użytkownik widzi źródło, świeżość, niekompletność i potwierdza relacje SKU–reklama |
-| F-03 | Lista Opportunity i decyzji | Widać dowody, uzasadnienie, politykę, ważność i wynik |
-| F-04 | L0/L1/L2 per akcja | W L0/L1 bez zgody nie występuje mutacja Meta; L2 działa wyłącznie w zakresie |
-| F-05 | Akceptacje i kill switch | Powtórzone kliknięcie nie duplikuje akcji; zmiana propozycji unieważnia zgodę |
-| F-06 | Siedem wspólnych procesów | Dostarczane etapami z tabeli procesów; każdy ma wynik i właściciela eskalacji |
-| F-07 | Pełna analityka MVP | Cztery zakładki, daty/porównania, drill-down, definicje i jakość metryk |
-| F-08 | Konwersacje i odpowiedzi e-mail | Historia, zamówienie, szkic, eskalacja, takeover i status wysyłki; brak równoległej odpowiedzi AI/człowieka |
-| F-09 | Jedno UI, trzy poziomy informacji | Przejście podsumowanie–uzasadnienie–analiza zachowuje produkt, daty i źródło decyzji |
-| F-10 | Decision Intelligence w MVP | Decyzja wskazuje wersje wiedzy/profilu, dowody i plan obserwacji; MONITOR różni się od NO_ACTION; każda nowa wersja wiedzy przechodzi ewaluację offline |
-| N-01 | Izolacja tenantów | Testy obejmują API, tools, SQL, snapshoty, kolejki i workery |
-| N-02 | Odporność na powtórki i restarty | Odtworzenie procesu nie powoduje dodatkowej zmiany biznesowej |
-| N-03 | Audyt | Każda mutacja ma dowody, policy evaluation, upoważnienie i wynik weryfikacji |
-| N-04 | Kontrola kosztów AI | Przebieg zatrzymuje się po limicie; koszt i przyczyna zatrzymania są widoczne |
-| N-05 | Dane i sekrety | Tokeny i zbędne dane osobowe nie trafiają do promptów ani logów |
-| N-06 | Widoczna degradacja | Niedostępny model lub API nie tworzy fałszywego `VERIFIED` |
+| F-01 | Onboarding of an existing WooCommerce, Meta, the Support mailbox and an internal channel | Test of the connection, access scopes, synchronization and account owner; no store creation |
+| F-02 | Unified data and mappings | The user sees the source, freshness, incompleteness and confirms SKU–ad relations |
+| F-03 | List of Opportunities and decisions | Evidence, rationale, policy, validity and result are visible |
+| F-04 | L0/L1/L2 per action | In L0/L1 there is no Meta mutation without approval; L2 works only within its scope |
+| F-05 | Approvals and the kill switch | A repeated click does not duplicate the action; a change of the proposal invalidates the approval |
+| F-06 | Seven shared processes | Delivered in stages from the process table; each has a result and an escalation owner |
+| F-07 | Full MVP analytics | Four tabs, dates/comparisons, drill-down, definitions and metric quality |
+| F-08 | E-mail conversations and replies | History, order, draft, escalation, takeover and send status; no parallel AI/human reply |
+| F-09 | One UI, three levels of information | Moving summary–rationale–analysis keeps the product, the dates and the decision source |
+| F-10 | Decision Intelligence in the MVP | A decision points to knowledge/profile versions, evidence and a monitoring plan; MONITOR differs from NO_ACTION; every new knowledge version goes through offline evaluation |
+| N-01 | Tenant isolation | Tests cover the API, tools, SQL, snapshots, queues and workers |
+| N-02 | Resilience to retries and restarts | Replaying a process does not cause an additional business change |
+| N-03 | Audit | Every mutation has evidence, a policy evaluation, an authorization and a verification result |
+| N-04 | AI cost control | A run stops after the limit; the cost and the reason for stopping are visible |
+| N-05 | Data and secrets | Tokens and unnecessary personal data do not reach prompts or logs |
+| N-06 | Visible degradation | An unavailable model or API does not create a false `VERIFIED` |
 
-**Z-01:** Cele pilota do potwierdzenia: 95% kwalifikujących się sygnałów analizowanych w 5 minut od trwałego przyjęcia; 95% zaakceptowanych pauz potwierdzonych do 2 minut, z wyłączeniem oczekiwania na człowieka. Awarie i limity źródła są raportowane osobno, a nie ukrywane w mianowniku. Budżet AI oraz maksymalna liczba mutacji zależą od sklepu. Konkretne parametry scenariusza nie stanowią SLA produktu.
+**Z-01:** Pilot targets to confirm: 95% of qualifying signals analyzed within 5 minutes of durable acceptance; 95% of approved pauses confirmed within 2 minutes, excluding the wait for a human. Source outages and limits are reported separately, not hidden in the denominator. The AI budget and the maximum number of mutations depend on the store. The specific parameters of a scenario are not a product SLA.
 
-Dane osobowe ograniczamy do niezbędnych dla procesu; Inventory Guardian nie potrzebuje imion, adresów ani treści wiadomości klientów. **O-03:** Region przetwarzania, retencja, umowy z dostawcami i zakres obowiązków ochrony danych wymagają uzgodnienia przed produkcją. To wymagania projektowe, nie opinia prawna.
+We limit personal data to what the process needs; Inventory Guardian does not need customers' names, addresses or message content. **O-03:** The processing region, retention, provider agreements and the scope of data protection obligations must be agreed before production. These are design requirements, not a legal opinion.
 
-Customer Support potrzebuje ograniczonego kontekstu klienta, wiadomości i powiązania zamówienia. Minimalizacja, kontrola dostępu i retencja obejmują również prompty, załączniki i audyt. Odczyt zamówienia wymaga zweryfikowanego powiązania klienta; samo podanie numeru zamówienia w e-mailu nie wystarcza.
+Customer Support needs a limited customer context, messages and the order link. Minimization, access control and retention also cover prompts, attachments and the audit. Reading an order requires a verified customer link; merely giving an order number in an e-mail is not enough.
 
-## 10. Fazy i kryteria przejścia [P]
+## 10. Phases and exit criteria [P]
 
-| Faza | Dostarczany rezultat | Warunek przejścia |
+| Phase | Delivered result | Exit condition |
 |---|---|---|
-| 0. Walidacja | Sklepy projektowe, dostęp do danych, ręczna mapa procesu | Potwierdzony problem, właściciel decyzji i możliwość bezpiecznego mapowania |
-| 1. Fundament danych | Integracje, normalizacja, inbox/outbox, health, panel jakości i modele analityczne MVP | Reconciliation wykrywa braki; warianty i rezerwacje mają uzgodnioną semantykę |
-| 2. Shadow Inventory Guardian | Runtime, skill, Opportunity, polityki bez mutacji | Przegląd błędów i testów historycznych; brak nieautoryzowanych akcji |
-| 3. L1 | Pauzy po akceptacji, Temporal, weryfikacja i kill switch | Crash/retry, konflikty i niejednoznaczny wynik obsłużone w testach |
-| 4. Ograniczone L2 | Wybrane dedykowane reklamy i limity pilota | Jawne opt-in, stabilne dane, zaakceptowany poziom fałszywych decyzji |
-| 5. Domknięcie MVP | Profit/Spend/Order/Briefing, Customer Support e-mail i pełne cztery zakładki Analytics | Polityki procesów, takeover i wysyłka Support, spójność analityki z dowodami decyzji |
-| 6. Rozszerzenia | Shopify, Google Ads, CRM, wielokanałowy support, wybrane delegacje | Potwierdzona wartość i własne kontrakty danych/wykonania |
+| 0. Validation | Design-partner stores, data access, a manual process map | A confirmed problem, a decision owner and the possibility of safe mapping |
+| 1. Data foundation | Integrations, normalization, inbox/outbox, health, a quality panel and MVP analytical models | Reconciliation detects gaps; variants and reservations have agreed semantics |
+| 2. Shadow Inventory Guardian | Runtime, skill, Opportunity, policies without mutations | Review of errors and historical tests; no unauthorized actions |
+| 3. L1 | Pauses after approval, Temporal, verification and the kill switch | Crash/retry, conflicts and an ambiguous result handled in tests |
+| 4. Limited L2 | Selected dedicated ads and pilot limits | Explicit opt-in, stable data, an accepted level of false decisions |
+| 5. MVP completion | Profit/Spend/Order/Briefing, e-mail Customer Support and all four Analytics tabs | Process policies, Support takeover and sending, consistency of analytics with decision evidence |
+| 6. Extensions | Shopify, Google Ads, CRM, multichannel support, selected delegations | Confirmed value and their own data/execution contracts |
 
-Analityka i Customer Support są wymaganiami odbioru MVP, nawet jeśli wdrażane przyrostowo. Sekwencja pionowego wycinka nie przenosi ich do fazy rozszerzeń.
+Analytics and Customer Support are MVP acceptance requirements, even if delivered incrementally. The vertical slice sequence does not move them to the extensions phase.
 
-Decision Intelligence jest częścią tych samych faz: profil i Metrics & Evidence Engine w fundamencie danych, wersjonowana wiedza i testy offline przed shadow/L1, Outcome Tracking od pierwszej wykonanej akcji. Nie stanowi osobnej fazy po MVP.
+Decision Intelligence is part of the same phases: the profile and the Metrics & Evidence Engine in the data foundation, versioned knowledge and offline tests before shadow/L1, Outcome Tracking from the first executed action. It is not a separate phase after the MVP.
 
-Nie ustalamy kalendarza bez informacji o zespole i dostępności kont testowych. Dostępność API, zgody i jakość danych są zależnościami planu, nie zadaniami ukrytymi pod „podłączenie integracji”. Wspomniany w rozmowie projekt `ecommerce-flow` może dostarczyć kod lub doświadczenia; jego zawartości tutaj nie sprawdzono, więc reuse nie jest założeniem harmonogramu.
+We do not set a calendar without information about the team and the availability of test accounts. API availability, consents and data quality are plan dependencies, not tasks hidden under "connecting integrations". The `ecommerce-flow` project mentioned in the conversation may provide code or experience; its content was not checked here, so reuse is not a schedule assumption.
 
-### Pomiar wartości
+### Measuring value
 
-Mierzymy czas ręcznej pracy przed i po wdrożeniu, udział rozstrzygniętych Opportunity, czas wykrycie–reakcja, odsetek zaakceptowanych propozycji, fałszywe blokady i akcje wymagające naprawy, skuteczność technicznej weryfikacji oraz koszt obsługi procesu. Zmiana wydatków po pauzie nie jest automatycznie „oszczędnością netto”: uwzględniamy utraconą sprzedaż, inne kanały i brak kontrfaktycznego pomiaru. Wynik biznesowy opisujemy jako obserwację lub estymację, dopóki eksperyment nie pozwala przypisać przyczyny.
+We measure manual work time before and after the deployment, the share of resolved Opportunities, the detection–reaction time, the share of accepted proposals, false blocks and actions that needed repair, the effectiveness of technical verification and the cost of running the process. A change in spend after a pause is not automatically a "net saving": we account for lost sales, other channels and the lack of a counterfactual measurement. We describe a business result as an observation or an estimate until an experiment allows attributing the cause.
 
-## 11. Rejestr decyzji i pytań
+## 11. Register of decisions and questions
 
-| ID | Status | Treść / dalsze działanie |
+| ID | Status | Content / next step |
 |---|---|---|
-| D-01 | Decyzja | Małe i średnie DTC jako segment startowy |
-| D-02 | Decyzja | `DecisionProposal`, backendowe `AuthorizedAction`, ograniczone wykonanie |
-| D-03 | Decyzja | Własny bounded runtime i gateway Spring AI, przenośne Skills/Tools/Policies/Workflows |
-| D-04 | Decyzja 1.1 | Wyłącznie istniejące sklepy, bez ich tworzenia i uruchamiania |
-| D-05 | Decyzja 1.1 | Zaawansowana analityka czterech obszarów w MVP |
-| D-06 | Decyzja 1.1 | Jedno UI, progressive disclosure; bez trybów początkujący/ekspert |
-| D-07 | Decyzja 1.1 | Customer Support e-mail jako osobna domena i proces MVP |
-| D-08 | Decyzja 1.2 | Cztery źródła wiedzy i deterministyczna podstawa decyzji niezależna od LLM |
-| D-09 | Decyzja 1.2 | Knowledge/Profile/Metrics/History/Outcome/Offline Evaluation w MVP, bez samodzielnej zmiany strategii |
-| U-01 | Kierunek | Reguły + interpretacja AI + kontrolowane wykonanie |
-| U-02 | Kierunek | Wspólny model danych i jakość metryk |
-| U-03 | Kierunek | Modularny monolit, Temporal, PostgreSQL; WooCommerce + Meta + kanał wewnętrzny; D-07 dodaje skrzynkę Support |
-| P-01 | Propozycja | Inventory Guardian jako pierwszy pionowy wycinek |
-| P-02 | Propozycja | Wspólne obiekty i stany opisane w tym pakiecie |
-| O-04 | Otwarte, blokuje L2 | Kto i jak potwierdza SKU–reklama; jak szybko wykrywamy zmianę kreacji? |
-| O-05 | Otwarte, blokuje L2 | Które źródło ustala zapas sprzedawalny i czy rezerwacje są już odjęte? |
-| O-06 | Otwarte, blokuje produkcję | Uprawnienia i testowe konto Meta, wersja API, ograniczenia obsługiwanych reklam |
-| O-07 | Otwarte | Dostawcy/model policy, rezydencja danych, budżety i kryteria ewaluacji |
-| O-08 | Otwarte | Definicje COGS, podatków, zwrotów i alokacji reklam dla Profit Monitor |
-| O-09 | Otwarte | Kanał Slack czy e-mail, role akceptujące, eskalacja po czasie |
-| O-10 | Otwarte | Konkretne wersje stacku, hosting Temporal i operacyjne utrzymanie |
-| O-11 | Otwarte, blokuje wysyłkę Support | Dostawca/integracja skrzynki, odczyt Sent, statusy i zachowanie po niejednoznacznym wysłaniu |
-| O-12 | Otwarte, blokuje L2 Support | Weryfikacja klient–zamówienie, zatwierdzone kategorie odpowiedzi i źródła polityk sklepu |
-| O-13 | Otwarte | Role Support, terminy reakcji na eskalacje i retencja wiadomości/załączników |
-| O-14 | Otwarte | Docelowy wolumen i czas odpowiedzi analityki, zakres eksportów; szczegóły w UI/UX |
-| O-18–O-23 | Otwarte, nowe w 1.2 | Właściciele wiedzy, profil i konflikty, definicje/maturity metryk, migracja kontraktu decyzji, outcome windows i benchmarki; centralny rejestr w dokumencie 05 |
+| D-01 | Decision | Small and medium DTC as the starting segment |
+| D-02 | Decision | `DecisionProposal`, backend `AuthorizedAction`, bounded execution |
+| D-03 | Decision | Our own bounded runtime and a Spring AI gateway, portable Skills/Tools/Policies/Workflows |
+| D-04 | Decision 1.1 | Existing stores only, without creating and launching them |
+| D-05 | Decision 1.1 | Advanced analytics of four areas in the MVP |
+| D-06 | Decision 1.1 | One UI, progressive disclosure; no beginner/expert modes |
+| D-07 | Decision 1.1 | E-mail Customer Support as a separate domain and MVP process |
+| D-08 | Decision 1.2 | Four knowledge sources and a deterministic decision basis independent of the LLM |
+| D-09 | Decision 1.2 | Knowledge/Profile/Metrics/History/Outcome/Offline Evaluation in the MVP, without autonomous strategy changes |
+| U-01 | Direction | Rules + AI interpretation + controlled execution |
+| U-02 | Direction | A shared data model and metric quality |
+| U-03 | Direction | Modular monolith, Temporal, PostgreSQL; WooCommerce + Meta + an internal channel; D-07 adds the Support mailbox |
+| P-01 | Proposal | Inventory Guardian as the first vertical slice |
+| P-02 | Proposal | Shared objects and states described in this package |
+| O-04 | Open, blocks L2 | Who confirms SKU–ad and how; how fast do we detect a creative change? |
+| O-05 | Open, blocks L2 | Which source sets sellable stock, and are reservations already subtracted? |
+| O-06 | Open, blocks production | Permissions and a Meta test account, API version, limits of supported ads |
+| O-07 | Open | Providers/model policy, data residency, budgets and evaluation criteria |
+| O-08 | Open | Definitions of COGS, taxes, refunds and ad allocation for Profit Monitor |
+| O-09 | Open | Slack or e-mail channel, approving roles, escalation after a timeout |
+| O-10 | Open | Specific stack versions, Temporal hosting and operational maintenance |
+| O-11 | Open, blocks Support sending | Mailbox provider/integration, reading Sent, statuses and behavior after an ambiguous send |
+| O-12 | Open, blocks Support L2 | Customer–order verification, approved reply categories and sources of the store's policies |
+| O-13 | Open | Support roles, escalation response times and retention of messages/attachments |
+| O-14 | Open | Target analytics volume and response time, scope of exports; details in UI/UX |
+| O-18–O-23 | Open, new in 1.2 | Knowledge owners, profile and conflicts, metric definitions/maturity, decision contract migration, outcome windows and benchmarks; central register in document 05 |
 
-Implementacja zasad AI: [02 — Architektura AI](02-AI-AGENT-ARCHITECTURE.md). Przykłady danych, polityk, awarii i testów: [03 — Inventory Guardian](03-INVENTORY-GUARDIAN-E2E.md).
+Implementation of the AI principles: [02 — AI Architecture](02-AI-AGENT-ARCHITECTURE.md). Examples of data, policies, failures and tests: [03 — Inventory Guardian](03-INVENTORY-GUARDIAN-E2E.md).
 
-## Zmiany w wersji 1.1
+## Changes in version 1.1
 
-Dodano decyzje D-04–D-07, Customer Support e-mail jako siódmy proces, pełną analitykę MVP i zasadę jednego UI. Uzupełniono moduły, wymagania, fazy i kwestie otwarte; zachowano dotychczasowy rdzeń architektury. Szczegóły ekranów przeniesiono do [04 — UI/UX](04-UI-UX-SPECIFICATION.md).
+Added decisions D-04–D-07, e-mail Customer Support as the seventh process, full MVP analytics and the one-UI principle. Modules, requirements, phases and open issues were extended; the existing architecture core was kept. Screen details moved to [04 — UI/UX](04-UI-UX-SPECIFICATION.md).
 
-## Zmiany w wersji 1.2
+## Changes in version 1.2
 
-Dodano D-08/D-09 i wysokopoziomową warstwę Decision Intelligence, bez zmiany granic wykonania. Uzupełniono model profilu, wymagania i fazy MVP; szczegółowe kontrakty, Marketing Knowledge Pack i pytania O-18–O-23 znajdują się w [05](05-DECISION-INTELLIGENCE-ARCHITECTURE.md).
+Added D-08/D-09 and a high-level Decision Intelligence layer, without changing the execution boundaries. The profile model, requirements and MVP phases were extended; detailed contracts, the Marketing Knowledge Pack and questions O-18–O-23 are in [05](05-DECISION-INTELLIGENCE-ARCHITECTURE.md).
