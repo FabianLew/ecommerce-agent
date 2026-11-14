@@ -22,6 +22,11 @@ moduły: [ADR-0003](../docs/adr/0003-module-convention.md)). Jeden artefakt, dwa
 Połączenie z bazą: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (domyślnie lokalny PostgreSQL z `infra/`).
 OIDC: `OIDC_ISSUER_URI` (domyślnie realm `operator` z lokalnego Keycloak) i `OIDC_AUDIENCE` (`operator-api`).
 
+Obserwowalność (B-07): logi JSON (ECS) na stdout z `requestId`, `correlationId`, `traceId`, `spanId`.
+Każda odpowiedź ma nagłówki `X-Request-Id` i `X-Correlation-Id` (przyjmowane od klienta tylko w bezpiecznym
+formacie). Eksport śladów OTLP: `OTEL_EXPORT_ENABLED=true`, adres `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`
+(domyślnie lokalny Jaeger z `infra/`), próbkowanie `TRACING_SAMPLING_PROBABILITY` (domyślnie 1.0).
+
 Profil `local` (łączony z `api` lub `worker`) dokłada demo-tenantów zgodnych z użytkownikami Keycloak:
 organizacja „Demo”, „Sklep A” dla `owner-a` i „Sklep B” dla `owner-b`.
 
@@ -32,13 +37,17 @@ TOKEN=$(curl -s -d grant_type=password -d client_id=operator-dev-cli -d username
 curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/stores
 ```
 
-## API (stan na B-06)
+## API (stan na B-07)
 
 | Endpoint | Opis |
 | --- | --- |
 | `GET /api/v1/me` | Bieżący użytkownik (rejestrowany przy pierwszym żądaniu) |
 | `GET /api/v1/stores` | Sklepy, do których użytkownik ma członkostwo, z rolami |
 | `GET /api/v1/stores/{storeId}` | Szczegóły sklepu; brak dostępu i brak sklepu dają ten sam `404 NOT_FOUND` |
+
+Błędy mają format z dokumentu 04 §3: `{code, message, fieldErrors?, retryable, requestId, currentVersion?}`,
+np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_ALLOWED` (405),
+`INTERNAL_ERROR` (500, bez szczegółów wyjątku; szczegóły są w logu z tym samym `requestId`).
 
 ## Zasady
 

@@ -6,7 +6,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 
 /**
  * The API is an OAuth2 resource server: bearer JWTs from the OIDC provider (Keycloak locally).
@@ -18,12 +20,24 @@ import org.springframework.security.web.SecurityFilterChain;
 class SecurityConfiguration {
 
     @Bean
-    SecurityFilterChain apiSecurity(HttpSecurity http) throws Exception {
+    SecurityFilterChain apiSecurity(HttpSecurity http, ApiErrorWriter errors) throws Exception {
+        AuthenticationEntryPoint unauthenticated = (request, response, exception) -> {
+            response.setHeader("WWW-Authenticate", "Bearer");
+            errors.write(request, response, 401, "UNAUTHENTICATED", "Sign in again to continue.");
+        };
+        AccessDeniedHandler forbidden = (request, response, exception) ->
+                errors.write(request, response, 403, "FORBIDDEN", "You do not have permission for this operation.");
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         .anyRequest().authenticated())
-                .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))
+                .oauth2ResourceServer(oauth -> oauth
+                        .jwt(Customizer.withDefaults())
+                        .authenticationEntryPoint(unauthenticated)
+                        .accessDeniedHandler(forbidden))
+                .exceptionHandling(handling -> handling
+                        .authenticationEntryPoint(unauthenticated)
+                        .accessDeniedHandler(forbidden))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .csrf(csrf -> csrf.disable());
         return http.build();

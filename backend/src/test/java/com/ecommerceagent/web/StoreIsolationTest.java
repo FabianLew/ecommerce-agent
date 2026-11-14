@@ -104,7 +104,8 @@ class StoreIsolationTest {
         String unknown = notFoundBody(UUID.randomUUID().toString());
         String malformed = notFoundBody("not-a-uuid");
 
-        assertThat(foreignOrg).isEqualTo(foreignStore).isEqualTo(unknown).isEqualTo(malformed);
+        assertThat(foreignOrg).isEqualTo(foreignStore).isEqualTo(unknown).isEqualTo(malformed)
+                .contains("\"code\":\"NOT_FOUND\"");
     }
 
     @Test
@@ -154,9 +155,11 @@ class StoreIsolationTest {
                 .andExpect(jsonPath("$.items.length()").value(0));
     }
 
+    /** 404 body without the per-request requestId, which differs on every call by design. */
     private String notFoundBody(String storeId) throws Exception {
         return mvc.perform(get("/api/v1/stores/" + storeId).with(user("subject-a")))
                 .andExpect(status().isNotFound())
-                .andReturn().getResponse().getContentAsString();
+                .andReturn().getResponse().getContentAsString()
+                .replaceAll("\"requestId\":\"[^\"]+\"", "\"requestId\":\"*\"");
     }
 }
