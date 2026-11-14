@@ -27,4 +27,5 @@ które doprecyzowują lub zmieniają te dokumenty, są zapisywane jako ADR w `do
 
 ## Spike'i iteracji I1
 
-Spike'i B-02 i B-03 (zgodność wersji stacku, granica tool calling w Spring AI) są dostarczane w osobnym PR.
+- [`spikes/stack-compat`](spikes/stack-compat/README.md) — B-02 (zgodność wersji stacku, ADR-0001)
+  i B-03 (granica tool calling w Spring AI, ADR-0002).
