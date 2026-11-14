@@ -23,7 +23,8 @@ import org.slf4j.Logger;
  * not followed by a newer stock state within the order delay (ADR-0010). From version {@value #RISK_DETECTION}
  * of {@code risk-detection} it also assesses inventory risk after each stock change and each fresh read, and
  * while a risk series builds up it confirms the stock with another fresh read when the detector asks (B-19,
- * ADR-0011).
+ * ADR-0011). From version {@value #GUARDIAN_NOTIFY} of {@code guardian-notify} each observation of an active
+ * episode reaches its {@code InventoryGuardianWorkflow} (B-22).
  */
 @WorkflowImpl(taskQueues = TaskQueues.MAIN)
 public class VariantInventoryWorkflowImpl implements VariantInventoryWorkflow {
@@ -32,6 +33,8 @@ public class VariantInventoryWorkflowImpl implements VariantInventoryWorkflow {
     static final int CONTINUE_AFTER = 500;
     static final String RISK_CHANGE = "risk-detection";
     static final int RISK_DETECTION = 1;
+    static final String GUARDIAN_CHANGE = "guardian-notify";
+    static final int GUARDIAN_NOTIFY = 1;
 
     private static final Logger log = Workflow.getLogger(VariantInventoryWorkflowImpl.class);
 
@@ -56,6 +59,7 @@ public class VariantInventoryWorkflowImpl implements VariantInventoryWorkflow {
     private int duplicates;
     private int verifications;
     private boolean riskEnabled;
+    private boolean guardianEnabled;
     private boolean riskDue;
     private Long riskCheckAtMillis;
     private int riskChecks;
@@ -67,6 +71,8 @@ public class VariantInventoryWorkflowImpl implements VariantInventoryWorkflow {
         state.recentEventIds().forEach(this::remember);
         latest = parse(state.latestSourceUpdatedAt());
         riskEnabled = Workflow.getVersion(RISK_CHANGE, Workflow.DEFAULT_VERSION, RISK_DETECTION) >= RISK_DETECTION;
+        guardianEnabled = riskEnabled
+                && Workflow.getVersion(GUARDIAN_CHANGE, Workflow.DEFAULT_VERSION, GUARDIAN_NOTIFY) >= GUARDIAN_NOTIFY;
         while (true) {
             Long dueAt = nextDue();
             if (dueAt == null) {
@@ -171,7 +177,7 @@ public class VariantInventoryWorkflowImpl implements VariantInventoryWorkflow {
             if (riskEnabled) {
                 riskDue = false;
                 riskCheckAtMillis = null;
-                record(activities.verifyAndAssess(variantId));
+                record(variantId, activities.verifyAndAssess(variantId));
             } else {
                 activities.verify(variantId);
             }
@@ -185,14 +191,14 @@ public class VariantInventoryWorkflowImpl implements VariantInventoryWorkflow {
     private void assessRisk(String variantId) {
         riskDue = false;
         try {
-            record(activities.assessRisk(variantId));
+            record(variantId, activities.assessRisk(variantId));
         } catch (ActivityFailure failure) {
             // The next stock change or fresh read assesses again.
             log.warn("Risk assessment of variant {} failed: {}", variantId, failure.getMessage());
         }
     }
 
-    private void record(RiskCheck check) {
+    private void record(String variantId, RiskCheck check) {
         riskChecks++;
         riskOutcome = check.outcome();
         if (check.opportunityId() != null) {
@@ -203,6 +209,15 @@ public class VariantInventoryWorkflowImpl implements VariantInventoryWorkflow {
             riskCheckAtMillis = null;
         } else if (riskCheckAtMillis == null) {
             riskCheckAtMillis = Workflow.currentTimeMillis() + check.nextCheckInSeconds() * 1000;
+        }
+        if (guardianEnabled && check.opportunityId() != null
+                && ("AT_RISK".equals(check.outcome()) || "NOT_AT_RISK".equals(check.outcome()))) {
+            try {
+                activities.notifyGuardian(variantId, check);
+            } catch (ActivityFailure failure) {
+                // The next observation notifies again; the episode workflow id makes a repeat harmless.
+                log.warn("Notifying the episode of variant {} failed: {}", variantId, failure.getMessage());
+            }
         }
     }
 

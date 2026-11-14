@@ -65,6 +65,25 @@ operator:
       min-observations: 2
       min-gap: 5m
       max-stock-age: 120s
+    workflow:
+      # Episode limits (ADR-0012): proposal validity, episode time limit, retries when data is missing.
+      proposal-ttl: 24h
+      episode-timeout: 7d
+      data-retry-delay: 15m
+      max-data-retries: 3
+      max-reanalyses: 5
+      # A risk update changing days of cover by at least this much starts a new revision.
+      significant-cover-change: 0.5
+  policies:
+    inventory-protection:
+      # Policy inventory-protection@1.0.0 (ADR-0012); the pilot only evaluates (L1, L2 disabled).
+      version: 1.0.0
+      mode: EVALUATION_ONLY
+      max-stock-age: 120s
+      max-ad-state-age: 60s
+      max-verification-age: 24h
+      autonomy: L1
+      l2-enabled: false
 
 springdoc:
   api-docs:
