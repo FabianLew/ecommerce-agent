@@ -69,3 +69,34 @@ oraz kiedy uznajemy okres zamówień za kompletny (od tego zależy, czy metryki 
   przy niezgodnym liczniku, idempotencja ponownego importu, izolacja sklepów.
 - `WooImportWorkflowTest`: kolejność aktywności, oznaczenie porażki i niekompletności.
 - Ręcznie: import lokalnego sklepu przez UI, liczby produktów, wariantów i zamówień zgodne z WooCommerce.
+
+## Uzupełnienie: trwały start workflow i odzyskiwanie (FIX-02, 2026-11-14, do akceptacji)
+
+Audyt wykazał, że `sync_run` w stanie `RUNNING` powstawał przed `WorkflowClient.start`, a błąd startu oznaczał
+przebieg jako `FAILED`. Awaria procesu między zapisem a startem blokowała sklep na stałe (unikalny indeks), a
+utracona odpowiedź po udanym starcie zwalniała indeks, choć workflow działał, więc mógł ruszyć drugi import.
+Limit wykonania workflow (2 h) kończył go bez kroku `finish()`.
+
+1. **Rekord jako trwałe zlecenie.** `sync_run` w stanie `RUNNING` z pustym `workflow_started_at` jest
+   zleceniem startu. Żądanie próbuje wystartować workflow od razu i potwierdza start; błąd startu nie zmienia
+   stanu przebiegu (nie wiadomo, czy workflow ruszył).
+2. **Deterministyczne ID bez ponownego użycia.** `woo-import-{runId}` z `REJECT_DUPLICATE`: ponowny start tego
+   samego przebiegu (retry, reconciler) nigdy nie tworzy drugiego wykonania.
+3. **Reconciler w workerze** (co `operator.sync.reconcile-interval`, domyślnie 1 min): niepotwierdzony przebieg
+   młodszy niż `start-deadline` (15 min) startuje i potwierdza; starszy potwierdza, jeśli Temporal zna workflow,
+   inaczej zamyka jako `FAILED/START_FAILED`. Potwierdzony przebieg, którego workflow zakończył się bez wyniku,
+   zamyka jako `FAILED` z kodem `WORKFLOW_TIMED_OUT`, `WORKFLOW_CANCELED`, `WORKFLOW_TERMINATED`,
+   `WORKFLOW_FAILED`, `WORKFLOW_NOT_FOUND` lub `WORKFLOW_ENDED_WITHOUT_OUTCOME`. Reconciler nigdy nie oznacza
+   sukcesu.
+4. **Bez blokad.** Wszystkie kroki są idempotentne (start po ID, potwierdzenie tylko pustego pola, zamknięcie
+   tylko wiersza `RUNNING`), więc równoległe przebiegi w kilku workerach są bezpieczne. Kroki importu odmawiają
+   pracy dla przebiegu, który nie jest `RUNNING` (`RUN_CLOSED`), więc spóźniony start nie importuje.
+5. **Zakres.** Reconciler czyta z `sync_run` tylko identyfikatory wszystkich sklepów; zakres aktora systemowego
+   `woo-import` buduje `StoreAccess.systemScope` z organizacji i sklepu zapisanych w przebiegu.
+
+Odrzucone: ogólny outbox/dispatcher dla startu importu. Powstaje w B-14/B-15 (ADR-0009); tu rekord przebiegu
+już jest jedynym zleceniem, więc osobna tabela dublowałaby stan. Po B-15 start importu może przejść na outbox.
+
+Weryfikacja: `SyncRecoveryTest` (awaria przed startem, niedostępny Temporal, utracona odpowiedź, timeout,
+anulowanie i przerwanie, uzgadnianie w trakcie importu, przeterminowany start i spóźniony workflow, równoległe
+uzgadnianie).
