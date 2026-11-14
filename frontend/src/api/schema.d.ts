@@ -84,6 +84,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stores/{storeId}/integration-connections/{connectionId}/webhook-secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["webhookSecret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stores/{storeId}/integrations": {
         parameters: {
             query?: never;
@@ -164,6 +180,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/webhooks/woocommerce/{endpointKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -199,7 +231,7 @@ export interface components {
             message: string;
         };
         IntegrationResponse: {
-            allowedActions: ("SAVE_CREDENTIALS" | "RUN_CHECK" | "START_SYNC")[];
+            allowedActions: ("SAVE_CREDENTIALS" | "SAVE_WEBHOOK_SECRET" | "RUN_CHECK" | "START_SYNC")[];
             /** Format: uuid */
             id: string;
             /** @description Last 4 characters of the API key */
@@ -218,6 +250,7 @@ export interface components {
             status: "PENDING_CREDENTIALS" | "CHECK_REQUIRED" | "CONNECTED" | "ERROR";
             storeUrl: string;
             warnings: ("CURRENCY_MISMATCH" | "CURRENCY_UNKNOWN")[];
+            webhook: components["schemas"]["WebhookResponse"];
         };
         ListResponseIntegrationResponse: {
             hasMore: boolean;
@@ -273,6 +306,24 @@ export interface components {
             windowFrom: string;
             /** Format: date-time */
             windowUntil: string;
+        };
+        WebhookReceiptResponse: {
+            /** @enum {string} */
+            receipt: "ACCEPTED" | "DUPLICATE" | "PING" | "IGNORED";
+        };
+        WebhookResponse: {
+            apiVersion: string;
+            /** @description Delivery URL to enter in WooCommerce; null until the public API address is configured */
+            deliveryUrl?: string;
+            /** Format: date-time */
+            lastReceivedAt?: string;
+            secretConfigured: boolean;
+            /** Format: date-time */
+            secretUpdatedAt?: string;
+            topics: string[];
+        };
+        WebhookSecretRequest: {
+            secret: string;
         };
         WooCommerceCredentialsRequest: {
             consumerKey: string;
@@ -460,6 +511,60 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["WooCommerceCredentialsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IntegrationResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    webhookSecret: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                connectionId: string;
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebhookSecretRequest"];
             };
         };
         responses: {
@@ -746,6 +851,37 @@ export interface operations {
             };
             /** @description Store or resource does not exist or is not available */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                endpointKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookReceiptResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

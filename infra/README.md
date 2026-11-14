@@ -55,5 +55,18 @@ Klucz REST API (tylko odczyt): `ck_local_operator_0000000000000000000000` /
 > (Basic Auth i klucze w query string działają tylko po HTTPS). Adapter WooCommerce (B-12) musi to
 > uwzględnić albo lokalny sklep dostanie TLS; decyzja w B-12.
 
+### Webhooki lokalnie (B-14, ADR-0009)
+
+Woo w Dockerze dostarcza webhooki do API na hoście przez `http://host.docker.internal:8080` (wpis
+`host-gateway` w compose). Seed instaluje mu-plugin `operator-local-webhooks.php`, który dopuszcza adresy
+prywatne w `wp_safe_remote_request`; to ustawienie wyłącznie dla lokalnego sklepu.
+
+1. W Integracjach (profil `api,local`) wygeneruj i zapisz sekret webhooków, skopiuj adres dostawy.
+2. W wp-admin → WooCommerce → Ustawienia → Zaawansowane → Webhooki dodaj 4 webhooki (Order created/updated,
+   Product created/updated), status „Aktywny”, wersja API „WP REST API Integration v3”, ten adres i sekret.
+3. Woo dostarcza asynchronicznie (Action Scheduler na WP-Cron), więc po zmianie odwiedź dowolną stronę sklepu
+   albo uruchom `wp action-scheduler run`. Kontener wp-cli uruchamiany osobno potrzebuje
+   `--add-host host.docker.internal:host-gateway`, bo to on wtedy wysyła webhooki.
+
 Instalacja offline: ustaw `WOOCOMMERCE_SOURCE` w usłudze `woo-seed` na ścieżkę zamontowanego pliku
 `woocommerce.zip` (domyślnie pobierany jest release z GitHub).

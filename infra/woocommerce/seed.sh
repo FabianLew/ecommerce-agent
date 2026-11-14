@@ -13,6 +13,15 @@ until [ -f wp-config.php ] && wp db check >/dev/null 2>&1; do
   sleep 2
 done
 
+# Local only: WordPress delivers webhooks with wp_safe_remote_request, which refuses private addresses such as
+# host.docker.internal. This must-use plugin lifts that for the local test store (ADR-0009). Never in production.
+mkdir -p wp-content/mu-plugins
+cat > wp-content/mu-plugins/operator-local-webhooks.php <<'PHP'
+<?php
+/* Plugin Name: Operator local webhooks (development only) */
+add_filter('http_request_host_is_external', '__return_true');
+PHP
+
 if wp option get operator_seed_version >/dev/null 2>&1; then
   echo "Store already seeded (operator_seed_version=$(wp option get operator_seed_version))."
   exit 0

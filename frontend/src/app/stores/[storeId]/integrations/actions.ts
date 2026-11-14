@@ -139,3 +139,42 @@ export async function startSync(storeId: string, integrationId: string): Promise
   redirectIfUnauthenticated(started.response.status, path);
   revalidatePath(path);
 }
+
+export type WebhookSecretState = { status: "idle" | "error" | "saved"; message?: string };
+
+/**
+ * Stores the webhook secret that the user also entered in WooCommerce (ADR-0009). The value was generated in
+ * the browser; it is sent only server-to-server and never echoed back.
+ */
+export async function saveWebhookSecret(
+  storeId: string,
+  integrationId: string,
+  _previous: WebhookSecretState,
+  form: FormData,
+): Promise<WebhookSecretState> {
+  const path = storePath(storeId, "integrations");
+  const secret = String(form.get("webhookSecret") ?? "").trim();
+  if (secret.length < 16) {
+    return { status: "error", message: "Sekret musi mieć co najmniej 16 znaków. Wygeneruj go przyciskiem." };
+  }
+  const api = await backend(path);
+  const saved = await api.POST("/api/v1/stores/{storeId}/integration-connections/{connectionId}/webhook-secret", {
+    params: { path: { storeId, connectionId: integrationId } },
+    body: { secret },
+  });
+  redirectIfUnauthenticated(saved.response.status, path);
+  revalidatePath(path);
+  if (saved.data) {
+    return { status: "saved", message: "Sekret zapisany. Webhooki z tym sekretem będą przyjmowane." };
+  }
+  if (saved.response.status === 403) {
+    return { status: "error", message: "Nie masz uprawnień do zmiany połączeń tego sklepu." };
+  }
+  if (saved.response.status === 422) {
+    return { status: "error", message: "Sekret: 16–200 znaków bez spacji." };
+  }
+  return {
+    status: "error",
+    message: `Nie udało się zapisać sekretu (identyfikator zgłoszenia ${saved.error?.requestId ?? "-"}).`,
+  };
+}
