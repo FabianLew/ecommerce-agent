@@ -18,8 +18,9 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Local stand-in for the Meta adapter (B-20): loads the ad fixture file every minute, so ads appear once the
- * catalog import has created their variants. Only in the local worker, and only when a file is configured.
+ * Local stand-in for the Meta adapter (B-20): loads the ad fixture file every minute (or
+ * {@code operator.commerce.ad-fixture-interval}), so ads appear once the catalog import has created their variants
+ * and their state stays as fresh as a polled ad. Only in the local worker, and only when a file is configured.
  */
 @Configuration(proxyBeanMethods = false)
 @Profile("local & worker")
@@ -42,7 +43,7 @@ class AdFixtureLoader {
         this.file = file;
     }
 
-    @Scheduled(initialDelayString = "10s", fixedDelayString = "60s")
+    @Scheduled(initialDelayString = "10s", fixedDelayString = "${operator.commerce.ad-fixture-interval:60s}")
     void load() {
         try {
             List<AdFixture> stores = JSON.readValue(Files.readString(file), new TypeReference<>() {

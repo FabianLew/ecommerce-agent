@@ -1,0 +1,18 @@
+# Test configuration for the Inventory Guardian scenario e2e (B-25, plan section F). It shortens waits only;
+# the detector, the policy and the workflow run unchanged. Load it into both the API and the worker:
+#   --spring.config.additional-location=file:../infra/e2e/application-e2e.yml
+operator:
+  commerce:
+    # The policy accepts ad state up to 60 s old; reload the local ad fixture well within that.
+    ad-fixture-interval: 5s
+  automation:
+    sync:
+      # Polling confirms the variant if a webhook is late or lost.
+      poll-interval: 30s
+  inventory-guardian:
+    risk:
+      # Two risk observations at least this far apart open an episode (5 minutes in the pilot).
+      min-gap: 20s
+    workflow:
+      # A deferred analysis is retried after this delay (15 minutes in the pilot).
+      data-retry-delay: 15s

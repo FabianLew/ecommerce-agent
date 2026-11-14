@@ -57,6 +57,20 @@ pnpm build && pnpm test:e2e      # Playwright against the local stack (backend a
 
 Where Chromium is already installed, set `PW_CHROMIUM_PATH` instead of running `pnpm exec playwright install chromium`.
 
+The Inventory Guardian scenario (`e2e/inventory-guardian-scenario.spec.ts`, B-25) runs only with `E2E_SCENARIO=1`.
+It needs a fresh full stack (`docker compose -f infra/docker-compose.yml down -v && ... up -d --wait`), and the API
+and the worker started with the e2e settings, which only shorten waits:
+
+```bash
+cd backend && ./gradlew bootJar
+E2E=--spring.config.additional-location=file:../infra/e2e/application-e2e.yml
+java -jar build/libs/ecommerce-agent-backend-0.1.0-SNAPSHOT.jar --spring.profiles.active=api,local $E2E &
+java -jar build/libs/ecommerce-agent-backend-0.1.0-SNAPSHOT.jar --spring.profiles.active=worker,local $E2E &
+cd ../frontend && pnpm build && E2E_SCENARIO=1 pnpm test:e2e
+```
+
+The scenario connects store B, so it passes once per fresh stack.
+
 ## Palette contrast (04 §2, §14)
 
 Measured contrast ratios (WCAG 2.x):

@@ -126,6 +126,9 @@ services:
       - woo-html:/var/www/html
       - ./woocommerce/seed.sh:/seed/seed.sh:ro
     entrypoint: ["sh", "/seed/seed.sh"]
+    # `docker compose run --entrypoint wp woo-seed action-scheduler run` delivers webhooks from this container.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       woo-db:
         condition: service_healthy
