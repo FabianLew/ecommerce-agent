@@ -23,6 +23,6 @@ class IntegrationConfiguration {
         IntegrationProperties.WooCommerce woo = properties.woocommerce();
         StoreUrlPolicy policy = new StoreUrlPolicy(woo.allowInsecureHttp(), woo.allowPrivateNetwork(),
                 InetAddress::getAllByName);
-        return new WooCommerceClient(policy, woo.connectTimeout(), woo.readTimeout(), woo.maxResponseBytes(), clock);
+        return new WooCommerceClient(policy, woo.connectTimeout(), woo.responseTimeout(), woo.maxResponseBytes(), clock);
     }
 }

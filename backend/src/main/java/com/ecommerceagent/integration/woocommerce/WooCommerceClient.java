@@ -1,21 +1,29 @@
 package com.ecommerceagent.integration.woocommerce;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Flow;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import javax.net.ssl.SSLException;
@@ -23,6 +31,10 @@ import javax.net.ssl.SSLException;
 /**
  * Read-only client for the WooCommerce REST API v3 (ADR-0007). Paths are fixed by callers; the client
  * checks the address policy before every request, never follows redirects and caps the response size.
+ *
+ * <p>{@code responseTimeout} is a deadline for the whole response, headers and body (FIX-01). The body is
+ * received asynchronously into a size-limited buffer; when the deadline passes, the exchange is cancelled,
+ * which closes the connection, so no thread stays blocked on a store that stopped sending.
  */
 public final class WooCommerceClient {
 
@@ -30,15 +42,15 @@ public final class WooCommerceClient {
 
     private final StoreUrlPolicy policy;
     private final HttpClient http;
-    private final Duration readTimeout;
+    private final Duration responseTimeout;
     private final int maxResponseBytes;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
 
-    public WooCommerceClient(StoreUrlPolicy policy, Duration connectTimeout, Duration readTimeout,
+    public WooCommerceClient(StoreUrlPolicy policy, Duration connectTimeout, Duration responseTimeout,
             int maxResponseBytes, Clock clock) {
         this.policy = policy;
-        this.readTimeout = readTimeout;
+        this.responseTimeout = responseTimeout;
         this.maxResponseBytes = maxResponseBytes;
         this.clock = clock;
         // No proxy: the address policy must judge the real destination. An egress proxy comes with F4.
@@ -59,7 +71,7 @@ public final class WooCommerceClient {
         policy.requireAllowedAddress(storeUrl);
         URI endpoint = URI.create(storeUrl + API_PREFIX + resource);
         Map<String, String> parameters = new LinkedHashMap<>(query);
-        HttpRequest.Builder request = HttpRequest.newBuilder().GET().timeout(readTimeout)
+        HttpRequest.Builder request = HttpRequest.newBuilder().GET().timeout(responseTimeout)
                 .header("Accept", "application/json");
 
         if ("https".equals(storeUrl.getScheme())) {
@@ -79,37 +91,50 @@ public final class WooCommerceClient {
                 .collect(Collectors.joining("&"));
         request.uri(URI.create(queryString.isEmpty() ? endpoint.toString() : endpoint + "?" + queryString));
 
+        HttpResponse<String> response = await(http.sendAsync(request.build(),
+                info -> new LimitedBody(maxResponseBytes, info.headers().firstValueAsLong("Content-Length").orElse(-1))));
+        return new WooResponse(response.statusCode(),
+                response.headers().firstValue("Content-Type").orElse(null),
+                response.body(),
+                header(response, "X-WP-Total"),
+                header(response, "X-WP-TotalPages"));
+    }
+
+    /**
+     * Waits for the complete response until the deadline. On timeout or interruption the exchange is
+     * cancelled: the JDK client then aborts the request and closes its connection.
+     */
+    private HttpResponse<String> await(CompletableFuture<HttpResponse<String>> exchange) throws WooClientException {
         try {
-            HttpResponse<InputStream> response = http.send(request.build(), HttpResponse.BodyHandlers.ofInputStream());
-            String body = read(response.body());
-            return new WooResponse(response.statusCode(),
-                    response.headers().firstValue("Content-Type").orElse(null),
-                    body,
-                    header(response, "X-WP-Total"),
-                    header(response, "X-WP-TotalPages"));
-        } catch (SSLException e) {
-            throw new WooClientException(WooClientException.Kind.TLS_ERROR, "TLS handshake failed", e);
-        } catch (HttpTimeoutException | ConnectException e) {
-            throw new WooClientException(WooClientException.Kind.UNREACHABLE, "Store not reachable", e);
-        } catch (IOException e) {
-            if (e.getCause() instanceof SSLException) {
-                throw new WooClientException(WooClientException.Kind.TLS_ERROR, "TLS handshake failed", e);
-            }
-            throw new WooClientException(WooClientException.Kind.UNREACHABLE, "Store not reachable", e);
+            return exchange.get(responseTimeout.toNanos(), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException e) {
+            exchange.cancel(true);
+            throw new WooClientException(WooClientException.Kind.TIMEOUT, "Store did not respond in time", e);
         } catch (InterruptedException e) {
+            exchange.cancel(true);
             Thread.currentThread().interrupt();
             throw new WooClientException(WooClientException.Kind.UNREACHABLE, "Interrupted", e);
+        } catch (ExecutionException e) {
+            throw classify(e.getCause());
         }
     }
 
-    private String read(InputStream body) throws IOException, WooClientException {
-        try (body) {
-            byte[] bytes = body.readNBytes(maxResponseBytes + 1);
-            if (bytes.length > maxResponseBytes) {
-                throw new WooClientException(WooClientException.Kind.RESPONSE_TOO_LARGE, "Response too large", null);
+    private static WooClientException classify(Throwable failure) {
+        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof ResponseTooLargeException) {
+                return new WooClientException(WooClientException.Kind.RESPONSE_TOO_LARGE, "Response too large", null);
             }
-            return new String(bytes, StandardCharsets.UTF_8);
+            if (cause instanceof SSLException) {
+                return new WooClientException(WooClientException.Kind.TLS_ERROR, "TLS handshake failed", failure);
+            }
+            if (cause instanceof HttpTimeoutException) {
+                return new WooClientException(WooClientException.Kind.TIMEOUT, "Store did not respond in time", failure);
+            }
+            if (cause instanceof ConnectException) {
+                break;
+            }
         }
+        return new WooClientException(WooClientException.Kind.UNREACHABLE, "Store not reachable", failure);
     }
 
     private static OptionalLong header(HttpResponse<?> response, String name) {
@@ -124,5 +149,78 @@ public final class WooCommerceClient {
         byte[] bytes = new byte[16];
         random.nextBytes(bytes);
         return HexFormat.of().formatHex(bytes);
+    }
+
+    /**
+     * Collects the body up to {@code maxBytes}; a larger body (declared or actual) cancels the subscription,
+     * which aborts the exchange instead of reading the rest.
+     */
+    static final class LimitedBody implements HttpResponse.BodySubscriber<String> {
+
+        private final int maxBytes;
+        private final long declaredLength;
+        private final CompletableFuture<String> result = new CompletableFuture<>();
+        private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        private Flow.Subscription subscription;
+
+        LimitedBody(int maxBytes, long declaredLength) {
+            this.maxBytes = maxBytes;
+            this.declaredLength = declaredLength;
+        }
+
+        @Override
+        public CompletionStage<String> getBody() {
+            return result;
+        }
+
+        @Override
+        public void onSubscribe(Flow.Subscription subscription) {
+            this.subscription = subscription;
+            if (declaredLength > maxBytes) {
+                tooLarge();
+                return;
+            }
+            subscription.request(Long.MAX_VALUE);
+        }
+
+        @Override
+        public void onNext(List<ByteBuffer> items) {
+            if (result.isDone()) {
+                return;
+            }
+            for (ByteBuffer item : items) {
+                if (buffer.size() + (long) item.remaining() > maxBytes) {
+                    tooLarge();
+                    return;
+                }
+                byte[] chunk = new byte[item.remaining()];
+                item.get(chunk);
+                buffer.writeBytes(chunk);
+            }
+        }
+
+        @Override
+        public void onError(Throwable throwable) {
+            result.completeExceptionally(throwable);
+        }
+
+        @Override
+        public void onComplete() {
+            result.complete(buffer.toString(StandardCharsets.UTF_8));
+        }
+
+        private void tooLarge() {
+            subscription.cancel();
+            result.completeExceptionally(new ResponseTooLargeException());
+        }
+    }
+
+    static final class ResponseTooLargeException extends IOException {
+
+        private static final long serialVersionUID = 1L;
+
+        ResponseTooLargeException() {
+            super("Response too large");
+        }
     }
 }
