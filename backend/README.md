@@ -172,6 +172,19 @@ np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_A
   epizodu (poprzednia przechodzi w `SUPERSEDED`); nieważna to tylko wpis w `proposal_rejection` z kodami (IG-10).
 - `AdEvidence` (moduł `metrics`) zapisuje dowody stanu reklamy i mapowania, na których opiera się walidacja celu.
 
+## Inventory Guardian w trybie shadow (B-22)
+
+- Otwarty epizod uruchamia `InventoryGuardianWorkflow` (ID `inventory-guardian-{storeId}-{variantId}-{opportunityId}`,
+  `REJECT_DUPLICATE`). Kroki to aktywności: `buildContext` (snapshot `inventory-context/1` z dowodami stanu, popytu,
+  dostaw i reklam), `propose` (`BaselineProposer`), `validateAndPersist`, `evaluatePolicy`.
+- `PauseAdPolicy` (`inventory-protection@1.0.0`, `operator.policies.inventory-protection.*`) sprawdza po kolei
+  izolację, zdrowie integracji, świeżość, ryzyko i jakość popytu, mapowanie i kreację, stan reklamy i autonomię.
+  Wynik z listą kontroli i parametrami trafia do `policy_evaluation` w trybie `EVALUATION_ONLY`; nic nie jest
+  wykonywane.
+- Status epizodu wynika z dyspozycji i wyniku polityki (ADR-0012 pkt 6). Limity epizodu są w
+  `operator.inventory-guardian.workflow.*`. Workflow wariantu przekazuje kolejne obserwacje sygnałami `riskUpdated`
+  i `riskResolved`.
+
 ## Zasady
 
 - Moduły to podpakiety `com.ecommerceagent`; dozwolone zależności są w `package-info.java` każdego modułu.

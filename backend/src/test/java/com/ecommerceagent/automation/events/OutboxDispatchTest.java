@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.ecommerceagent.TestcontainersConfiguration;
+import com.ecommerceagent.automation.guardian.InventoryGuardianWorkflow;
 import com.ecommerceagent.automation.inventory.VariantInventoryStatus;
 import com.ecommerceagent.automation.inventory.VariantInventoryWorkflow;
 import com.ecommerceagent.automation.inventory.VariantInventoryWorkflowImpl;
@@ -256,12 +257,22 @@ class OutboxDispatchTest {
         assertThat(status.verifications()).isGreaterThanOrEqualTo(2);
         // The confirming read waits for the gap instead of polling the shop.
         assertThat(requests.stream().filter("products/14"::equals).count()).isBetween(2L, 3L);
-        assertThat(jdbc.sql("SELECT count(*) FROM opportunity WHERE subject_id = ? AND status = 'OPEN'").param(mug)
+        assertThat(jdbc.sql("SELECT count(*) FROM opportunity WHERE subject_id = ?").param(mug)
                 .query(Long.class).single()).isEqualTo(1);
         assertThat(jdbc.sql("""
                 SELECT count(*) FROM inventory_risk_observation
                 WHERE variant_id = ? AND outcome = 'AT_RISK' AND stock_confirmed_at IS NOT NULL
                 """).param(mug).query(Long.class).single()).isGreaterThanOrEqualTo(2);
+
+        // The opened episode started its guardian once; with no ad promoting the mug there is nothing to pause.
+        String opportunityId = status.opportunityId();
+        InventoryGuardianWorkflow guardian = client.newWorkflowStub(InventoryGuardianWorkflow.class,
+                InventoryGuardianWorkflow.workflowId(STORE, mug.toString(), opportunityId));
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> assertThat(guardian.status().finished()).isTrue());
+        assertThat(guardian.status().analyses()).isEqualTo(1);
+        assertThat(guardian.status().disposition()).isEqualTo("NO_ACTION");
+        assertThat(jdbc.sql("SELECT status || ':' || close_reason FROM opportunity WHERE id = ?::uuid")
+                .param(opportunityId).query(String.class).single()).isEqualTo("CLOSED:NO_ACTION");
 
         WorkflowExecutionHistory history = client.fetchHistory(VariantInventoryWorkflow.workflowId(STORE,
                 mug.toString()));

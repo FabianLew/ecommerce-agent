@@ -8,12 +8,23 @@ import java.util.UUID;
 
 import com.ecommerceagent.automation.TaskQueues;
 import com.ecommerceagent.automation.temporal.ActivityErrors;
+import com.ecommerceagent.automation.guardian.GuardianSettings;
+import com.ecommerceagent.automation.guardian.InventoryGuardianWorkflow;
+import com.ecommerceagent.automation.guardian.RiskSignal;
 import com.ecommerceagent.automation.temporal.ActivityStoreScope;
+import com.ecommerceagent.automation.temporal.StoreContextPropagator;
+import com.ecommerceagent.automation.temporal.WorkflowStoreContext;
 import com.ecommerceagent.decisions.InventoryRiskDetector;
 import com.ecommerceagent.decisions.Opportunity;
 import com.ecommerceagent.decisions.RiskAssessment;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.integration.WooSourceRefresh;
+import io.temporal.api.enums.v1.WorkflowIdReusePolicy;
+import io.temporal.client.BatchRequest;
+import io.temporal.client.WorkflowClient;
+import io.temporal.client.WorkflowExecutionAlreadyStarted;
+import io.temporal.client.WorkflowNotFoundException;
+import io.temporal.client.WorkflowOptions;
 import io.temporal.spring.boot.ActivityImpl;
 import org.springframework.stereotype.Component;
 
@@ -24,11 +35,16 @@ public class VariantInventoryActivitiesImpl implements VariantInventoryActivitie
     private final WooSourceRefresh refresh;
     private final InventoryRiskDetector detector;
     private final Clock clock;
+    private final WorkflowClient client;
+    private final GuardianSettings guardianSettings;
 
-    VariantInventoryActivitiesImpl(WooSourceRefresh refresh, InventoryRiskDetector detector, Clock clock) {
+    VariantInventoryActivitiesImpl(WooSourceRefresh refresh, InventoryRiskDetector detector, Clock clock,
+            WorkflowClient client, GuardianSettings guardianSettings) {
         this.refresh = refresh;
         this.detector = detector;
         this.clock = clock;
+        this.client = client;
+        this.guardianSettings = guardianSettings;
     }
 
     @Override
@@ -53,6 +69,39 @@ public class VariantInventoryActivitiesImpl implements VariantInventoryActivitie
         return check(detector.assess(scope, id, confirmedAt));
     }
 
+    @Override
+    public void notifyGuardian(String variantId, RiskCheck check) {
+        TrustedStoreScope scope = ActivityStoreScope.current();
+        String workflowId = InventoryGuardianWorkflow.workflowId(scope.storeId(), variantId, check.opportunityId());
+        RiskSignal signal = new RiskSignal(check.outcome(), check.daysOfCover());
+        WorkflowStoreContext context = WorkflowStoreContext.of(scope, "guardian-" + check.opportunityId());
+        if ("NOT_AT_RISK".equals(check.outcome())) {
+            try {
+                StoreContextPropagator.callWith(context, () -> {
+                    client.newWorkflowStub(InventoryGuardianWorkflow.class, workflowId).riskResolved(signal);
+                    return null;
+                });
+            } catch (WorkflowNotFoundException e) {
+                // The episode's workflow already finished.
+            }
+            return;
+        }
+        InventoryGuardianWorkflow guardian = client.newWorkflowStub(InventoryGuardianWorkflow.class,
+                WorkflowOptions.newBuilder()
+                        .setTaskQueue(TaskQueues.MAIN)
+                        .setWorkflowId(workflowId)
+                        .setWorkflowIdReusePolicy(WorkflowIdReusePolicy.WORKFLOW_ID_REUSE_POLICY_REJECT_DUPLICATE)
+                        .build());
+        BatchRequest batch = client.newSignalWithStartRequest();
+        batch.add(guardian::run, guardianSettings.input(check.opportunityId(), variantId));
+        batch.add(guardian::riskUpdated, signal);
+        try {
+            StoreContextPropagator.callWith(context, () -> client.signalWithStart(batch));
+        } catch (WorkflowExecutionAlreadyStarted e) {
+            // The episode's workflow ran and finished; the same id never starts a second one.
+        }
+    }
+
     static boolean confirms(String outcome) {
         return outcome != null && !outcome.isEmpty() && Arrays.stream(outcome.split(","))
                 .allMatch(part -> part.equals("RECORDED") || part.equals("DUPLICATE"));
@@ -63,6 +112,8 @@ public class VariantInventoryActivitiesImpl implements VariantInventoryActivitie
                 : Math.max(1, Duration.between(clock.instant(), assessment.nextCheckAt()).toSeconds());
         Opportunity opportunity = assessment.opportunity();
         return new RiskCheck(assessment.observation().outcome().name(), assessment.observation().reason(),
-                opportunity == null ? null : opportunity.id().toString(), assessment.opened(), next);
+                opportunity == null ? null : opportunity.id().toString(), assessment.opened(), next,
+                assessment.observation().daysOfCover() == null ? null
+                        : assessment.observation().daysOfCover().toPlainString());
     }
 }

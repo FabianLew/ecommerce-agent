@@ -13,4 +13,10 @@ public interface VariantInventoryActivities {
 
     /** Reads the variant's stock from the source, then assesses risk with the stock confirmed by that read. */
     RiskCheck verifyAndAssess(String variantId);
+
+    /**
+     * Tells the variant's active episode about a risk observation: starts its {@code InventoryGuardianWorkflow}
+     * (at most once per episode) and signals the update, or signals that the risk is resolved.
+     */
+    void notifyGuardian(String variantId, RiskCheck check);
 }
