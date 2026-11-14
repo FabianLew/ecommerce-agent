@@ -1,0 +1,10 @@
+# Test-only settings, merged over src/main/resources/application.yml.
+operator:
+  integration:
+    secrets-key: +8ixWUDP7q0PlVTSA1mCnWZsD8tYl+VhgMS+hqXdv1w=
+    secrets-key-id: test-v1
+    woocommerce:
+      # Tests call a stub WooCommerce server on localhost over HTTP.
+      allow-insecure-http: true
+      allow-private-network: true
+      read-timeout: 2s

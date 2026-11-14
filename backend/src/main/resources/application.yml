@@ -25,6 +25,17 @@ spring:
     # Workers run only in the "worker" profile; "api" uses the client to start workflows.
     start-workers: false
 
+operator:
+  integration:
+    # Base64 of 32 random bytes (AES-256). Required; never reuse the local key elsewhere (ADR-0007).
+    secrets-key: ${INTEGRATION_SECRETS_KEY:}
+    secrets-key-id: ${INTEGRATION_SECRETS_KEY_ID:v1}
+    woocommerce:
+      allow-insecure-http: false
+      allow-private-network: false
+      connect-timeout: 5s
+      read-timeout: 10s
+
 springdoc:
   api-docs:
     # The contract is generated in tests (OpenApiContractTest) and committed; not served by default.

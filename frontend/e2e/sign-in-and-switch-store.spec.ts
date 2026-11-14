@@ -97,3 +97,35 @@ test("an expiring access token is refreshed transparently", async ({ page, conte
   expect(after).toBeDefined();
   expect(after).not.toBe(before);
 });
+
+test("owner saves a WooCommerce key and sees the check result; analyst gets a read-only card", async ({ page }) => {
+  await signIn(page, "owner-a", `/stores/${STORE_A}/integrations`);
+  await expect(page).toHaveURL(`/stores/${STORE_A}/integrations`);
+  const card = page.getByTestId("woocommerce-card");
+  await expect(card.getByRole("heading", { name: "WooCommerce" })).toBeVisible();
+
+  // Client-side format check: the key and the secret are easy to swap.
+  const storeUrl = card.getByLabel("Adres sklepu");
+  if (await storeUrl.isVisible()) {
+    await storeUrl.fill("https://shop.invalid");
+  }
+  await card.getByLabel("Consumer key").fill("cs_swapped");
+  await card.getByLabel("Consumer secret").fill("cs_swapped");
+  await card.getByRole("button", { name: /sprawdź/ }).last().click();
+  await expect(card.getByText("Wartość z WooCommerce zaczyna się od ck_.")).toBeVisible();
+
+  // The store address does not resolve: the key is saved, the check reports a repair step.
+  await card.getByLabel("Consumer key").fill("ck_e2e0000000000000000000000000000000000001");
+  await card.getByLabel("Consumer secret").fill("cs_e2e0000000000000000000000000000000000001");
+  await card.getByRole("button", { name: /sprawdź/ }).last().click();
+  await expect(card.getByTestId("woocommerce-status")).toHaveText("Błąd połączenia");
+  await expect(card.getByTestId("woocommerce-error")).toContainText("Nie udało się połączyć ze sklepem");
+  await expect(card.getByText("…0001")).toBeVisible();
+  // Secrets are never rendered back, not even in the form.
+  expect(await page.content()).not.toContain("cs_e2e0000000000000000000000000000000000001");
+
+  await page.getByLabel("Sklep").selectOption(STORE_C);
+  await expect(page).toHaveURL(`/stores/${STORE_C}/integrations`);
+  await expect(page.getByRole("heading", { name: "Tylko podgląd" })).toBeVisible();
+  await expect(page.getByLabel("Consumer key")).toHaveCount(0);
+});
