@@ -1,0 +1,4 @@
+# Profile "worker": background processing (Temporal workers from B-08). No HTTP server.
+spring:
+  main:
+    web-application-type: none

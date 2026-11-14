@@ -1,0 +1,3 @@
+# Profile "api": serves the REST API for the frontend.
+server:
+  port: ${PORT:8080}

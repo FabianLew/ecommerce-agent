@@ -9,5 +9,6 @@ Statusy: `Proponowany` → `Zaakceptowany` (po akceptacji właściciela w PR) �
 | --- | --- | --- |
 | [0001](0001-stack-versions.md) | Wersje stacku backendu | Proponowany |
 | [0002](0002-spring-ai-tool-calling.md) | Pętla narzędzi należy do runtime, nie do Spring AI | Proponowany |
+| [0003](0003-module-convention.md) | Konwencja modułów backendu | Proponowany |
 
 Szablon: [0000-template.md](0000-template.md).

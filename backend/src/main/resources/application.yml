@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: ecommerce-agent
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/operator}
+    username: ${DB_USERNAME:operator}
+    password: ${DB_PASSWORD:operator}
+  flyway:
+    locations: classpath:db/migration
+  jackson:
+    time-zone: UTC
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
