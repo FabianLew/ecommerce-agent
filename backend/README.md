@@ -135,6 +135,15 @@ np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_A
   ograniczoną (IG-25).
 - Testy złote: `InventoryMetricsGoldenTest` (IG-01, IG-02, IG-03, IG-25).
 
+## Dowody i ContextSnapshot (B-18)
+
+- `EvidenceStore` (moduł `metrics`) zapisuje niezmienne dowody z hashem kanonicznego rekordu (`CanonicalJson`,
+  ADR-0011). Identyczna treść w sklepie to ten sam dowód; trigger bazy odrzuca zmianę i usunięcie.
+- `InventoryEvidence` utrwala dowody forecastu (stan, sprzedaż, tempo, pokrycie) z lineage. Dowody powstają tylko
+  przy budowie kontekstu decyzji, nie przy zapytaniach analityki.
+- `ContextSnapshots` (moduł `decisions`) zapisuje snapshot raz, z listą dowodów tego samego sklepu; odczyt tylko
+  przez `TrustedStoreScope`.
+
 ## Zasady
 
 - Moduły to podpakiety `com.ecommerceagent`; dozwolone zależności są w `package-info.java` każdego modułu.

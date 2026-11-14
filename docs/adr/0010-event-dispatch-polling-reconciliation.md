@@ -1,6 +1,6 @@
 # ADR-0010: Przekazywanie zdarzeń do Temporal, polling i rekonsyliacja WooCommerce, Integration Health
 
-- Status: Proponowany
+- Status: Zaakceptowany (2026-11-14)
 - Data: 2026-11-14
 - Powiązania: dokument 01 §„Przepływ danych”, dokument 03 §3 i §11, dokument 04 §10, ADR-0004, ADR-0008,
   ADR-0009, backlog B-15, B-16
