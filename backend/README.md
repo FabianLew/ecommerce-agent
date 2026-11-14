@@ -79,6 +79,15 @@ np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_A
   nie startuje). Profil `local` ma klucz deweloperski i pozwala na `http://` oraz adresy prywatne (lokalny Woo).
 - Test z prawdziwym lokalnym WooCommerce: `WOO_LIVE_URL=http://localhost:8081 ./gradlew test --tests '*WooCommerceLiveTest'`.
 
+## Import WooCommerce (B-13)
+
+- `POST /api/v1/stores/{storeId}/integrations/{id}/sync-jobs` `{"scope":"INITIAL_14_DAYS"}` → 202 i przebieg
+  `sync_run`; status: `GET .../sync-jobs/{jobId}` albo `lastSync` w `GET .../integrations`.
+- Workflow `WooImportWorkflow` (profil `worker`) importuje katalog ze stanami, potem zamówienia od północy
+  czasu sklepu 14 dni temu. Okres trafia do `order_sync_coverage` tylko przy zgodności z `X-WP-Total` (ADR-0008).
+- Lokalnie: API (`api,local`) i worker (`worker,local --server.port=8090`), potem przycisk „Importuj dane z
+  ostatnich 14 dni” w Integracjach.
+
 ## Zasady
 
 - Moduły to podpakiety `com.ecommerceagent`; dozwolone zależności są w `package-info.java` każdego modułu.

@@ -5,8 +5,17 @@ import { StatePanel } from "@/components/StatePanel";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { storePath } from "@/lib/store-path";
 
-import { checkConnection } from "./actions";
-import { ERROR_HELP, formatInstant, type Integration, STATUS_LABELS, WARNING_HELP } from "./labels";
+import { checkConnection, startSync } from "./actions";
+import {
+  ERROR_HELP,
+  formatInstant,
+  type Integration,
+  STATUS_LABELS,
+  SYNC_STATUS_LABELS,
+  syncHelp,
+  WARNING_HELP,
+} from "./labels";
+import { RefreshWhileRunning } from "./RefreshWhileRunning";
 import { WooCommerceForm } from "./WooCommerceForm";
 
 export const dynamic = "force-dynamic";
@@ -44,11 +53,18 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ s
         )}
         {canManage ? (
           <>
-            {woo?.allowedActions.includes("RUN_CHECK") ? (
-              <form action={checkConnection.bind(null, storeId, woo.id)} className="inline-form">
-                <button type="submit" className="button secondary">Sprawdź połączenie</button>
-              </form>
-            ) : null}
+            <div className="form-actions inline-form">
+              {woo?.allowedActions.includes("START_SYNC") ? (
+                <form action={startSync.bind(null, storeId, woo.id)}>
+                  <button type="submit" className="button primary">Importuj dane z ostatnich 14 dni</button>
+                </form>
+              ) : null}
+              {woo?.allowedActions.includes("RUN_CHECK") ? (
+                <form action={checkConnection.bind(null, storeId, woo.id)}>
+                  <button type="submit" className="button secondary">Sprawdź połączenie</button>
+                </form>
+              ) : null}
+            </div>
             <h3 className="subheading">{woo ? "Zmień klucz API" : "Połącz sklep"}</h3>
             <WooCommerceForm storeId={storeId} integrationId={woo?.id} />
           </>
@@ -89,6 +105,46 @@ function ConnectionDetails({ integration, timezone }: { integration: Integration
         <dt>Waluta w WooCommerce</dt>
         <dd>{integration.sourceCurrency ?? "—"}</dd>
       </dl>
+      <SyncDetails integration={integration} timezone={timezone} />
     </>
+  );
+}
+
+function SyncDetails({ integration, timezone }: { integration: Integration; timezone: string }) {
+  const job = integration.lastSync;
+  if (!job) {
+    return integration.status === "CONNECTED" ? (
+      <p className="muted sync-empty">Dane nie zostały jeszcze zaimportowane.</p>
+    ) : null;
+  }
+  const help = syncHelp(job);
+  return (
+    <section className="sync" aria-labelledby="sync-title" data-testid="woocommerce-sync">
+      <RefreshWhileRunning running={job.status === "RUNNING"} />
+      <h3 id="sync-title" className="subheading">Synchronizacja</h3>
+      <p className={`badge badge-sync-${job.status.toLowerCase()}`} role="status" data-testid="sync-status">
+        {SYNC_STATUS_LABELS[job.status]}
+      </p>
+      {help ? <p className="form-message error">{help}</p> : null}
+      <dl className="details">
+        <dt>Zakres zamówień</dt>
+        <dd>
+          {formatInstant(job.windowFrom, timezone)} – {formatInstant(job.windowUntil, timezone)}
+        </dd>
+        <dt>Produkty / warianty</dt>
+        <dd>
+          {job.productsImported ?? "—"} / {job.variantsImported ?? "—"}
+        </dd>
+        <dt>Zamówienia</dt>
+        <dd data-testid="sync-orders">
+          {job.ordersImported ?? "—"}
+          {job.ordersExpected != null && job.ordersExpected !== job.ordersImported
+            ? ` (WooCommerce podaje ${job.ordersExpected})`
+            : ""}
+        </dd>
+        <dt>Zakończono</dt>
+        <dd>{formatInstant(job.finishedAt, timezone)}</dd>
+      </dl>
+    </section>
   );
 }
