@@ -30,9 +30,10 @@ Backend (`backend/`) łączy się domyślnie z tą bazą: `./gradlew bootRun --a
 Importowany z [`keycloak/operator-realm.json`](keycloak/operator-realm.json) przy pierwszym starcie.
 
 - Klient `operator-web`: poufny (sesja po stronie serwera Next.js, B-09), Authorization Code + PKCE,
-  redirect `http://localhost:3000/*`, sekret `local-operator-web-secret`.
+  redirect tylko `http://localhost:3000/auth/callback`, sekret `local-operator-web-secret`.
 - Klient `operator-dev-cli`: publiczny, tylko password grant, **wyłącznie lokalnie** — do wywołań API z curl.
 - Oba klienty dodają do tokenu audience `operator-api`; backend odrzuca tokeny bez niego.
+- Access token jest ważny 60 s, żeby odświeżanie sesji frontendu było stale ćwiczone (ADR-0006).
 - Użytkownicy `owner-a` i `owner-b` (hasło = login) mają stałe ID (`1111…`, `2222…`), na które wskazuje
   profil `local` backendu. Role per sklep nie są w Keycloak, tylko w naszej bazie (ADR-0004).
 

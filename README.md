@@ -4,8 +4,8 @@ Autonomous E-commerce Operator — operator działający w tle dla istniejących
 (WooCommerce + Meta Ads + e-mail obsługi klienta). Wykrywa problemy, przygotowuje decyzje
 z dowodami, wykonuje dozwolone działania i weryfikuje ich skutek.
 
-> Status: wczesna implementacja (iteracja I2): szkielet backendu, lokalne środowisko i CI.
-> Logika domenowa jeszcze nie istnieje.
+> Status: wczesna implementacja (iteracja I4): backend z tenancy, obserwowalnością i workerem Temporal,
+> frontend z logowaniem i wyborem sklepu, lokalne środowisko i CI. Logika domenowa jeszcze nie istnieje.
 
 ## Struktura repozytorium
 
@@ -13,6 +13,7 @@ z dowodami, wykonuje dozwolone działania i weryfikuje ich skutek.
 | --- | --- | --- |
 | `docs/architecture/` | Dokumenty 01–05: produkt, architektura AI, Inventory Guardian E2E, UI/UX, Decision Intelligence | I1 |
 | `docs/adr/` | Architecture Decision Records | I1 |
+| `contracts/openapi/` | Kontrakt API backendu, źródło generowanego klienta frontendu | I4 |
 | `spikes/` | Jednorazowe eksperymenty weryfikujące decyzje techniczne (nie są kodem produkcyjnym) | I1 (B-02, B-03) |
 | `backend/` | Modularny monolit Spring Boot (profile `api`, `worker`) | I2 |
 | `frontend/` | Next.js (App Router, TypeScript) | I4 |
@@ -25,6 +26,7 @@ z dowodami, wykonuje dozwolone działania i weryfikuje ich skutek.
 ```bash
 docker compose -f infra/docker-compose.yml up -d --wait   # środowisko lokalne, szczegóły: infra/README.md
 cd backend && ./gradlew check                            # wymaga JDK 21 i Dockera
+cd frontend && pnpm install && pnpm test                 # wymaga Node 22; szczegóły: frontend/README.md
 ```
 
 ## Dokumentacja

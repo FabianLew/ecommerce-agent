@@ -21,6 +21,8 @@ repositories {
 
 val springModulithVersion = "2.1.2"
 val temporalVersion = "1.40.0"
+// OpenAPI contract for the generated frontend client (B-09, ADR-0006).
+val springdocVersion = "3.1.1"
 
 dependencies {
     implementation(platform(SpringBootPlugin.BOM_COORDINATES))
@@ -34,6 +36,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.springframework.modulith:spring-modulith-starter-core")
     implementation("io.temporal:temporal-spring-boot-starter:$temporalVersion")
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:$springdocVersion")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
@@ -61,6 +64,9 @@ tasks.test {
     // Never let tests pick up a developer's real Anthropic endpoint or key (see CLAUDE.md).
     environment("ANTHROPIC_BASE_URL", "")
     environment("ANTHROPIC_API_KEY", "")
+    if (project.hasProperty("updateOpenApi")) {
+        systemProperty("updateOpenApi", "true")
+    }
     if (project.hasProperty("recordTemporalFixtures")) {
         systemProperty("recordTemporalFixtures", "true")
     }

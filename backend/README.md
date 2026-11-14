@@ -28,7 +28,7 @@ formacie). Eksport śladów OTLP: `OTEL_EXPORT_ENABLED=true`, adres `OTEL_EXPORT
 (domyślnie lokalny Jaeger z `infra/`), próbkowanie `TRACING_SAMPLING_PROBABILITY` (domyślnie 1.0).
 
 Profil `local` (łączony z `api` lub `worker`) dokłada demo-tenantów zgodnych z użytkownikami Keycloak:
-organizacja „Demo”, „Sklep A” dla `owner-a` i „Sklep B” dla `owner-b`.
+organizacja „Demo”: `owner-a` jest właścicielem „Sklep A” i analitykiem w „Sklep C”, `owner-b` widzi tylko „Sklep B”.
 
 ```bash
 ./gradlew bootRun --args='--spring.profiles.active=api,local'

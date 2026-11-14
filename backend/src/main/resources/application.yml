@@ -25,6 +25,12 @@ spring:
     # Workers run only in the "worker" profile; "api" uses the client to start workflows.
     start-workers: false
 
+springdoc:
+  api-docs:
+    # The contract is generated in tests (OpenApiContractTest) and committed; not served by default.
+    enabled: ${OPENAPI_DOCS_ENABLED:false}
+  default-produces-media-type: application/json
+
 logging:
   structured:
     # JSON logs (Elastic Common Schema) with MDC fields: requestId, correlationId, traceId, spanId.
