@@ -5,9 +5,13 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.UUID;
 
+import com.ecommerceagent.identity.AuditEntry;
+import com.ecommerceagent.identity.AuditTrail;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -19,11 +23,15 @@ import org.springframework.stereotype.Service;
 @Service
 public class Opportunities {
 
+    static final String RESOURCE = "opportunity";
+
     private final JdbcClient jdbc;
+    private final AuditTrail audit;
     private final Clock clock;
 
-    Opportunities(JdbcClient jdbc, Clock clock) {
+    Opportunities(JdbcClient jdbc, AuditTrail audit, Clock clock) {
         this.jdbc = jdbc;
+        this.audit = audit;
         this.clock = clock;
     }
 
@@ -50,6 +58,8 @@ public class Opportunities {
                 .query(UUID.class)
                 .optional();
         if (inserted.isPresent()) {
+            audit.record(AuditEntry.inScope(scope, "OPPORTUNITY_OPENED", RESOURCE, inserted.get().toString(),
+                    Map.of("category", category.name(), "subjectType", subjectType, "subjectId", subjectId.toString())));
             return new Opened(find(scope, inserted.get()).orElseThrow(), true);
         }
         return new Opened(active(scope, category, subjectType, subjectId).orElseThrow(), false);
@@ -113,6 +123,12 @@ public class Opportunities {
         if (updated == 0) {
             throw new IllegalTransitionException("Opportunity " + opportunityId + " changed concurrently");
         }
+        Map<String, String> details = new TreeMap<>(Map.of("from", current.status().name(), "to", next.name()));
+        if (!next.isActive() && closeReason != null) {
+            details.put("reason", closeReason);
+        }
+        audit.record(AuditEntry.inScope(scope, "OPPORTUNITY_STATUS_CHANGED", RESOURCE, opportunityId.toString(),
+                details));
         return find(scope, opportunityId).orElseThrow();
     }
 

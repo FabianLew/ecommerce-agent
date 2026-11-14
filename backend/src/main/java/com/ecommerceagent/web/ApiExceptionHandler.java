@@ -71,6 +71,11 @@ class ApiExceptionHandler {
         };
     }
 
+    @ExceptionHandler(InvalidQueryException.class)
+    ResponseEntity<ApiError> invalidQuery(HttpServletRequest request, InvalidQueryException exception) {
+        return error(request, HttpStatus.BAD_REQUEST, exception.code(), "A query parameter is not valid.", false);
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     ResponseEntity<ApiError> malformed(HttpServletRequest request) {
         return error(request, HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", "The request body is not valid.", false);

@@ -1,6 +1,6 @@
 # ADR-0013: Interface languages (English default, Polish second)
 
-- Status: Proposed
+- Status: Accepted (PR merge, 2026-11-14)
 - Date: 2026-11-14
 - Related: 04 §1 (interface languages), 04 §2 (store time), 04 §14 (accessibility), ADR-0006 (frontend and session)
 
