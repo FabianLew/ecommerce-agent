@@ -16,6 +16,14 @@ spring:
           audiences: ${OIDC_AUDIENCE:operator-api}
   jackson:
     time-zone: UTC
+  temporal:
+    connection:
+      target: ${TEMPORAL_ADDRESS:localhost:7233}
+    namespace: ${TEMPORAL_NAMESPACE:default}
+    workers-auto-discovery:
+      packages: com.ecommerceagent.automation
+    # Workers run only in the "worker" profile; "api" uses the client to start workflows.
+    start-workers: false
 
 logging:
   structured:

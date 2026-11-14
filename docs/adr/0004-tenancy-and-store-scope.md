@@ -19,7 +19,12 @@ ani payload nie mogą go ustawić. Wyciek danych między sklepami jest najpoważ
 3. **`TrustedStoreScope(organizationId, storeId, userId, roles)`** to jedyny typ zakresu przekazywany do
    modułów. Buduje go wyłącznie backend:
    - HTTP: z uwierzytelnionego użytkownika i `{storeId}` ze ścieżki, po sprawdzeniu członkostwa w bazie;
-   - Temporal/aktywności (B-08) i Agent Runtime: z zapisanego rekordu, nigdy z argumentów modelu.
+   - Temporal (B-08): `StoreContextPropagator` przenosi w nagłówkach workflow identyfikatory
+     (`organizationId`, `storeId`, `userId`) i `correlationId`. Nagłówek to tylko **deklaracja**:
+     `StoreScopeActivityInterceptor` przed każdą aktywnością ponownie sprawdza członkostwo w bazie i dopiero
+     wtedy udostępnia `ActivityStoreScope.current()`. Brak lub niezgodność deklaracji kończy aktywność
+     nieretryowalnym błędem `STORE_SCOPE_MISSING` / `STORE_SCOPE_REJECTED` (z wpisem w audycie);
+   - Agent Runtime: z zapisanego rekordu, nigdy z argumentów modelu.
    Zapytania repozytoriów biorą `organizationId` i `storeId` z tego obiektu.
 4. **Brak dostępu i brak zasobu dają tę samą odpowiedź `404 NOT_FOUND`** (dokument 04 §3), żeby nie
    ujawniać istnienia cudzych sklepów. Próba dostępu do cudzego lub nieistniejącego sklepu trafia do audytu
