@@ -1,54 +1,53 @@
-# ADR-0003: Konwencja modułów backendu
+# ADR-0003: Backend module convention
 
-- Status: Zaakceptowany (merge PR, 2026-11-14)
-- Data: 2026-11-14
-- Powiązania: plan architektury (B2 „Proponowana mapa modułów”, D1), dokument 02, ADR-0001, backlog B-04
+- Status: Accepted (PR merge, 2026-11-14)
+- Date: 2026-11-14
+- Related: architecture plan (B2 "Proposed module map", D1), document 02, ADR-0001, backlog B-04
 
-## Kontekst
+## Context
 
-Backend to modularny monolit: jeden artefakt uruchamiany w profilach `api` i `worker`. Granice modułów
-z mapy B2 mają być sprawdzane automatycznie w każdym buildzie, zanim powstanie kod domenowy. Inaczej
-zależności zaczną biec w górę (np. `identity` → `commerce`) i trudno to potem odwrócić.
+The backend is a modular monolith: one artifact run with the `api` and `worker` profiles. The module boundaries
+from the B2 map must be checked automatically in every build, before domain code is written. Otherwise
+dependencies start pointing upward (e.g. `identity` → `commerce`), and that is hard to reverse later.
 
-## Decyzja
+## Decision
 
-1. Moduł = bezpośredni podpakiet `com.ecommerceagent` (konwencja Spring Modulith). Moduły:
+1. Module = a direct subpackage of `com.ecommerceagent` (the Spring Modulith convention). Modules:
    `identity`, `integration`, `commerce`, `businessprofile`, `metrics`, `decisions`, `support`,
    `reporting`, `intelligence`, `automation`, `web`.
-2. Każdy moduł ma `package-info.java` z `@ApplicationModule(allowedDependencies = …)` zgodnie z B2.
-   Lista dozwolonych zależności jest jawna, także pusta (`identity`). Zmiana listy to zmiana architektury
-   i wymaga uzasadnienia w PR.
-3. Publiczne API modułu to typy w jego pakiecie bazowym. Podpakiety (np. `commerce.internal`) są
-   wewnętrzne i niedostępne dla innych modułów (domyślna reguła Spring Modulith).
-4. Komunikacja „w górę” mapy (np. `commerce` informuje `decisions`) odbywa się wyłącznie przez zdarzenia
-   domenowe, nie przez wywołania.
-5. `ModularityTest` (`ApplicationModules.verify()` + lista oczekiwanych modułów) jest częścią
-   `./gradlew check` i blokuje merge.
-6. Jeden projekt Gradle (`backend/`), bez podziału na podprojekty Gradle: granice pilnuje Modulith,
-   a podział buildu dodamy dopiero, gdy pojawi się konkretna potrzeba (np. czas kompilacji).
+2. Every module has a `package-info.java` with `@ApplicationModule(allowedDependencies = …)` following B2.
+   The list of allowed dependencies is explicit, even when empty (`identity`). Changing the list is an
+   architecture change and needs a justification in the PR.
+3. A module's public API is the types in its base package. Subpackages (e.g. `commerce.internal`) are
+   internal and not accessible to other modules (the Spring Modulith default rule).
+4. Communication "up" the map (e.g. `commerce` informing `decisions`) happens only through domain events,
+   not through calls.
+5. `ModularityTest` (`ApplicationModules.verify()` + the list of expected modules) is part of
+   `./gradlew check` and blocks the merge.
+6. One Gradle project (`backend/`), without Gradle subprojects: Modulith guards the boundaries,
+   and we split the build only when a concrete need appears (e.g. compile time).
 
-## Rozważane alternatywy
+## Alternatives considered
 
-- **Podprojekty Gradle per moduł** — odrzucone na teraz: twarde granice kompilacji, ale 11 plików
-  buildu i rozbudowana konfiguracja bez obecnej korzyści; Modulith daje tę samą kontrolę testem.
-- **Moduły tworzone dopiero z pierwszym kodem** — odrzucone: mapa B2 jest zatwierdzona, a puste moduły
-  z jawnymi zależnościami kosztują 11 plików `package-info.java` i od pierwszego dnia blokują błędne
-  zależności.
-- **ArchUnit bez Modulith** — odrzucone: Modulith już jest w stacku (ADR-0001) i daje też zdarzenia,
-  testy modułowe i dokumentację.
+- **Gradle subprojects per module** — rejected for now: hard compile boundaries, but 11 build files
+  and an extensive configuration with no current benefit; Modulith gives the same control through a test.
+- **Creating modules only with the first code** — rejected: the B2 map is approved, and empty modules
+  with explicit dependencies cost 11 `package-info.java` files and block wrong dependencies from day one.
+- **ArchUnit without Modulith** — rejected: Modulith is already in the stack (ADR-0001) and also gives events,
+  module tests and documentation.
 
-## Konsekwencje
+## Consequences
 
-- Pozytywne: naruszenie mapy modułów kończy się czerwonym buildem z dokładną ścieżką zależności.
-- Moduły `support`, `reporting`, `businessprofile` istnieją, choć ich kod powstanie po Pilocie; to tylko
-  deklaracje pakietów.
-- Wybór warstwy dostępu do danych (Spring Data JDBC vs JPA) nie należy do tego ADR. Backend ma na razie
-  tylko `spring-boot-starter-jdbc` i Flyway; decyzja zapadnie w B-06 razem z pierwszymi tabelami.
-- Plan wspominał „ADR-002: konwencja modułów”; numer 0002 zajęła granica tool calling, stąd 0003.
-  Model tenancy (w planie ADR-003) dostanie kolejny wolny numer w I3.
+- Positive: a violation of the module map ends in a red build with the exact dependency path.
+- The `support`, `reporting` and `businessprofile` modules exist although their code will be written after the
+  Pilot; they are only package declarations.
+- The choice of data access layer (Spring Data JDBC vs JPA) is not part of this ADR. For now the backend has only
+  `spring-boot-starter-jdbc` and Flyway; the decision will be made in B-06 together with the first tables.
+- The plan mentioned "ADR-002: module convention"; number 0002 was taken by the tool calling boundary, hence 0003.
+  The tenancy model (ADR-003 in the plan) will get the next free number in I3.
 
-## Weryfikacja
+## Verification
 
-`backend/`, `./gradlew check`: `ModularityTest` przechodzi (2/2). Sprawdzone mutacyjnie: tymczasowa
-klasa w `identity` odwołująca się do `commerce` daje
-`Module 'identity' depends on module 'commerce' … Allowed targets: none.` i czerwony build.
+`backend/`, `./gradlew check`: `ModularityTest` passes (2/2). Checked by mutation: a temporary
+class in `identity` referencing `commerce` gives
+`Module 'identity' depends on module 'commerce' … Allowed targets: none.` and a red build.

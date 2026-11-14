@@ -1,80 +1,81 @@
-# ADR-0006: Frontend Next.js z sesją po stronie serwera (BFF) i klientem z kontraktu OpenAPI
+# ADR-0006: Next.js frontend with a server-side session (BFF) and a client from the OpenAPI contract
 
-- Status: Zaakceptowany (akceptacja właściciela, 2026-11-14)
-- Data: 2026-11-14
-- Powiązania: plan (decyzja I5: Spring Security + OIDC, Keycloak), dokument 04 §2–3, §14–15, backlog B-09,
-  B-10, ADR-0001 (zasada wersji), ADR-0004 (zakres sklepu)
+- Status: Accepted (owner acceptance, 2026-11-14)
+- Date: 2026-11-14
+- Related: plan (decision I5: Spring Security + OIDC, Keycloak), document 04 §2–3, §14–15, backlog B-09,
+  B-10, ADR-0001 (version rule), ADR-0004 (store scope)
 
-## Kontekst
+## Context
 
-B-09 wymaga frontendu Next.js z TypeScript, logowania OIDC z sesją w ciasteczku, `AppShell`, `StoreSwitcher`
-i klienta generowanego z OpenAPI. To pierwsza warstwa, która trzyma tokeny użytkownika, więc decyzje o tym, gdzie
-leżą tokeny i jak frontend rozmawia z API, są trudne do odwrócenia. Dokument 04 wymaga, żeby backend sprawdzał
-dostęp do sklepu przy każdym żądaniu, a cache i kontekst sklepu nie przeciekały po przełączeniu konta lub roli
+B-09 requires a Next.js frontend with TypeScript, OIDC sign-in with a session in a cookie, `AppShell`, `StoreSwitcher`
+and a client generated from OpenAPI. This is the first layer that holds user tokens, so the decisions about where
+tokens live and how the frontend talks to the API are hard to reverse. Document 04 requires the backend to check
+store access on every request, and the cache and the store context must not leak after an account or role switch
 (UX-13).
 
-Ograniczenia: tylko wydania GA starsze niż ok. 2 tygodnie (ADR-0001), bez dodatkowej infrastruktury w MVP
-(np. Redis), małe zależności.
+Constraints: only GA releases older than about 2 weeks (ADR-0001), no extra infrastructure in the MVP
+(e.g. Redis), small dependencies.
 
-## Decyzja
+## Decision
 
-1. **Stack:** Next.js 16.4.3 (App Router), React 19.3.1, TypeScript 5.9.3 w trybie `strict`, Node 22 LTS,
-   pnpm 10 (wersja w `packageManager`, instalowana przez corepack). TypeScript 6/7 odłożone: `openapi-typescript`
-   wymaga jeszcze TS 5.
-2. **Wzorzec BFF: tokeny nie trafiają do przeglądarki.** Serwer Next.js jest poufnym klientem OIDC
-   `operator-web` (Authorization Code + PKCE + `state` + `nonce`, biblioteka `openid-client` 6.8.8). Przeglądarka
-   dostaje tylko zaszyfrowane ciasteczko sesji. Wywołania API idą z Server Components i Route Handlers z
-   nagłówkiem `Authorization: Bearer`, bez cache (`no-store`).
-3. **Sesja w jednym zaszyfrowanym ciasteczku `op_session`:** JWE `dir` + `A256GCM` (`jose` 6.2.14), klucz
-   wyprowadzony z `SESSION_SECRET` przez HKDF osobno dla sesji i dla transakcji logowania. Atrybuty: `HttpOnly`,
-   `SameSite=Lax`, `Path=/`, `Secure` przy `https`, wygasa razem z refresh tokenem. Zawartość: `sub`, access
-   token, refresh token i ich czasy wygaśnięcia. ID token jest sprawdzany przy logowaniu i nie jest zapisywany.
-   Zmierzony rozmiar ciasteczka: ok. 2,7–3,3 KB przy limicie 4 KB; test e2e pilnuje progu 3,5 KB.
-4. **Odświeżanie:** `proxy.ts` (dawniej middleware) odświeża access token, gdy zostało mniej niż 30 s, i
-   przekazuje nową sesję renderowanej stronie. Nieudane odświeżenie kończy sesję i prowadzi do logowania z
-   zachowaniem bezpiecznego `returnTo` (tylko ścieżki tego samego originu).
-5. **Wylogowanie:** `POST /auth/logout`, tylko z naszego originu (ochrona CSRF). Serwer kończy sesję Keycloak
-   kanałem zwrotnym (endpoint `end_session` z refresh tokenem i sekretem klienta) i czyści ciasteczko.
-6. **Kontrakt API:** springdoc-openapi 3.1.1 generuje opis `/api/v1` w testach backendu. Plik
-   `contracts/openapi/operator-api.json` jest w repozytorium, a `OpenApiContractTest` sprawdza, że odpowiada
-   działającemu API. Frontend generuje z niego typy (`openapi-typescript` 7.13.0) i używa `openapi-fetch` 0.17.0.
-   CI sprawdza, że wygenerowany plik jest aktualny. Endpoint `/v3/api-docs` jest domyślnie wyłączony.
-7. **Routing i sklep:** wszystkie widoki mają prefiks `/stores/{storeId}` (04 §2). Sklep zawsze weryfikuje
-   backend; dla cudzego lub nieistniejącego sklepu UI pokazuje bezpieczny stan „niedostępny” i nie przełącza
-   sklepu samo. Zmiana sklepu zachowuje sekcję, a usuwa identyfikatory zasobów i parametry poprzedniego sklepu.
-8. **Testy:** Vitest 4.1.12 dla logiki (sesja, `returnTo`, ścieżki sklepu), Playwright 1.64.1 dla e2e z
-   prawdziwym Keycloak, Postgres i backendem. Oba w CI.
+1. **Stack:** Next.js 16.4.3 (App Router), React 19.3.1, TypeScript 5.9.3 in `strict` mode, Node 22 LTS,
+   pnpm 10 (version in `packageManager`, installed by corepack). TypeScript 6/7 postponed: `openapi-typescript`
+   still requires TS 5.
+2. **BFF pattern: tokens never reach the browser.** The Next.js server is the confidential OIDC client
+   `operator-web` (Authorization Code + PKCE + `state` + `nonce`, library `openid-client` 6.8.8). The browser
+   gets only an encrypted session cookie. API calls go from Server Components and Route Handlers with the
+   `Authorization: Bearer` header, without caching (`no-store`).
+3. **The session is in one encrypted cookie, `op_session`:** JWE `dir` + `A256GCM` (`jose` 6.2.14), with keys
+   derived from `SESSION_SECRET` through HKDF separately for the session and for the sign-in transaction. Attributes:
+   `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` on `https`, expires together with the refresh token. Content: `sub`,
+   the access token, the refresh token and their expiry times. The ID token is checked at sign-in and is not stored.
+   Measured cookie size: about 2.7–3.3 KB against a 4 KB limit; an e2e test guards a 3.5 KB threshold.
+4. **Refresh:** `proxy.ts` (formerly middleware) refreshes the access token when less than 30 s remain and
+   passes the new session to the rendered page. A failed refresh ends the session and leads to sign-in while
+   keeping a safe `returnTo` (same-origin paths only).
+5. **Sign-out:** `POST /auth/logout`, only from our origin (CSRF protection). The server ends the Keycloak session
+   through the back channel (the `end_session` endpoint with the refresh token and the client secret) and clears
+   the cookie.
+6. **API contract:** springdoc-openapi 3.1.1 generates the `/api/v1` description in the backend tests. The file
+   `contracts/openapi/operator-api.json` is in the repository, and `OpenApiContractTest` checks that it matches the
+   running API. The frontend generates types from it (`openapi-typescript` 7.13.0) and uses `openapi-fetch` 0.17.0.
+   CI checks that the generated file is up to date. The `/v3/api-docs` endpoint is disabled by default.
+7. **Routing and the store:** every view has the `/stores/{storeId}` prefix (04 §2). The backend always verifies
+   the store; for another or a non-existent store the UI shows a safe "unavailable" state and does not switch the
+   store on its own. Switching the store keeps the section but drops the resource identifiers and parameters of
+   the previous store.
+8. **Tests:** Vitest 4.1.12 for logic (session, `returnTo`, store paths), Playwright 1.64.1 for e2e with
+   real Keycloak, Postgres and the backend. Both in CI.
 
-## Rozważane alternatywy
+## Alternatives considered
 
-- **Auth.js (next-auth)** — odrzucone: linia 5 jest wciąż w fazie beta (zasada GA), a 4.x to starsza linia
-  projektowana pod Pages Router. Własny kod logowania to ok. 200 linii na `openid-client`, który robi
-  weryfikację protokołu (state, PKCE, nonce, podpis i claims ID tokenu).
-- **Tokeny w przeglądarce (SPA + PKCE, klient publiczny)** — odrzucone: access token dostępny dla JavaScriptu
-  zwiększa skutki XSS; dokument 04 i plan zakładają sesję w ciasteczku.
-- **Sesja po stronie serwera w Redis/Postgres** — odłożone: wymaga dodatkowego magazynu albo endpointów sesji w
-  backendzie. Wrócimy do tego, gdy tokeny przestaną mieścić się w ciasteczku albo będzie potrzebne zdalne
-  unieważnianie sesji z poziomu aplikacji.
-- **Ręcznie pisany klient API** — odrzucone: rozjazd typów z backendem wychodzi dopiero w runtime.
+- **Auth.js (next-auth)** — rejected: line 5 is still in beta (GA rule), and 4.x is an older line
+  designed for the Pages Router. Our own sign-in code is about 200 lines on top of `openid-client`, which does
+  the protocol verification (state, PKCE, nonce, ID token signature and claims).
+- **Tokens in the browser (SPA + PKCE, public client)** — rejected: an access token reachable from JavaScript
+  increases the impact of XSS; document 04 and the plan assume a session in a cookie.
+- **Server-side session in Redis/Postgres** — postponed: it needs extra storage or session endpoints in the
+  backend. We will come back to it when tokens no longer fit in a cookie or remote session revocation from the
+  application is needed.
+- **A hand-written API client** — rejected: type drift from the backend shows up only at runtime.
 
-## Konsekwencje
+## Consequences
 
-- Komponenty klienckie nie wołają backendu bezpośrednio. Gdy pojawią się komendy z UI (B-24), dodamy trasę
-  proxy BFF w Next.js z ochroną CSRF (Origin + `SameSite`), z `Idempotency-Key` i `If-Match` zgodnie z 04 §3.
-- Zmiana API wymaga: `./gradlew test --tests '*OpenApiContractTest' -PupdateOpenApi`, potem `pnpm generate:api`.
-- Lokalny realm wydaje access tokeny ważne 60 s, żeby odświeżanie było stale ćwiczone (także w e2e).
-- Redirect URI klienta `operator-web` to wyłącznie `/auth/callback` (bez wildcardów).
-- Paleta z 04 §2 zmierzona (README frontendu): tekst i akcent spełniają 4,5:1; obramowanie `#DFE7E2` (1,26:1)
-  jest tylko dekoracyjne, kontrolki formularzy mają obramowanie `#74867E` (3,85:1).
-- Ryzyko: Keycloak może wydawać większe tokeny (więcej claims), a ciasteczko przekroczy limit. Mitygacja: test
-  rozmiaru w e2e; wtedy dzielenie ciasteczka albo sesja po stronie serwera.
-- Ryzyko: refresh token w ciasteczku jest szyfrowany, ale wyciek `SESSION_SECRET` ujawnia sesje. Sekret
-  pochodzi z magazynu sekretów środowiska; rotacja unieważnia wszystkie sesje.
+- Client components do not call the backend directly. When UI commands appear (B-24), we add a BFF proxy route
+  in Next.js with CSRF protection (Origin + `SameSite`), with `Idempotency-Key` and `If-Match` per 04 §3.
+- An API change requires: `./gradlew test --tests '*OpenApiContractTest' -PupdateOpenApi`, then `pnpm generate:api`.
+- The local realm issues access tokens valid for 60 s, so that refresh is exercised all the time (also in e2e).
+- The redirect URI of the `operator-web` client is only `/auth/callback` (no wildcards).
+- The palette from 04 §2 was measured (frontend README): text and accent meet 4.5:1; the `#DFE7E2` border (1.26:1)
+  is only decorative, form controls have a `#74867E` border (3.85:1).
+- Risk: Keycloak may issue larger tokens (more claims), and the cookie would exceed the limit. Mitigation: the size
+  test in e2e; then split the cookie or move to a server-side session.
+- Risk: the refresh token in the cookie is encrypted, but a leak of `SESSION_SECRET` exposes sessions. The secret
+  comes from the environment's secret store; rotating it invalidates all sessions.
 
-## Weryfikacja
+## Verification
 
-`frontend/`: `pnpm typecheck`, `pnpm test` (17 testów), `pnpm build`, `pnpm test:e2e` (6 scenariuszy przeciw
-lokalnemu stackowi): logowanie i przełączanie sklepu z zachowaniem sekcji, bezpieczny stan dla cudzego sklepu,
-`HttpOnly` i brak JWT w stronie, wylogowanie kończące sesję Keycloak, odrzucenie wylogowania z obcego originu,
-odświeżenie tokenu. Mutacyjnie: wyłączenie odświeżania powoduje porażkę testu odświeżenia. Backend:
-`OpenApiContractTest`.
+`frontend/`: `pnpm typecheck`, `pnpm test` (17 tests), `pnpm build`, `pnpm test:e2e` (6 scenarios against the
+local stack): sign-in and store switching that keeps the section, a safe state for another store,
+`HttpOnly` and no JWT in the page, sign-out ending the Keycloak session, rejecting a sign-out from a foreign origin,
+token refresh. By mutation: disabling refresh makes the refresh test fail. Backend: `OpenApiContractTest`.

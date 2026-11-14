@@ -54,25 +54,25 @@ public class BaselineProposer {
                 reasons.add("FORECAST_UNAVAILABLE");
             }
             return recommendation(DecisionDisposition.INSUFFICIENT_DATA, null, demand, missing, reasons,
-                    "Brak aktualnego stanu albo prognozy sprzedaży, więc nie da się ocenić ryzyka braku.",
+                    "No current stock level or sales forecast, so the stock-out risk cannot be assessed.",
                     List.of());
         }
         String cover = context.daysOfCover().value().setScale(1, RoundingMode.HALF_UP).toPlainString();
         if (context.daysOfCover().value().compareTo(context.thresholdDays()) >= 0) {
             return recommendation(DecisionDisposition.NO_ACTION, null, demand, List.of(),
                     List.of("COVER_ABOVE_THRESHOLD"),
-                    "Zapas wystarcza na " + cover + " dnia, czyli nie mniej niż próg " + context.thresholdDays()
-                            + " dni.", List.of());
+                    "Stock covers " + cover + " days, which is not below the threshold of " + context.thresholdDays()
+                            + " days.", List.of());
         }
 
         List<EvidenceRef> evidence = new ArrayList<>(demand);
         evidence.add(context.replenishmentEvidence());
         List<String> uncertainties = context.replenishmentKnown() ? List.of()
-                : List.of("Nie znamy terminu dostawy tego wariantu.");
+                : List.of("The replenishment date for this variant is unknown.");
         if (context.ads().isEmpty()) {
             return recommendation(DecisionDisposition.NO_ACTION, null, evidence, List.of(),
                     List.of("COVER_BELOW_THRESHOLD", "NO_MAPPED_ADS", "REPLENISHMENT_UNKNOWN"),
-                    "Zapas wystarcza na " + cover + " dnia, ale żadna reklama nie promuje tego wariantu.",
+                    "Stock covers " + cover + " days, but no ad promotes this variant.",
                     uncertainties);
         }
         List<InventoryContext.AdFact> multi = context.ads().stream()
@@ -91,13 +91,13 @@ public class BaselineProposer {
             evidence.add(target.stateEvidence());
             evidence.add(target.mappingEvidence());
             List<String> reasons = new ArrayList<>(List.of("COVER_BELOW_THRESHOLD", "DEDICATED_AD_ACTIVE"));
-            String summary = "Zapas wystarcza na " + cover + " dnia przy progu " + context.thresholdDays()
-                    + " dni. Proponujemy wstrzymać dedykowaną reklamę " + target.externalId() + ".";
+            String summary = "Stock covers " + cover + " days against a threshold of " + context.thresholdDays()
+                    + " days. We propose pausing the dedicated ad " + target.externalId() + ".";
             if (!multi.isEmpty()) {
                 reasons.add("MULTI_PRODUCT_AD_EXCLUDED");
-                summary += " Reklamy katalogowe (" + String.join(", ", multi.stream()
+                summary += " The catalog ads (" + String.join(", ", multi.stream()
                         .map(InventoryContext.AdFact::externalId).sorted().toList())
-                        + ") promują też inne produkty, więc ich nie wstrzymujemy.";
+                        + ") also promote other products, so we do not pause them.";
             }
             if (!context.replenishmentKnown()) {
                 reasons.add("REPLENISHMENT_UNKNOWN");
@@ -110,7 +110,7 @@ public class BaselineProposer {
             candidates.forEach(ad -> evidence.add(ad.stateEvidence()));
             return recommendation(DecisionDisposition.NO_ACTION, null, evidence, List.of(),
                     List.of("COVER_BELOW_THRESHOLD", "AD_NOT_ACTIVE"),
-                    "Zapas wystarcza na " + cover + " dnia, a dedykowane reklamy już nie emitują.", uncertainties);
+                    "Stock covers " + cover + " days, and the dedicated ads are already not running.", uncertainties);
         }
         List<String> reasons = new ArrayList<>(List.of("COVER_BELOW_THRESHOLD"));
         boolean unverified = context.ads().stream().anyMatch(ad -> ad.singleVariant()
@@ -124,8 +124,8 @@ public class BaselineProposer {
                     .forEach(ad -> evidence.add(ad.mappingEvidence()));
         }
         return recommendation(DecisionDisposition.ESCALATE, null, evidence, List.of(), reasons,
-                "Zapas wystarcza na " + cover + " dnia, ale wariant promują tylko reklamy katalogowe albo bez "
-                        + "potwierdzonego mapowania. Decyzja należy do Ciebie.", uncertainties);
+                "Stock covers " + cover + " days, but the variant is promoted only by catalog ads or ads without "
+                        + "a verified mapping. The decision is yours.", uncertainties);
     }
 
     private static Recommendation recommendation(DecisionDisposition disposition, PauseAd action,

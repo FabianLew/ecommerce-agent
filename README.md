@@ -1,41 +1,43 @@
 # ecommerce-agent
 
-Autonomous E-commerce Operator — operator działający w tle dla istniejących sklepów DTC
-(WooCommerce + Meta Ads + e-mail obsługi klienta). Wykrywa problemy, przygotowuje decyzje
-z dowodami, wykonuje dozwolone działania i weryfikuje ich skutek.
+Autonomous E-commerce Operator — a background operator for existing DTC stores (WooCommerce + Meta Ads +
+customer-service e-mail). It detects problems, prepares decisions with evidence, performs allowed actions and
+verifies their effect.
 
-> Status: wczesna implementacja (iteracja I4): backend z tenancy, obserwowalnością i workerem Temporal,
-> frontend z logowaniem i wyborem sklepu, lokalne środowisko i CI. Logika domenowa jeszcze nie istnieje.
+> Status: early implementation (iteration I7): backend with tenancy, observability and a Temporal worker;
+> WooCommerce import, webhooks, polling and integration health; Metrics Engine v1; the first Inventory Guardian
+> episode in shadow mode (risk detection, evidence, DecisionProposal v1, baseline and policy evaluation); frontend
+> with sign-in and store selection; local environment and CI.
 
-## Struktura repozytorium
+## Repository layout
 
-| Ścieżka | Zawartość | Od iteracji |
+| Path | Contents | Since iteration |
 | --- | --- | --- |
-| `docs/architecture/` | Dokumenty 01–05: produkt, architektura AI, Inventory Guardian E2E, UI/UX, Decision Intelligence | I1 |
+| `docs/architecture/` | Documents 01–05: product, AI architecture, Inventory Guardian E2E, UI/UX, Decision Intelligence | I1 |
 | `docs/adr/` | Architecture Decision Records | I1 |
-| `contracts/openapi/` | Kontrakt API backendu, źródło generowanego klienta frontendu | I4 |
-| `spikes/` | Jednorazowe eksperymenty weryfikujące decyzje techniczne (nie są kodem produkcyjnym) | I1 (B-02, B-03) |
-| `backend/` | Modularny monolit Spring Boot (profile `api`, `worker`) | I2 |
+| `contracts/openapi/` | Backend API contract, source of the generated frontend client | I4 |
+| `spikes/` | One-off experiments that verify technical decisions (not production code) | I1 (B-02, B-03) |
+| `backend/` | Spring Boot modular monolith (profiles `api`, `worker`) | I2 |
 | `frontend/` | Next.js (App Router, TypeScript) | I4 |
-| `knowledge/` | Skills, playbooks, JSON Schema kontraktów, przypadki ewaluacyjne | I7 |
-| `infra/` | Docker Compose dla środowiska lokalnego | I2 |
-| `.github/workflows/` | CI: backend, testy bezpieczeństwa runtime, smoke test środowiska | I2 |
+| `knowledge/` | Skills, playbooks, contract JSON Schemas, evaluation cases | I7 |
+| `infra/` | Docker Compose for the local environment | I2 |
+| `.github/workflows/` | CI: backend, runtime safety tests, environment smoke test | I2 |
 
-## Szybki start
+## Quick start
 
 ```bash
-docker compose -f infra/docker-compose.yml up -d --wait   # środowisko lokalne, szczegóły: infra/README.md
-cd backend && ./gradlew check                            # wymaga JDK 21 i Dockera
-cd frontend && pnpm install && pnpm test                 # wymaga Node 22; szczegóły: frontend/README.md
+docker compose -f infra/docker-compose.yml up -d --wait   # local environment, details: infra/README.md
+cd backend && ./gradlew check                            # needs JDK 21 and Docker
+cd frontend && pnpm install && pnpm test                 # needs Node 22; details: frontend/README.md
 ```
 
-## Dokumentacja
+## Documentation
 
-Źródłem prawdy o produkcie i architekturze są dokumenty w `docs/architecture/`
-(kolejność lektury: 01 → 02 → 03 → 04 → 05). Decyzje podjęte w trakcie implementacji,
-które doprecyzowują lub zmieniają te dokumenty, są zapisywane jako ADR w `docs/adr/`.
+The documents in `docs/architecture/` are the source of truth about the product and the architecture (reading
+order: 01 → 02 → 03 → 04 → 05). Decisions made during implementation that refine or change those documents are
+recorded as ADRs in `docs/adr/`.
 
-## Spike'i iteracji I1
+## Iteration I1 spikes
 
-- [`spikes/stack-compat`](spikes/stack-compat/README.md) — B-02 (zgodność wersji stacku, ADR-0001)
-  i B-03 (granica tool calling w Spring AI, ADR-0002).
+- [`spikes/stack-compat`](spikes/stack-compat/README.md) — B-02 (stack version compatibility, ADR-0001)
+  and B-03 (the tool-calling boundary in Spring AI, ADR-0002).

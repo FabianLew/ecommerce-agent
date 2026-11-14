@@ -1,62 +1,63 @@
 # Frontend (Next.js)
 
-Aplikacja webowa operatora: logowanie przez Keycloak, wybór sklepu, `AppShell` z ośmioma sekcjami z
-dokumentu 04 §2. Decyzje: [ADR-0006](../docs/adr/0006-frontend-and-session.md).
+The operator's web application: sign-in through Keycloak, store selection, an `AppShell` with the eight sections
+from document 04 §2. Decisions: [ADR-0006](../docs/adr/0006-frontend-and-session.md).
 
-## Uruchomienie lokalne
+## Running locally
 
-Wymaga Node 22 (`corepack enable` instaluje pnpm w wersji z `package.json`), środowiska z
-`infra/docker-compose.yml` i backendu z profilami `api,local`.
+Needs Node 22 (`corepack enable` installs the pnpm version from `package.json`), the environment from
+`infra/docker-compose.yml` and the backend with profiles `api,local`.
 
 ```bash
 docker compose -f ../infra/docker-compose.yml up -d --wait postgres keycloak temporal
-(cd ../backend && ./gradlew bootRun --args='--spring.profiles.active=api,local')   # osobny terminal
+(cd ../backend && ./gradlew bootRun --args='--spring.profiles.active=api,local')   # separate terminal
 cp .env.example .env.local
 pnpm install
-pnpm dev                         # http://localhost:3000, użytkownicy owner-a / owner-b (hasło = login)
+pnpm dev                         # http://localhost:3000, users owner-a / owner-b (password = login)
 ```
 
-`owner-a` jest właścicielem „Sklep A” i analitykiem w „Sklep C” (przełączanie sklepu, różne uprawnienia).
-`owner-b` widzi tylko „Sklep B”.
+`owner-a` owns "Sklep A" and is an analyst in "Sklep C" (store switching, different permissions). `owner-b` sees
+only "Sklep B".
 
-## Jak działa sesja
+## How the session works
 
-- Przeglądarka dostaje tylko ciasteczko `op_session` (zaszyfrowane JWE, `HttpOnly`, `SameSite=Lax`). Tokeny
-  zostają na serwerze Next.js; komponenty klienckie nie wołają backendu bezpośrednio.
-- `src/proxy.ts` wymaga sesji na każdej stronie i odświeża access token przed wygaśnięciem.
-- `/auth/login` → Keycloak (PKCE, state, nonce) → `/auth/callback`. `POST /auth/logout` kończy też sesję
-  Keycloak.
-- Dane z API pobierają Server Components przez `backend()` z `src/lib/api.ts` (bez cache).
+- The browser gets only the `op_session` cookie (encrypted JWE, `HttpOnly`, `SameSite=Lax`). Tokens stay on the
+  Next.js server; client components never call the backend directly.
+- `src/proxy.ts` requires a session on every page and refreshes the access token before it expires.
+- `/auth/login` → Keycloak (PKCE, state, nonce) → `/auth/callback`. `POST /auth/logout` also ends the Keycloak
+  session.
+- Server Components fetch API data through `backend()` from `src/lib/api.ts` (no cache).
 
-## Klient API
+## API client
 
-Typy w `src/api/schema.d.ts` są generowane z `../contracts/openapi/operator-api.json`. Nie edytuj ich ręcznie.
+The types in `src/api/schema.d.ts` are generated from `../contracts/openapi/operator-api.json`. Do not edit them by
+hand.
 
 ```bash
-(cd ../backend && ./gradlew test --tests '*OpenApiContractTest' -PupdateOpenApi)   # po zmianie API
+(cd ../backend && ./gradlew test --tests '*OpenApiContractTest' -PupdateOpenApi)   # after an API change
 pnpm generate:api
 ```
 
-CI (`pnpm check:api`) nie przejdzie, jeśli wygenerowany plik nie odpowiada kontraktowi.
+CI (`pnpm check:api`) fails when the generated file does not match the contract.
 
-## Testy
+## Tests
 
 ```bash
-pnpm typecheck && pnpm test      # logika sesji, returnTo, ścieżki sklepu
-pnpm build && pnpm test:e2e      # Playwright przeciw lokalnemu stackowi (backend i Keycloak muszą działać)
+pnpm typecheck && pnpm test      # session logic, returnTo, store paths
+pnpm build && pnpm test:e2e      # Playwright against the local stack (backend and Keycloak must be running)
 ```
 
-W środowisku z gotowym Chromium ustaw `PW_CHROMIUM_PATH` zamiast `pnpm exec playwright install chromium`.
+Where Chromium is already installed, set `PW_CHROMIUM_PATH` instead of running `pnpm exec playwright install chromium`.
 
-## Kontrast palety (04 §2, §14)
+## Palette contrast (04 §2, §14)
 
-Zmierzone współczynniki kontrastu (WCAG 2.x):
+Measured contrast ratios (WCAG 2.x):
 
-| Para | Kontrast | Użycie |
+| Pair | Contrast | Use |
 | --- | --- | --- |
-| tekst `#172B25` na `#FFFFFF` / `#F6F8F7` | 14,91 / 13,98 | treść |
-| pomocniczy `#52665E` na `#FFFFFF` / `#F6F8F7` | 6,14 / 5,76 | etykiety, opisy |
-| akcent `#16734B` na `#FFFFFF`, biały na akcencie | 5,85 | linki, przycisk główny |
-| akcent `#16734B` na `#EAF5EE` | 5,24 | aktywna pozycja menu |
-| obramowanie `#DFE7E2` na `#FFFFFF` | 1,26 | tylko dekoracyjne (karty) |
-| obramowanie kontrolek `#74867E` na `#FFFFFF` | 3,85 | pola, przyciski drugorzędne (wymóg 3:1) |
+| text `#172B25` on `#FFFFFF` / `#F6F8F7` | 14.91 / 13.98 | content |
+| secondary `#52665E` on `#FFFFFF` / `#F6F8F7` | 6.14 / 5.76 | labels, descriptions |
+| accent `#16734B` on `#FFFFFF`, white on accent | 5.85 | links, primary button |
+| accent `#16734B` on `#EAF5EE` | 5.24 | active menu item |
+| border `#DFE7E2` on `#FFFFFF` | 1.26 | decorative only (cards) |
+| control border `#74867E` on `#FFFFFF` | 3.85 | inputs, secondary buttons (3:1 requirement) |

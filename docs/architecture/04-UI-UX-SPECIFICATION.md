@@ -1,428 +1,428 @@
-# Autonomous E-commerce Operator — specyfikacja UI/UX MVP
+# Autonomous E-commerce Operator — MVP UI/UX specification
 
-Wersja: 1.1 · Data: 14 listopada 2026 · Status: specyfikacja do przeglądu
+Version: 1.1 · Date: 14 November 2026 · Status: specification for review
 
-Źródła prawdy: [01 — zakres i decyzje produktu](01-PRODUCT-VISION-AND-ARCHITECTURE.md), [02 — kontrakty i architektura agentowa](02-AI-AGENT-ARCHITECTURE.md), [03 — referencyjny Inventory Guardian](03-INVENTORY-GUARDIAN-E2E.md). Obowiązuje ich legenda **[D] / [U] / [P] / [Z] / [O]**. Nowe decyzje produktowe D-04–D-07 są wiążącym zakresem; układy, komponenty, endpointy i DTO poniżej to **[P]**. Nie są deklaracją istniejącego API ani gotowego wdrożenia.
+Sources of truth: [01 — product scope and decisions](01-PRODUCT-VISION-AND-ARCHITECTURE.md), [02 — contracts and agent architecture](02-AI-AGENT-ARCHITECTURE.md), [03 — reference Inventory Guardian](03-INVENTORY-GUARDIAN-E2E.md). Their legend **[D] / [U] / [P] / [Z] / [O]** applies. The new product decisions D-04–D-07 are a binding scope; the layouts, components, endpoints and DTOs below are **[P]**. They are not a statement of an existing API or a finished implementation.
 
-Wersja 1.1 uwzględnia D-08/D-09. Wymagania Decision Intelligence uzupełnia sekcja 17; definicje wiedzy, profilu, KPI i outcome mają jedno miejsce opisu w [05 — Decision Intelligence Architecture](05-DECISION-INTELLIGENCE-ARCHITECTURE.md).
+Version 1.1 takes D-08/D-09 into account. The Decision Intelligence requirements are added in section 17; the definitions of knowledge, the profile, KPIs and outcomes are described in one place in [05 — Decision Intelligence Architecture](05-DECISION-INTELLIGENCE-ARCHITECTURE.md).
 
-## 1. Cel i zasady UX [D, P]
+## 1. Goal and UX principles [D, P]
 
-**Simple by default. Powerful by design.** Użytkownik ma szybko ustalić: jak działa sklep, co zrobił operator AI i co wymaga decyzji człowieka. Pełna analityka jest częścią MVP, dostępna zarówno z nawigacji, jak i z konkretnej decyzji. Nie tworzymy przełącznika początkujący/ekspert. Różnice dostępnych akcji wynikają z uprawnień i polityk, nie z poziomu znajomości analityki.
+**Simple by default. Powerful by design.** The user must quickly find out how the store is doing, what the AI operator did and what requires a human decision. Full analytics is part of the MVP, available both from the navigation and from a specific decision. We do not create a beginner/expert switch. Differences in the available actions come from permissions and policies, not from the level of analytics knowledge.
 
-Progressive disclosure ma trzy poziomy:
+Progressive disclosure has three levels:
 
-| Poziom | Prezentacja | Źródło |
+| Level | Presentation | Source |
 |---|---|---|
-| 1. Co się dzieje i co zrobić | Krótkie podsumowanie, istotne liczby, proponowana czynność i pilność | Business Summary |
-| 2. Dlaczego | Uzasadnienie, zakres akcji, konsekwencje, ryzyka, świeżość i polityka | Decision Explanation |
-| 3. Sprawdź dane | Wykresy, tabele, porównania, definicje i źródła | Analytical Evidence |
+| 1. What is happening and what to do | A short summary, the key numbers, the proposed action and urgency | Business Summary |
+| 2. Why | The rationale, action scope, consequences, risks, freshness and policy | Decision Explanation |
+| 3. Check the data | Charts, tables, comparisons, definitions and sources | Analytical Evidence |
 
-Liczby wszystkich poziomów pochodzą ze wspólnych dowodów i obliczeń, zgodnie z [reprezentacjami decyzji](02-AI-AGENT-ARCHITECTURE.md#15-reprezentacje-decyzji-dla-ui-d-p). Rozwinięcie nie może ukrywać krytycznego ostrzeżenia: brak danych, niepewny wynik lub zakres zmiany są widoczne przed akceptacją. Nie pokazujemy chain-of-thought. Nazwy interfejsu są polskie; domenowe identyfikatory zachowują nazwy kontraktów.
+The numbers on all levels come from shared evidence and calculations, in line with the [decision representations](02-AI-AGENT-ARCHITECTURE.md#15-decision-representations-for-the-ui-d-p). Expanding must not hide a critical warning: missing data, an uncertain result or the scope of a change are visible before approval. We do not show chain-of-thought. **[D]** The interface is available in two languages, English (the default) and Polish; domain identifiers keep the contract names.
 
-## 2. Nawigacja, układ i komponenty [P]
+## 2. Navigation, layout and components [P]
 
-### Mapa ośmiu widoków
+### Map of the eight views
 
-Wszystkie ścieżki poniżej mają prefiks `/stores/:storeId`.
+All paths below have the `/stores/:storeId` prefix.
 
-| Pozycja lewego sidebaru | Ścieżka | Szczegóły | Moduł backendu |
+| Left sidebar item | Path | Details | Backend module |
 |---|---|---|---|
-| Przegląd | `/dashboard` | Karta problemu, wykonana praca | Reporting / Commerce / Support |
-| Decyzje | `/decisions` | `/decisions/:proposalId` | Intelligence / Automation |
-| Obsługa klientów | `/support` | `/support/:conversationId` | Customer Support |
-| Analityka | `/analytics/:tab` | `sales`, `profitability`, `ads`, `products` i drill-down | Reporting / Commerce |
-| Automatyzacje | `/automations` | `/automations/:automationId` | Automation |
-| Aktywność | `/activity` | `/activity/:activityId` | Audit / Reporting |
-| Integracje | `/integrations` | `/integrations/:integrationId` | Integrations |
-| Ustawienia | `/settings/:section` | Store, policies, team, notifications, data | Tenants / Identity / Policies |
+| Overview | `/dashboard` | Problem card, work done | Reporting / Commerce / Support |
+| Decisions | `/decisions` | `/decisions/:proposalId` | Intelligence / Automation |
+| Customer support | `/support` | `/support/:conversationId` | Customer Support |
+| Analytics | `/analytics/:tab` | `sales`, `profitability`, `ads`, `products` and drill-down | Reporting / Commerce |
+| Automations | `/automations` | `/automations/:automationId` | Automation |
+| Activity | `/activity` | `/activity/:activityId` | Audit / Reporting |
+| Integrations | `/integrations` | `/integrations/:integrationId` | Integrations |
+| Settings | `/settings/:section` | Store, policies, team, notifications, data | Tenants / Identity / Policies |
 
-Onboarding jest osobną ścieżką `/onboarding`, a nie dziewiątym codziennym widokiem. Nie dodajemy kreatora sklepu. Sidebar zawiera wybór istniejącego sklepu, osiem pozycji, liczniki oczekujących decyzji i eskalacji oraz stan operatora. Liczniki pochodzą z backendu i respektują dostęp do danych.
+Onboarding is a separate path, `/onboarding`, not a ninth everyday view. We do not add a store builder. The sidebar contains the choice of an existing store, eight items, counters of pending decisions and escalations, and the operator state. The counters come from the backend and respect data access.
 
-Nagłówek zawiera breadcrumbs, nazwę sklepu, strefę czasu, filtr okresu na ekranach analitycznych i wskaźnik połączeń. Filtry operacyjne skrzynki, np. „wymaga człowieka”, pozostają niezależne od dat wykresów. Ustawienia konta nie stają się dodatkowym trybem UI.
+The header contains breadcrumbs, the store name, the time zone, the period filter on analytics screens and a connection indicator. Operational inbox filters, e.g. "needs a human", stay independent of chart dates. Account settings do not become an additional UI mode.
 
-**Kontekst przejścia:** URL przechowuje zakres `from`, `to` (koniec wyłączny), `timezone`, porównanie oraz dopuszczone identyfikatory produktu/kampanii i źródła decyzji. Wsparcie wyszukiwania e-maili i treść wiadomości nie trafiają do udostępnianych URL. Powrót przywraca zakładkę, filtry, paginację i scroll. Zmiana sklepu czyści identyfikatory zasobów poprzedniego sklepu; link do obcego zasobu zwraca bezpieczny brak dostępu, nie przełącza tenanta automatycznie.
+**Navigation context:** the URL stores the `from`, `to` range (exclusive end), `timezone`, the comparison and the allowed product/campaign and decision source identifiers. E-mail search terms and message content are not put into shareable URLs. Going back restores the tab, filters, pagination and scroll. Switching the store clears the resource identifiers of the previous store; a link to a foreign resource returns a safe "no access" and does not switch the tenant automatically.
 
-### Kierunek wizualny i design system
+### Visual direction and design system
 
-Minimalistyczny, jasny SaaS: tło `#F6F8F7`, powierzchnie `#FFFFFF`, tekst `#172B25`, tekst pomocniczy `#52665E`, akcent `#16734B`, delikatne zielone tło `#EAF5EE`, obramowanie `#DFE7E2`. Zieleń oznacza główną akcję i sukces, nie wszystkie dodatnie wartości. Bursztyn sygnalizuje uwagę, czerwień błąd; status ma również tekst i ikonę. Paleta jest propozycją wymagającą pomiaru kontrastu przed implementacją.
+A minimalist, light SaaS: background `#F6F8F7`, surfaces `#FFFFFF`, text `#172B25`, secondary text `#52665E`, accent `#16734B`, a subtle green background `#EAF5EE`, border `#DFE7E2`. Green marks the main action and success, not all positive values. Amber signals attention, red an error; a status also has text and an icon. The palette is a proposal that needs a contrast measurement before implementation.
 
-Typografia: Inter lub systemowy fallback, body 16 px/1,5, tabele 14 px, etykiety pomocnicze co najmniej 12 px, nagłówek strony 28 px; liczby tabelaryczne wyrównane do prawej. Skala odstępów 4/8/12/16/24/32 px, promień kart 12 px. Sidebar około 232 px, siatka treści z odstępem 24 px. Jedna główna akcja w kontekście; „Zatwierdź” opisuje zakres, np. „Zatwierdź pauzę reklamy”. Nazwa produktu pozostaje Autonomous E-commerce Operator; nazwa „Commerce OS” z prototypu nie jest zatwierdzonym brandingiem.
+Typography: Inter or a system fallback, body 16 px/1.5, tables 14 px, secondary labels at least 12 px, page heading 28 px; tabular numbers right-aligned. Spacing scale 4/8/12/16/24/32 px, card radius 12 px. Sidebar about 232 px, a content grid with a 24 px gap. One main action per context; "Approve" describes the scope, e.g. "Approve ad pause". The product name stays Autonomous E-commerce Operator; the name "Commerce OS" from the prototype is not approved branding.
 
-Desktop: pełny sidebar i tabele; tablet: zwijana nawigacja i węższe kolumny; telefon: drawer nawigacji, karty w jednej kolumnie, konwersacja jako oddzielny ekran. Tabele zachowują kluczowe pola i kontrolowany poziomy scroll, nie tracą danych przez ukrycie kolumn bez możliwości ich odczytu. Detale o trwałym adresie otwieramy jako stronę; drawer może służyć szybkiemu podglądowi. Widok Support na małym ekranie przechodzi lista → rozmowa → kontekst.
+Desktop: a full sidebar and tables; tablet: collapsible navigation and narrower columns; phone: a navigation drawer, cards in one column, a conversation as a separate screen. Tables keep the key fields and a controlled horizontal scroll, and do not lose data by hiding columns without a way to read them. Details with a durable address open as a page; a drawer may serve as a quick preview. On a small screen the Support view goes list → conversation → context.
 
-**Komponenty React/Next.js:** `AppShell`, `StoreSwitcher`, `Breadcrumbs`, `DateRangeFilter`, `MetricCard`, `QualityBadge`, `FreshnessIndicator`, `TrendChart`, `DataTable`, `FilterBar`, `DecisionCard`, `ExplanationPanel`, `EvidenceDrawer`, `ExecutionTimeline`, `ConversationList`, `MessageTimeline`, `ReplyComposer`, `HandoffPanel`, `AutonomyControl`, `PolicyPreview`, `IntegrationStatusCard`, `StatePanel`, `ConfirmActionDialog`. To wspólna biblioteka UI; stan workflow pozostaje po stronie backendu. Klucze cache uwzględniają sklep, permissions, filtry i wersję danych.
+**React/Next.js components:** `AppShell`, `StoreSwitcher`, `Breadcrumbs`, `DateRangeFilter`, `MetricCard`, `QualityBadge`, `FreshnessIndicator`, `TrendChart`, `DataTable`, `FilterBar`, `DecisionCard`, `ExplanationPanel`, `EvidenceDrawer`, `ExecutionTimeline`, `ConversationList`, `MessageTimeline`, `ReplyComposer`, `HandoffPanel`, `AutonomyControl`, `PolicyPreview`, `IntegrationStatusCard`, `StatePanel`, `ConfirmActionDialog`. This is a shared UI library; the workflow state stays on the backend. Cache keys include the store, permissions, filters and the data version.
 
-## 3. Wspólne kontrakty frontend–backend [P]
+## 3. Shared frontend–backend contracts [P]
 
-### Konwencje transportowe
+### Transport conventions
 
-W tabelach endpointów `B = /api/v1/stores/{storeId}`. Tenant pochodzi z uwierzytelnionego principal, a backend sprawdza dostęp do sklepu i każdego zasobu. Integracyjne sekrety nie wracają w DTO. Paginacja list używa `cursor`, `limit`, zwraca `items`, `nextCursor`, `hasMore` oraz osobno wyliczane liczniki. Sortowanie i filtry są allowlistowane; frontend nie przesyła SQL.
+In the endpoint tables, `B = /api/v1/stores/{storeId}`. The tenant comes from the authenticated principal, and the backend checks access to the store and to every resource. Integration secrets never come back in DTOs. List pagination uses `cursor`, `limit` and returns `items`, `nextCursor`, `hasMore` and separately computed counters. Sorting and filters are allowlisted; the frontend does not send SQL.
 
-Każda odpowiedź odczytu zawiera `meta`: `requestId`, `generatedAt`, `asOf`, `timezone`, `dataVersion`, `completeness`, `warnings`; części danych mogą mieć własne źródła i czasy. Edytowalne zasoby zwracają `version`/ETag. Pole `allowedActions` służy prezentacji, ale serwer ponownie autoryzuje komendę.
+Every read response contains `meta`: `requestId`, `generatedAt`, `asOf`, `timezone`, `dataVersion`, `completeness`, `warnings`; parts of the data may have their own sources and times. Editable resources return a `version`/ETag. The `allowedActions` field is for presentation, but the server authorizes the command again.
 
-Komendy wysyłają `Idempotency-Key`; operacje zależne od stanu również `If-Match` aktualnej wersji. Wysłanie klucza drugi raz z innym payloadem jest konfliktem. Odpowiedź `202` zwraca `operationId`, `statusUrl`, ewentualny `actionId`; UI odczytuje `B/operations/{operationId}`, dopóki nie ma wyniku lub terminu eskalacji. `200/201` potwierdza zapis danego zasobu, nie implikuje zewnętrznego skutku. Nie stosujemy optymistycznego oznaczania mutacji jako wykonanej.
+Commands send an `Idempotency-Key`; state-dependent operations also send `If-Match` with the current version. Sending a key a second time with a different payload is a conflict. A `202` response returns `operationId`, `statusUrl` and possibly `actionId`; the UI reads `B/operations/{operationId}` until there is a result or an escalation deadline. `200/201` confirms that the given resource was written; it does not imply an external effect. We do not optimistically mark a mutation as executed.
 
-| HTTP / kod domenowy | Reakcja UI |
+| HTTP / domain code | UI reaction |
 |---|---|
-| 401 / brak sesji | Ponowne logowanie, zachowanie bezpiecznego kontekstu nawigacji |
-| 403 / brak uprawnień | Wyjaśnienie ograniczenia, bez sugerowania retry nadającego prawa |
-| 404 | Zasób niedostępny; bez ujawniania cudzych identyfikatorów |
-| 409 lub 412 / `VERSION_CONFLICT`, `OWNERSHIP_CHANGED` | Odświeżenie i pokazanie zmiany; brak automatycznego ponowienia komendy |
-| 410 / `PROPOSAL_EXPIRED` | Przycisk zgody nieaktywny, możliwość zlecenia nowej analizy |
-| 422 / `POLICY_DENIED`, walidacja | Czytelna przyczyna przy polu lub akcji; brak obejścia przez klienta |
-| 429 / limit | Informacja o oczekiwaniu zgodnie z retry-after |
-| 503 / źródło niedostępne | Dane historyczne ze znacznikiem nieaktualności i blokada zależnej mutacji |
+| 401 / no session | Sign in again, keeping a safe navigation context |
+| 403 / no permission | An explanation of the restriction, without suggesting a retry that grants rights |
+| 404 | Resource unavailable; without revealing foreign identifiers |
+| 409 or 412 / `VERSION_CONFLICT`, `OWNERSHIP_CHANGED` | Refresh and show the change; no automatic retry of the command |
+| 410 / `PROPOSAL_EXPIRED` | The approval button is inactive; a new analysis can be requested |
+| 422 / `POLICY_DENIED`, validation | A clear reason next to the field or action; no client-side workaround |
+| 429 / limit | Information about waiting according to retry-after |
+| 503 / source unavailable | Historical data with a staleness marker and a block on dependent mutations |
 
-Błąd ma strukturę `{code, message, fieldErrors, retryable, requestId, currentVersion}`; opcjonalne pola występują tylko, gdy mają zastosowanie. Toast nie jest jedynym miejscem pokazania ważnego błędu. Backend zwraca status i bezpieczny opis, a nie surowe wyjątki dostawcy.
+An error has the structure `{code, message, fieldErrors, retryable, requestId, currentVersion}`; optional fields appear only when they apply. A toast is not the only place where an important error is shown. The backend returns a status and a safe description, not raw provider exceptions.
 
-### DTO współdzielone
+### Shared DTOs
 
-| DTO | Minimalne pola i znaczenie |
+| DTO | Minimal fields and meaning |
 |---|---|
-| `MetricDTO` | `key`, `value` lub `null`, `unit`, `currency`, `quality`, `period`, `definitionVersion`, `sourceRefs`, `observedAt`, `missingComponents`, `comparison` |
-| `ComparisonDTO` | Wartość okresu bazowego, różnica bezwzględna i procentowa; przy zerowej bazie procent `null` z przyczyną |
-| `AnalysisContext` | Store, daty, strefa, filtry produktu/kampanii, porównanie, `sourceProposalId`, opcjonalny `snapshotId` |
+| `MetricDTO` | `key`, `value` or `null`, `unit`, `currency`, `quality`, `period`, `definitionVersion`, `sourceRefs`, `observedAt`, `missingComponents`, `comparison` |
+| `ComparisonDTO` | The base period value, the absolute and percentage difference; with a zero base, percentage `null` with a reason |
+| `AnalysisContext` | Store, dates, time zone, product/campaign filters, comparison, `sourceProposalId`, optional `snapshotId` |
 | `DecisionPresentation` | `proposalId`, `revision`, `status`, `businessSummary`, `explanation`, `evidenceRefs`, `analysisLinks`, `policyEvaluation`, `expiresAt`, `execution`, `allowedActions`, ETag |
-| `OperationDTO` | ID, typ, `PENDING/RUNNING/SUCCEEDED/FAILED/UNKNOWN`, referencja do zasobu, status domenowy, reason i następna dozwolona akcja |
+| `OperationDTO` | ID, type, `PENDING/RUNNING/SUCCEEDED/FAILED/UNKNOWN`, resource reference, domain status, reason and the next allowed action |
 
-`quality` ma wartości z [modelu danych produktu](01-PRODUCT-VISION-AND-ARCHITECTURE.md#6-model-biznesowy-danych-u-p). `UNAVAILABLE` oznacza `value=null`, nigdy zero. Kwoty i zasady czasu stosują kontrakt tego modelu. Definicje metryk, a nie LLM, określają mianowniki, kwalifikujące się zamówienia i alokacje. Operacyjny sukces komendy jest odróżniony od stanu biznesowego: `SUCCEEDED` dla takeover nie oznacza wysłania odpowiedzi, a przyjęcie wiadomości przez dostawcę nie oznacza jej przeczytania.
+`quality` takes values from the [product data model](01-PRODUCT-VISION-AND-ARCHITECTURE.md#6-business-data-model-u-p). `UNAVAILABLE` means `value=null`, never zero. Amounts and time rules follow that model's contract. Metric definitions, not the LLM, determine denominators, qualifying orders and allocations. The operational success of a command is distinguished from the business state: `SUCCEEDED` for a takeover does not mean a reply was sent, and acceptance of a message by the provider does not mean it was read.
 
-### Stany wspólne i aktualizacje
+### Shared states and updates
 
-Każdy widok ma opisane niżej loading/empty/error/success; dodatkowo `stale`, częściowe dane, brak uprawnień i akcję w toku. Loading stosuje skeleton o docelowym układzie. Empty odróżnia „brak zdarzeń” od „jeszcze nie zsynchronizowano”. Success oznacza wynik z potwierdzonego odczytu. Przy częściowej awarii zachowujemy poprawne sekcje, a uszkodzone oznaczamy lokalnie.
+Every view has the loading/empty/error/success states described below; in addition `stale`, partial data, no permission and an action in progress. Loading uses a skeleton of the target layout. Empty distinguishes "no events" from "not synchronized yet". Success means a result from a confirmed read. With a partial failure, correct sections stay, and broken ones are marked locally.
 
-W MVP proponujemy polling otwartych operacji i konwersacji z backoffem; odświeżenie nie nadpisuje lokalnie edytowanego szkicu. **O-15:** SSE jako późniejsza optymalizacja albo wymóg pilota po pomiarze opóźnień. Każdy mechanizm aktualizacji zachowuje wersjonowanie. Tła nie przeładowują tabel bez zachowania zaznaczenia i fokusu.
+In the MVP we propose polling of open operations and conversations with backoff; a refresh does not overwrite a locally edited draft. **O-15:** SSE as a later optimization or a pilot requirement after measuring delays. Every update mechanism keeps versioning. Background refreshes do not reload tables without keeping the selection and focus.
 
 ## 4. Dashboard
 
-**Cel i scenariusze:** szybka ocena kondycji sklepu, wykonanej pracy AI i wyjątków wymagających człowieka. Użytkownik otwiera decyzję, eskalację lub KPI i przechodzi do właściwego kontekstu.
+**Goal and scenarios:** a quick assessment of the store's condition, the work done by the AI and the exceptions that require a human. The user opens a decision, an escalation or a KPI and moves to the right context.
 
-**Układ i dane:** nagłówek z okresem i porównaniem; cztery karty: sprzedaż netto, zamówienia, wydatek Meta, marża kontrybucyjna po znanych kosztach. Dalej trend sprzedaży, „Wymaga uwagi”, „Co zrobił operator”, blok Support (sprawy obsłużone przez AI / eskalacje), zdrowie integracji i jakość danych. Karta rentowności ma widoczną etykietę estymacji/braku kosztów. Każdy licznik Support ma określone okno i jednostkę: liczba spraw, nie zamiennie liczba wiadomości.
+**Layout and data:** a header with the period and comparison; four cards: net sales, orders, Meta spend, contribution margin after known costs. Then the sales trend, "Needs attention", "What the operator did", a Support block (cases handled by the AI / escalations), integration health and data quality. The profitability card has a visible estimate/missing costs label. Every Support counter has a defined window and unit: number of cases, not interchangeably number of messages.
 
-**Akcje i nawigacja:** klik KPI → odpowiednia zakładka Analytics z tym samym okresem; karta ryzyka → Decision Detail; eskalacja → Conversation Detail; błąd źródła → konkretna integracja; ostatnie działanie → Activity detail. Dashboard nie ma zbiorczego „zaakceptuj wszystko” ani ukrytego włączania L2.
+**Actions and navigation:** clicking a KPI → the matching Analytics tab with the same period; a risk card → Decision Detail; an escalation → Conversation Detail; a source error → the specific integration; a recent action → Activity detail. The Dashboard has no bulk "approve all" and no hidden enabling of L2.
 
-**Stany:** loading — niezależne skeletony kart; empty — po konfiguracji brak danych/zdarzeń, CTA do integracji lub zmiany dat; error — błąd sekcji i retry, pozostałe sekcje zostają; success — aktualne liczby i wykonane operacje; stale — pasek „Dane z…” i wpływ na dostępność analiz. „Brak spraw wymagających uwagi” jest pozytywnym empty, nie błędem.
+**States:** loading — independent card skeletons; empty — no data/events after configuration, a CTA to integrations or a date change; error — a section error and retry, the other sections stay; success — current numbers and executed operations; stale — a "Data from…" bar and the impact on the availability of analyses. "No cases need attention" is a positive empty state, not an error.
 
-**Backend i API:** Reporting agreguje dane ze wspólnych read models, bez inicjowania nowych analiz LLM przy wejściu na stronę.
+**Backend and API:** Reporting aggregates data from the shared read models, without starting new LLM analyses when the page is opened.
 
-| Endpoint | Wejście → wynik |
+| Endpoint | Input → result |
 |---|---|
 | `GET B/dashboard` | `from,to,timezone,compare` → `metrics: MetricDTO[]`, `salesTrend`, `attentionItems`, `recentActivities`, `supportSummary`, `integrationHealth`, meta |
 
-`attentionItems` zawierają typ, ID zasobu, prosty tytuł, pilność, status i backendowy link; nie pełne PII ani treść e-mail. Metryki i wykres pochodzą z tej samej wersji danych lub UI jawnie pokazuje różnicę ich czasu odczytu.
+`attentionItems` contain a type, a resource ID, a simple title, urgency, status and a backend link; not full PII or e-mail content. The metrics and the chart come from the same data version, or the UI explicitly shows the difference in their read time.
 
 ## 5. Decision Inbox + Decision Detail
 
-**Cel i scenariusze:** uporządkować decyzje biznesowe, zrozumieć powód i zakres, sprawdzić dane, zaakceptować/odrzucić ważną rewizję, śledzić wykonanie. Rozmowy z klientami mają osobną kolejkę Support; tu może istnieć powiązana decyzja biznesowa.
+**Goal and scenarios:** organize business decisions, understand the reason and the scope, check the data, approve/reject a valid revision, track execution. Customer conversations have a separate Support queue; a related business decision may exist here.
 
-**Układ listy i dane:** zakładki „Do zatwierdzenia”, „W obserwacji”, „Zakończone”; filtry domeny, priorytetu, automatyzacji, dat i statusu. Wiersz/karta: problem, cel, rekomendacja, priorytet, wiek, termin, poziom autonomii i status. „W obserwacji” grupuje m.in. oczekiwanie na dane; grupy UI są projekcją, nie nowymi stanami workflow.
+**List layout and data:** the tabs "To approve", "Monitoring", "Completed"; filters for domain, priority, automation, dates and status. A row/card: the problem, the target, the recommendation, priority, age, deadline, autonomy level and status. "Monitoring" groups, among others, waiting for data; UI groups are a projection, not new workflow states.
 
-**Detail:** breadcrumbs i prosty nagłówek; proponowana czynność oraz dokładny zasób; widoczna ważność i ryzyko; panel „Dlaczego”; dowody i źródła; link „Szczegółowa analiza”; reguły i zgoda; oś wykonania i weryfikacji. Rozwijane dane techniczne mają request/action ID dla diagnozy. Kwoty wpływu są oznaczone jako estymacje, o ile faktycznie istnieje metoda ich wyliczenia.
+**Detail:** breadcrumbs and a simple header; the proposed action and the exact resource; visible validity and risk; a "Why" panel; evidence and sources; a "Detailed analysis" link; rules and approval; an execution and verification timeline. Expandable technical data has request/action IDs for diagnosis. Impact amounts are marked as estimates, provided a method of computing them actually exists.
 
-**Akcje:** zatwierdź konkretną rewizję, odrzuć z opcjonalnym powodem, poproś o ponowną analizę przy wygaśnięciu. Przed zgodą pokazujemy zakres i konsekwencje. Backend ponawia kontrolę polityki; UI nie dopisuje `approved=true`. L2 pokazuje stan wykonania, nie wymusza sztucznej zgody. Brak przycisku ponawiającego mutację przy UNKNOWN.
+**Actions:** approve a specific revision, reject with an optional reason, request a new analysis on expiry. Before approval we show the scope and the consequences. The backend repeats the policy check; the UI does not add `approved=true`. L2 shows the execution state and does not force an artificial approval. No button to retry a mutation on UNKNOWN.
 
-**Nawigacja:** Summary → Explanation → Evidence/Analytics, z przekazaniem `sourceProposalId`, produktu, kampanii i okresu. Historyczny snapshot ma etykietę „Dane użyte do decyzji”; aktualna analiza ma własny `asOf`. Powrót zachowuje rewizję i filtry skrzynki.
+**Navigation:** Summary → Explanation → Evidence/Analytics, passing `sourceProposalId`, the product, the campaign and the period. A historical snapshot is labeled "Data used for the decision"; the current analysis has its own `asOf`. Going back keeps the revision and the inbox filters.
 
-**Stany:** loading — lista i sekcje detail ładowane oddzielnie; empty — zero decyzji w filtrze lub wszystko obsłużone; error — brak detalu, błąd dowodów lub konflikt wersji z widocznym odświeżeniem; success — „Zgoda zapisana”, później osobne „Akcja potwierdzona”; stale/expired — ostrzeżenie i blokada zgody; pending — disabled CTA oraz widoczna oś operacji.
+**States:** loading — the list and the detail sections load separately; empty — zero decisions in the filter, or everything handled; error — missing detail, an evidence error or a version conflict with a visible refresh; success — "Approval saved", later a separate "Action confirmed"; stale/expired — a warning and a block on approval; pending — a disabled CTA and a visible operation timeline.
 
-**Backend i API:** Intelligence udostępnia prezentację, Automation obsługuje komendy i powiązanie z Temporal.
+**Backend and API:** Intelligence provides the presentation, Automation handles the commands and the link to Temporal.
 
-| Endpoint | Wejście → wynik |
+| Endpoint | Input → result |
 |---|---|
-| `GET B/decisions` | Filtry, cursor → streszczenia propozycji i liczniki grup |
-| `GET B/decisions/{proposalId}` | Opcjonalna `revision` → `DecisionPresentation`, ETag |
-| `GET B/decisions/{proposalId}/evidence` | `revision,cursor` → dowody, snapshot i definicje; kontrola scope |
-| `POST B/decisions/{proposalId}/approvals` | `{revision}`, If-Match → 202, approval ID i operation ID |
-| `POST B/decisions/{proposalId}/rejections` | `{revision,reason?}`, If-Match → utrwalone odrzucenie i nowy status |
-| `POST B/decisions/{proposalId}/reanalysis` | `{revision}`, If-Match → 202; nowa analiza/rewizja bez nadpisania starej |
+| `GET B/decisions` | Filters, cursor → proposal summaries and group counters |
+| `GET B/decisions/{proposalId}` | Optional `revision` → `DecisionPresentation`, ETag |
+| `GET B/decisions/{proposalId}/evidence` | `revision,cursor` → evidence, snapshot and definitions; scope check |
+| `POST B/decisions/{proposalId}/approvals` | `{revision}`, If-Match → 202, approval ID and operation ID |
+| `POST B/decisions/{proposalId}/rejections` | `{revision,reason?}`, If-Match → a persisted rejection and a new status |
+| `POST B/decisions/{proposalId}/reanalysis` | `{revision}`, If-Match → 202; a new analysis/revision without overwriting the old one |
 
-Komendy stosują wspólną idempotencję. Wygaśnięcie, brak uprawnień i konflikt zwracają kody z sekcji 3. Anulowanie już rozpoczętej akcji nie jest obiecywane przez interfejs.
+Commands use the shared idempotency. Expiry, no permission and a conflict return the codes from section 3. The interface does not promise cancellation of an already started action.
 
 ## 6. Customer Support + Conversation Detail
 
-**Cel i scenariusze:** zobaczyć historię pracy AI, znaleźć sprawy wymagające człowieka, zrozumieć eskalację, przejąć rozmowę, poprawić szkic i odpowiedzieć. Proces, model domenowy i polityki mają źródło w [Customer Support Agent](02-AI-AGENT-ARCHITECTURE.md#14-customer-support-agent-d-p); UI nie implementuje drugiego zestawu reguł.
+**Goal and scenarios:** see the history of the AI's work, find cases that need a human, understand an escalation, take over a conversation, fix a draft and reply. The process, the domain model and the policies come from the [Customer Support Agent](02-AI-AGENT-ARCHITECTURE.md#14-customer-support-agent-d-p); the UI does not implement a second set of rules.
 
-**Układ listy:** liczniki wszystkich konwersacji, spraw obsłużonych przez AI i wymagających interwencji; filtry statusu, przypisania, priorytetu, skrzynki i ostatniej aktywności. Wyszukiwanie wiadomości/e-maili ma uprawnienia Support i nie publikuje danych klienta w URL. Wiersz: klient lub bezpieczny identyfikator, temat, podgląd ostatniej wiadomości, status, assignee, czas oczekiwania i znacznik eskalacji. Czas oczekiwania liczony od ostatniej wiadomości klienta wymagającej odpowiedzi; nie od dowolnej aktywności systemowej.
+**List layout:** counters of all conversations, cases handled by the AI and cases needing intervention; filters for status, assignment, priority, mailbox and last activity. Searching messages/e-mails requires Support permissions and does not publish customer data in the URL. A row: the customer or a safe identifier, the subject, a preview of the last message, status, assignee, waiting time and an escalation marker. The waiting time is counted from the customer's last message that needs a reply, not from any system activity.
 
-**Układ Conversation Detail:** na desktopie trzy obszary — lista, historia i kontekst. Góra historii pokazuje status, właściciela oraz „Przejmij rozmowę”. Wiadomości mają autora, czas, źródło AI/człowiek/system i status wysyłki. Prawy panel: podsumowanie, powód eskalacji, zweryfikowany klient i zamówienia, źródła faktów, proponowana odpowiedź. Dół: composer z treścią szkicu, historią rewizji, informacją o zapisie i przyciskiem wysyłki. HTML wiadomości jest sanitizowany, zewnętrzne obrazki domyślnie nie są ładowane automatycznie; nie renderujemy aktywnego kodu.
+**Conversation Detail layout:** on desktop, three areas — the list, the history and the context. The top of the history shows the status, the owner and "Take over conversation". Messages have an author, a time, an AI/human/system source and a send status. The right panel: summary, escalation reason, verified customer and orders, fact sources, proposed reply. The bottom: a composer with the draft content, the revision history, save information and a send button. Message HTML is sanitized, external images are not loaded automatically by default; we do not render active code.
 
-**Prezentowane dane:** `Conversation.status`, priorytet, assignee, `ownershipVersion`, wersja wątku, powiązane zamówienia i stopień weryfikacji relacji, Message timeline, draft revision, niepewności i reason codes eskalacji. Statusy widoczne dla użytkownika: „Nowa”, „Obsługuje AI”, „Wymaga człowieka”, „Przejęta”, „Rozwiązana”. Statusy wiadomości pozostają osobne: szkic, w kolejce, wysyłanie, przyjęta przez dostawcę, dostarczona — jeśli mamy potwierdzenie — błąd lub nieustalony wynik. Nie nazywamy ACCEPTED „przeczytana” ani „doręczona”.
+**Presented data:** `Conversation.status`, priority, assignee, `ownershipVersion`, the thread version, linked orders and the degree of relation verification, the Message timeline, the draft revision, uncertainties and escalation reason codes. Statuses visible to the user: "New", "Handled by AI", "Needs a human", "Taken over", "Resolved". Message statuses stay separate: draft, queued, sending, accepted by the provider, delivered — if we have a confirmation — error or undetermined result. We do not call ACCEPTED "read" or "delivered".
 
-**Akcje:** przejmij/przypisz sprawę, edytuj szkic, przygotuj szkic AI na żądanie, wyślij dokładną rewizję, oznacz jako rozwiązaną, jawnie oddaj AI. Przejmowanie i wysyłka mają odrębne potwierdzenia. Composer blokuje send bez własności, uprawnień lub przy nieaktualnym wątku. Nowa wiadomość klienta nie nadpisuje tekstu operatora: pokazuje banner, unieważnia automatyczne wysłanie starego szkicu i wymaga przeglądu. Przy takeover w trakcie dispatch widzimy „Przejmujesz rozmowę; wcześniejsza wiadomość jest już w wysyłce” i jej stan. UI nie obiecuje cofnięcia wysłanego maila.
+**Actions:** take over/assign a case, edit the draft, prepare an AI draft on request, send the exact revision, mark as resolved, explicitly hand back to the AI. Takeover and sending have separate confirmations. The composer blocks sending without ownership, without permissions or with a stale thread. A new customer message does not overwrite the operator's text: it shows a banner, invalidates the automatic sending of the old draft and requires a review. With a takeover during dispatch we see "You are taking over the conversation; an earlier message is already being sent" and its state. The UI does not promise to recall a sent e-mail.
 
-**Nawigacja:** zamówienie otwiera ograniczony drawer z faktami Commerce i ewentualnym linkiem do istniejącego systemu; nowy ekran zarządzania zamówieniami nie jest wymagany. Eskalacja może linkować powiązaną decyzję biznesową, lecz jej korespondencja zostaje w Support. Z Activity wracamy do konkretnej wiadomości; z Dashboardu otwieramy właściwą kolejkę. Dane klienta nie są dostępne dla analityka bez uprawnień Support.
+**Navigation:** an order opens a limited drawer with Commerce facts and possibly a link to the existing system; a new order management screen is not required. An escalation may link a related business decision, but its correspondence stays in Support. From Activity we return to the specific message; from the Dashboard we open the right queue. Customer data is not available to an analyst without Support permissions.
 
-**Stany:** loading — szkielet listy i historii bez przeskoku scrolla; empty — brak wiadomości, filtr bez wyników albo niepodłączona skrzynka z CTA; error — błąd synchronizacji/wysyłki przy konkretnej wiadomości, możliwość zachowania szkicu; success — potwierdzone przejęcie/zapis szkicu i odrębne przyjęcie wysyłki; UNKNOWN — informacja „Sprawdzamy, czy wiadomość została wysłana”, bez automatycznego resend. Stale pokazuje ostatnią synchronizację; konflikt właściciela blokuje wysyłkę i odświeża kontekst. Przy opuszczaniu widoku z niezapisanym szkicem wymagany jest czytelny wybór zachowania zmian.
+**States:** loading — a list and history skeleton without a scroll jump; empty — no messages, a filter without results, or an unconnected mailbox with a CTA; error — a synchronization/send error on the specific message, with the option to keep the draft; success — a confirmed takeover/draft save and a separate send acceptance; UNKNOWN — the message "Checking whether the message was sent", without an automatic resend. Stale shows the last synchronization; an owner conflict blocks sending and refreshes the context. Leaving the view with an unsaved draft requires a clear choice about keeping the changes.
 
-**Backend i API:** Customer Support read models zwracają dane z odpowiednią minimalizacją; wysyłka i generowanie szkicu są operacjami asynchronicznymi.
+**Backend and API:** the Customer Support read models return data with appropriate minimization; sending and draft generation are asynchronous operations.
 
-| Endpoint | Wejście → wynik |
+| Endpoint | Input → result |
 |---|---|
-| `GET B/support/conversations` | Filtry, cursor → list items, liczniki według tego samego filtra, meta |
-| `POST B/support/conversation-search` | `{query,filters,cursor}` → uprawnione wyniki; bez logowania treści zapytania jako zwykłego URL |
-| `GET B/support/conversations/{id}` | → status, kontekst, eskalacja, draft summary, ownership/version, allowedActions, ETag |
-| `GET B/support/conversations/{id}/messages` | `beforeCursor/afterCursor,limit` → Message DTOs z author/source/send state; chronologiczny timeline |
-| `POST B/support/conversations/{id}/takeover` | `{assigneeId?}`, If-Match → nowe ownershipVersion i status; trwałe przejęcie |
-| `POST B/support/conversations/{id}/release` | `{reason?}`, If-Match → oddanie AI, nowa wersja i ocena dopuszczalności |
-| `POST B/support/conversations/{id}/draft-generation` | `{triggerMessageId}`, If-Match → 202 + operation ID; wynik jako nowy draft |
-| `PATCH B/support/drafts/{draftId}` | `{bodyText}`, If-Match draftu → nowa draftRevision, contentHash i ETag |
-| `POST B/support/conversations/{id}/send` | `{draftId,draftRevision,triggerMessageId,ownershipVersion}`, If-Match wątku → 202 + message/operation ID |
-| `POST B/support/conversations/{id}/resolve` | `{resolutionCode}`, If-Match → nowy stan i zapis audytu |
+| `GET B/support/conversations` | Filters, cursor → list items, counters for the same filter, meta |
+| `POST B/support/conversation-search` | `{query,filters,cursor}` → permitted results; the query content is not logged as a regular URL |
+| `GET B/support/conversations/{id}` | → status, context, escalation, draft summary, ownership/version, allowedActions, ETag |
+| `GET B/support/conversations/{id}/messages` | `beforeCursor/afterCursor,limit` → Message DTOs with author/source/send state; a chronological timeline |
+| `POST B/support/conversations/{id}/takeover` | `{assigneeId?}`, If-Match → a new ownershipVersion and status; a durable takeover |
+| `POST B/support/conversations/{id}/release` | `{reason?}`, If-Match → hand back to the AI, a new version and an admissibility evaluation |
+| `POST B/support/conversations/{id}/draft-generation` | `{triggerMessageId}`, If-Match → 202 + operation ID; the result as a new draft |
+| `PATCH B/support/drafts/{draftId}` | `{bodyText}`, If-Match of the draft → a new draftRevision, contentHash and ETag |
+| `POST B/support/conversations/{id}/send` | `{draftId,draftRevision,triggerMessageId,ownershipVersion}`, If-Match of the thread → 202 + message/operation ID |
+| `POST B/support/conversations/{id}/resolve` | `{resolutionCode}`, If-Match → a new state and an audit record |
 
-Wszystkie komendy mają idempotencję z sekcji 3. `send` rozwiązuje adresata po stronie backendu i sprawdza bieżący stan. UI nie wysyła dowolnego `to`, `cc` ani danych zamówienia jako upoważnienia. Message DTO zawiera ID, direction, authorType, bezpieczną treść, daty, provider reference, status i failure reason, nie token dostawcy. **O-11–O-13:** provider, reguły tożsamości, retencja i obsługa załączników pozostają otwarte; UI pokazuje załącznik jako nieprzeanalizowany, dopóki system nie ma obsługiwanej ścieżki.
+All commands use the idempotency from section 3. `send` resolves the recipient on the backend and checks the current state. The UI does not send an arbitrary `to`, `cc` or order data as an authorization. The Message DTO contains the ID, direction, authorType, safe content, dates, provider reference, status and failure reason, not the provider token. **O-11–O-13:** the provider, identity rules, retention and attachment handling stay open; the UI shows an attachment as not analyzed until the system has a supported path.
 
 ## 7. Analytics: Sales, Profitability, Ads, Products
 
-**Cel i scenariusze:** samodzielna analiza wyników i weryfikacja rekomendacji. Użytkownik porównuje okresy, bada kampanię lub SKU, sprawdza źródła i brakujące koszty. Pełne cztery zakładki są w MVP; nie wymagają trybu eksperta.
+**Goal and scenarios:** independent analysis of results and verification of recommendations. The user compares periods, examines a campaign or a SKU, checks sources and missing costs. All four tabs are in the MVP; they do not require an expert mode.
 
-**Wspólny układ:** pasek dat, porównanie, strefa i aktywne filtry; karty KPI; wykres trendu; tabela drill-down; rozwijane definicje i źródła. Filtry mają reset oraz widoczne chips. Kliknięcie serii/wiersza zawęża analizę, breadcrumbs umożliwiają wycofanie. Sortowanie, paginacja i agregacja odbywają się w backendzie. Dla dużych zestawów nie pobieramy wszystkich zamówień do przeglądarki.
+**Shared layout:** a date bar, comparison, time zone and active filters; KPI cards; a trend chart; a drill-down table; expandable definitions and sources. Filters have a reset and visible chips. Clicking a series/row narrows the analysis, and breadcrumbs allow going back. Sorting, pagination and aggregation happen in the backend. For large sets we do not load all orders into the browser.
 
-| Zakładka | Dane i układ szczegółów | Akcje i drill-down |
+| Tab | Data and detail layout | Actions and drill-down |
 |---|---|---|
-| Sales / Sprzedaż | Sprzedaż netto, zamówienia kwalifikujące się, AOV, refundacje/zwroty, trendy i porównania | Dzień → zamówienia w ograniczonym drill-down; produkt → Products; definicja AOV i baza okresu |
-| Profitability / Rentowność | Sprzedaż netto, COGS, fulfillment, opłaty, reklamy, znane koszty zmienne; waterfall kosztów, marża i pokrycie danych kosztowych | Rozwinięcie składnika kosztu, alokacji i braków; link do uzupełnienia kosztów w Settings dla uprawnionych |
-| Ads / Reklamy | Wydatek Meta, platformowe konwersje, ROAS/CPA, tabela kampanii i trend, model/okno atrybucji i opóźnienie danych | Campaign → adset → ad; porównanie i link do powiązanego SKU tylko przy znanym mapowaniu |
-| Products / Produkty | Sprzedaż i marża SKU, zapas, tempo sprzedaży, pokrycie, dostawy i niepewność prognozy | Wariant → wykres sprzedaży/zapasu → powiązane reklamy/decyzje i historyczne działania |
+| Sales | Net sales, qualifying orders, AOV, refunds/returns, trends and comparisons | Day → orders in a limited drill-down; product → Products; the AOV definition and the period base |
+| Profitability | Net sales, COGS, fulfillment, fees, ads, known variable costs; a cost waterfall, margin and cost data coverage | Expand a cost component, allocations and gaps; a link to completing costs in Settings for permitted users |
+| Ads | Meta spend, platform conversions, ROAS/CPA, a campaign table and trend, attribution model/window and data delay | Campaign → adset → ad; a comparison and a link to the linked SKU only with a known mapping |
+| Products | SKU sales and margin, stock, sales velocity, cover, deliveries and forecast uncertainty | Variant → sales/stock chart → linked ads/decisions and historical actions |
 
-MVP obejmuje analizy i stałe zestawy porównań, nie dowolny język raportowy. „Zysk” zastępujemy precyzyjną nazwą marży kontrybucyjnej po znanych kosztach; definicji nie powielamy tutaj — obowiązuje [model finansowy](01-PRODUCT-VISION-AND-ARCHITECTURE.md#6-model-biznesowy-danych-u-p). AOV/ROAS/CPA mają jawne definicje i mianowniki; zero konwersji nie generuje nieskończonej wartości CPA. Różne waluty pokazujemy oddzielnie, dopóki nie wdrożono jawnego przeliczenia z kursem i datą. Metryki Meta nie są nazywane potwierdzoną atrybucją do unikalnych zamówień sklepu.
+The MVP covers analyses and fixed sets of comparisons, not an arbitrary reporting language. We replace "profit" with the precise name contribution margin after known costs; the definition is not repeated here — the [financial model](01-PRODUCT-VISION-AND-ARCHITECTURE.md#6-business-data-model-u-p) applies. AOV/ROAS/CPA have explicit definitions and denominators; zero conversions do not produce an infinite CPA. Different currencies are shown separately until an explicit conversion with a rate and a date is implemented. Meta metrics are not called confirmed attribution to the store's unique orders.
 
-**Dane i jakość:** każda karta i tabela udostępnia MetricDTO, pokrycie kosztów i datę synchronizacji. Estimated ma badge z przyczyną; Unavailable pokazuje „Brak danych” i brakujące składniki. Nie łączymy braku wartości linią sugerującą zero. Wariant w Decision Detail może być historyczny; „Otwórz bieżącą analizę” jawnie przełącza snapshot na aktualny stan.
+**Data and quality:** every card and table exposes a MetricDTO, cost coverage and the synchronization date. Estimated has a badge with a reason; Unavailable shows "No data" and the missing components. We do not connect a missing value with a line suggesting zero. A variant in Decision Detail may be historical; "Open current analysis" explicitly switches from the snapshot to the current state.
 
-**Akcje i nawigacja:** zmień okres, porównanie, granularność i filtr; otwórz źródło/definicję; przejdź do powiązanej decyzji, Activity albo Integrations. Brak bezpośredniego pauzowania reklam z tabeli omijającego workflow. Eksport analityki pozostaje kwestią O-14; nie jest wymagany do podstawowego drill-down MVP.
+**Actions and navigation:** change the period, comparison, granularity and filter; open the source/definition; go to the related decision, Activity or Integrations. No direct pausing of ads from the table that bypasses the workflow. Analytics export remains question O-14; it is not required for the basic MVP drill-down.
 
-**Stany:** loading — karty i wykres z skeletonami, aktywny kontekst dat; empty — brak danych dla filtra, bez fikcyjnych zer; error — błąd zapytania lokalnie dla zakładki/tabeli; success — ten sam query/data version dla powiązanych liczb; stale — watermarky źródeł i ostrzeżenie o opóźnieniu; partial — dostępna sprzedaż przy brakującej rentowności, z czytelną przyczyną.
+**States:** loading — cards and chart with skeletons, an active date context; empty — no data for the filter, without fictitious zeros; error — a query error local to the tab/table; success — the same query/data version for related numbers; stale — source watermarks and a delay warning; partial — sales available with missing profitability, with a clear reason.
 
-**Backend i API:** Reporting korzysta z wersjonowanych definicji i agregatów Commerce. Zapytania nie uruchamiają reasoning LLM. Wszystkie endpointy przyjmują `from,to,timezone,compare,granularity` oraz allowlistowane filtry; wspólny `queryId/dataVersion` pozwala łączyć widoki tego samego wyniku.
+**Backend and API:** Reporting uses versioned definitions and Commerce aggregates. Queries do not run LLM reasoning. All endpoints take `from,to,timezone,compare,granularity` and allowlisted filters; a shared `queryId/dataVersion` allows linking views of the same result.
 
-| Endpoint | Wynik i dodatkowy kontekst |
+| Endpoint | Result and additional context |
 |---|---|
-| `GET B/analytics/sales` | Metrics, series, breakdowns, definicje i meta |
+| `GET B/analytics/sales` | Metrics, series, breakdowns, definitions and meta |
 | `GET B/analytics/profitability` | Metrics, costBreakdown, costCoverage, allocationMethods, missingComponents |
-| `GET B/analytics/ads` | Metrics i series; `campaignId/adsetId/adId`, attributionSettings |
-| `GET B/analytics/products` | Metrics, series, paginated SKU rows; `productVariantId`, forecastMethod i risk flags |
-| `GET B/analytics/{tab}/rows` | `queryId`, whitelisted dimension, cursor, sort → drill-down tej samej wersji; po wygaśnięciu query jawne odświeżenie |
-| `GET B/analytics/definitions/{key}` | Wersja definicji, jednostki, mianownik, metoda i źródła; bez duplikowania algorytmu w UI |
+| `GET B/analytics/ads` | Metrics and series; `campaignId/adsetId/adId`, attributionSettings |
+| `GET B/analytics/products` | Metrics, series, paginated SKU rows; `productVariantId`, forecastMethod and risk flags |
+| `GET B/analytics/{tab}/rows` | `queryId`, a whitelisted dimension, cursor, sort → drill-down of the same version; after the query expires, an explicit refresh |
+| `GET B/analytics/definitions/{key}` | Definition version, units, denominator, method and sources; without duplicating the algorithm in the UI |
 
-Wynik analizy ma czytelne statusy kompletności. **O-14:** docelowe wolumeny i limity opóźnień zdecydują o potrzebie asynchronicznych ciężkich zapytań; obecny projekt wymaga paginacji i limitów zakresu, nie obiecuje dowolnego czasu odpowiedzi.
+An analysis result has clear completeness statuses. **O-14:** target volumes and delay limits will decide whether heavy queries need to be asynchronous; the current design requires pagination and range limits and does not promise an arbitrary response time.
 
-## 8. Automations + konfiguracja autonomii
+## 8. Automations + autonomy configuration
 
-**Cel i scenariusze:** zrozumieć, co system robi w tle, sprawdzić gotowe procesy, skonfigurować dopuszczone działania i limity, wstrzymać proces. Nie wymagamy znajomości konfiguracji agentów.
+**Goal and scenarios:** understand what the system does in the background, check the ready processes, configure the allowed actions and limits, pause a process. We do not require knowledge of agent configuration.
 
-**Układ i dane:** lista siedmiu procesów z [zakresu MVP](01-PRODUCT-VISION-AND-ARCHITECTURE.md#siedem-procesów-korzystających-ze-wspólnego-rdzenia), z nazwą użytkową („Obsługa wiadomości klientów” zamiast technicznej nazwy profilu), opisem, statusem, ostatnim/następnym uruchomieniem, zakresem L0/L1/L2 i zdrowiem zależności. Detail zawiera działanie procesu, dozwolone czynności, efektywną politykę, limity, wyłączenia, historię oraz rozwijane szczegóły.
+**Layout and data:** a list of the seven processes from the [MVP scope](01-PRODUCT-VISION-AND-ARCHITECTURE.md#seven-processes-using-the-shared-core), with a user-facing name ("Handling customer messages" instead of the technical profile name), a description, status, last/next run, the L0/L1/L2 scope and the health of dependencies. The detail contains how the process works, the allowed actions, the effective policy, limits, exclusions, history and expandable details.
 
-**Akcje:** wstrzymaj/wznów proces, zmień dozwolony poziom per akcja i zakres, ustaw limity, sprawdź skutki zmiany. L2 wymaga pokazania konkretnych dopuszczonych czynności i jawnego potwierdzenia. L3 jest oznaczone jako poza MVP i nieaktywne. „Wstrzymaj automatyzację” zatrzymuje nowe działania tego procesu, nie usuwa integracji ani audytu i nie cofa wysłanej akcji. Dla Support odrębnie wstrzymujemy automatyczne odpowiedzi; odbiór wiadomości i praca człowieka pozostają dostępne, o ile globalne polityki na to pozwalają.
+**Actions:** pause/resume the process, change the allowed level per action and scope, set limits, check the effects of a change. L2 requires showing the specific allowed actions and an explicit confirmation. L3 is marked as outside the MVP and inactive. "Pause automation" stops new actions of this process; it does not remove the integration or the audit and does not undo a sent action. For Support, automatic replies are paused separately; receiving messages and human work stay available, as long as the global policies allow it.
 
-**Nawigacja:** ostatni run → Activity; wymagana zgoda → Decision Detail; eskalacje Support → jego kolejka; awaria zależności → Integrations; globalna polityka → Settings z powrotem do procesu. Formularz pokazuje, które wartości dziedziczy, a które nadpisuje w dozwolonym zakresie. Edytor globalnych reguł istnieje w Settings, bez drugiego niezależnego źródła konfiguracji.
+**Navigation:** last run → Activity; required approval → Decision Detail; Support escalations → its queue; a dependency failure → Integrations; global policy → Settings with a way back to the process. The form shows which values are inherited and which are overridden within the allowed scope. The global rule editor lives in Settings, without a second independent source of configuration.
 
-**Stany:** loading — karty; empty — dostępne procesy jeszcze nieskonfigurowane, bez kreatora dowolnego workflow; error — zależność blokuje proces, czytelny link do naprawy; success — zapis polityki z wersją i zakresem; conflict — nowa wersja wymaga przeglądu; partial/stale — brak bieżącego health blokuje zwiększenie autonomii.
+**States:** loading — cards; empty — available processes not configured yet, without a builder for arbitrary workflows; error — a dependency blocks the process, a clear link to the fix; success — the policy is saved with a version and a scope; conflict — a new version needs a review; partial/stale — missing current health blocks increasing autonomy.
 
-**Backend i API:** Automation zwraca rozdzielnie konfigurację żądaną i efektywną po zastosowaniu nadrzędnych polityk.
+**Backend and API:** Automation returns the requested and the effective configuration separately, after applying the parent policies.
 
-| Endpoint | Wejście → wynik |
+| Endpoint | Input → result |
 |---|---|
-| `GET B/automations` | → karty procesów, status, dependencies, effectiveAutonomy |
-| `GET B/automations/{id}` | → dozwolone akcje, konfiguracja, wersja, effectivePolicy, historia referencyjna |
-| `POST B/automations/{id}/policy-preview` | Proponowane ustawienia + baseVersion → różnica uprawnień i blokujące reguły; bez zapisu |
-| `PATCH B/automations/{id}/configuration` | Zatwierdzony zakres + If-Match → nowa konfiguracja; serwer ponownie wylicza politykę |
-| `POST B/automations/{id}/pause` i `/resume` | If-Match, reason → utrwalony stan i wpływ na aktywne operacje |
+| `GET B/automations` | → process cards, status, dependencies, effectiveAutonomy |
+| `GET B/automations/{id}` | → allowed actions, configuration, version, effectivePolicy, reference history |
+| `POST B/automations/{id}/policy-preview` | Proposed settings + baseVersion → the permission difference and blocking rules; nothing is saved |
+| `PATCH B/automations/{id}/configuration` | Approved scope + If-Match → a new configuration; the server recomputes the policy |
+| `POST B/automations/{id}/pause` and `/resume` | If-Match, reason → a persisted state and the impact on active operations |
 
-Preview nie jest upoważnieniem do przyszłej akcji; zapis i executor nadal egzekwują aktualny stan. Każda zmiana jest audytowana i dostępna wyłącznie uprawnionej roli.
+A preview is not an authorization for a future action; the save and the executor still enforce the current state. Every change is audited and available only to a permitted role.
 
 ## 9. Activity History
 
-**Cel i scenariusze:** zobaczyć wykonaną pracę, znaleźć przyczynę błędu i zweryfikować skutek. Widok jest czytelną historią operacyjną z możliwością wejścia w audyt.
+**Goal and scenarios:** see the work done, find the cause of an error and verify the effect. The view is a readable operational history with a way into the audit.
 
-**Układ i dane:** timeline lub tabela z filtrem typu (wykrycie, rekomendacja, akcja, odpowiedź, eskalacja, retry, weryfikacja), procesu, wyniku, czasu i aktora. Wiersz: prosty opis, zasób, czas, AI/człowiek/system oraz wynik. Detail zawiera pre/post-state, powiązaną propozycję/draft, wersję polityki, oś prób i weryfikacji oraz identyfikatory korelacyjne. Odpowiedzi klientów w ogólnej historii są redagowane dla ról bez dostępu Support.
+**Layout and data:** a timeline or table with filters for type (detection, recommendation, action, reply, escalation, retry, verification), process, result, time and actor. A row: a simple description, the resource, time, AI/human/system and the result. The detail contains the pre/post-state, the related proposal/draft, the policy version, the attempt and verification timeline and correlation identifiers. Customer replies in the general history are redacted for roles without Support access.
 
-**Akcje i nawigacja:** filtrowanie, kopiowanie bezpiecznego ID diagnostycznego, przejście do decyzji, rozmowy, integracji lub kontekstowej analityki. Kontrolowane ponowienie jest widoczne tylko, jeśli backend zwróci je jako dozwoloną komendę właściwego zasobu. Nie ma uniwersalnego „cofnij” ani „ponów” dla każdego eventu.
+**Actions and navigation:** filtering, copying a safe diagnostic ID, going to the decision, conversation, integration or contextual analytics. A controlled retry is visible only if the backend returns it as an allowed command of the right resource. There is no universal "undo" or "retry" for every event.
 
-**Stany:** loading — szkielet osi; empty — brak aktywności w okresie; error — błąd pobrania strony z zachowaniem filtrów; success — potwierdzony wynik i dalsze linki; UNKNOWN — wyróżniony status niepewności z właścicielem eskalacji; pending — proces trwa, nie jest zakończonym sukcesem.
+**States:** loading — a timeline skeleton; empty — no activity in the period; error — a page fetch error, keeping the filters; success — a confirmed result and further links; UNKNOWN — a highlighted uncertainty status with an escalation owner; pending — the process is running, it is not a completed success.
 
-**Backend i API:** Audit jest historią, nie interfejsem swobodnej mutacji zdarzeń.
+**Backend and API:** Audit is a history, not an interface for freely mutating events.
 
-| Endpoint | Wejście → wynik |
+| Endpoint | Input → result |
 |---|---|
-| `GET B/activities` | Filtry, cursor → ActivitySummary[], nextCursor, meta |
+| `GET B/activities` | Filters, cursor → ActivitySummary[], nextCursor, meta |
 | `GET B/activities/{id}` | → timeline, actor, resourceRefs, before/after, outcome, retry history, policy/proposal refs, redacted audit |
 
-Treści e-mail udostępnia właściwy endpoint Support z własną kontrolą dostępu. Opóźniona projekcja audytu jest oznaczona; nie usuwa potwierdzonego wyniku ActionExecution.
+E-mail content is exposed by the appropriate Support endpoint with its own access control. A delayed audit projection is marked; it does not remove a confirmed ActionExecution result.
 
 ## 10. Integrations
 
-**Cel i scenariusze:** podłączyć źródła istniejącego sklepu, sprawdzić uprawnienia i świeżość, odnowić dostęp, wykonać synchronizację i bezpiecznie odłączyć połączenie.
+**Goal and scenarios:** connect the existing store's sources, check permissions and freshness, renew access, run a synchronization and safely disconnect a connection.
 
-**Układ i dane:** karty WooCommerce, Meta Ads, skrzynki e-mail Support i opcjonalnego Slacka. Detail: osobno status autoryzacji, odbioru, wysyłki i synchronizacji; ostatni sukces, watermark, backlog, zakres uprawnień, konto/skrzynka, zależne procesy i czytelny błąd. E-mail do klientów i wewnętrzny kanał raportów są opisane odrębnie. Sekrety są maskowane i nigdy nie wracają z backendu.
+**Layout and data:** cards for WooCommerce, Meta Ads, the Support e-mail mailbox and optional Slack. Detail: separate statuses for authorization, receiving, sending and synchronization; the last success, watermark, backlog, permission scope, account/mailbox, dependent processes and a readable error. E-mail to customers and the internal report channel are described separately. Secrets are masked and never come back from the backend.
 
-**Akcje:** połącz, sprawdź połączenie, odnów zgodę, wybierz uprawnione konto/skrzynkę, synchronizuj, odłącz po pokazaniu zależności. Podłączenie dostępu do wysyłki nie aktywuje automatycznie odpowiedzi L2. Odłączenie blokuje nowe zależne mutacje i nie oznacza skasowania historii. Test wysyłki, jeśli potrzebny dla wybranego dostawcy, wymaga jawnego odbiorcy testowego i zgody; nie wysyła się do klientów w tle.
+**Actions:** connect, check the connection, renew consent, choose a permitted account/mailbox, synchronize, disconnect after showing the dependencies. Connecting send access does not automatically activate L2 replies. Disconnecting blocks new dependent mutations and does not mean deleting history. A send test, if the chosen provider needs one, requires an explicit test recipient and consent; nothing is sent to customers in the background.
 
-**Nawigacja:** błąd konkretnej automatyzacji → detail odpowiedniej integracji; brak kosztów → Settings; po podłączeniu link do postępu onboarding albo uruchomienia analizy. Otwierane zewnętrzne procesy autoryzacji mają powrót do tego samego kroku i informację o wyniku.
+**Navigation:** an error of a specific automation → the detail of the right integration; missing costs → Settings; after connecting, a link to the onboarding progress or to starting an analysis. External authorization flows that are opened return to the same step and report the result.
 
-**Stany:** loading — health i zależności oddzielnie; empty — połączenie jeszcze nie istnieje; error — token, zakres lub synchronizacja z konkretnym krokiem naprawy; success — „Połączono” i osobno „Synchronizacja ukończona”; partial — odczyt działa, wysyłka nieaktywna; stale — ostatni sukces i zablokowane procesy. Sam HTTP sukces OAuth nie oznacza gotowych danych.
+**States:** loading — health and dependencies separately; empty — the connection does not exist yet; error — token, scope or synchronization with a specific fix step; success — "Connected" and separately "Synchronization completed"; partial — reading works, sending is inactive; stale — the last success and the blocked processes. An OAuth HTTP success alone does not mean the data is ready.
 
-**Backend i API:** Integrations realizuje walidację kont, sekretów, uprawnień, callbacków i URL sklepu; frontend nie przechowuje tokenów w adresie ani pamięci trwałej aplikacji.
+**Backend and API:** Integrations validates accounts, secrets, permissions, callbacks and the store URL; the frontend does not keep tokens in the URL or in persistent application storage.
 
-| Endpoint | Wejście → wynik |
+| Endpoint | Input → result |
 |---|---|
 | `GET B/integrations` / `GET B/integrations/{id}` | → capabilities, health, account label, freshness, sync jobs, dependencies, allowedActions |
-| `POST B/integration-connections` | `{provider,returnPath,storeUrl?}` → connection ID i bezpieczny następny krok; returnPath z allowlist |
-| `POST B/integration-connections/{id}/credentials` | Sekrety tylko dla connectora wymagającego formularza → status bez zwracania wartości |
-| `POST B/integrations/{id}/checks` | → 202 + operation ID, odczytowy test dostępu |
-| `POST B/integrations/{id}/sync-jobs` | `{scope}`, bez nieograniczonego backfill → 202 + job ID |
-| `POST B/integrations/{id}/reauthorization` | → ścieżka odnowienia, bez automatycznego rozszerzenia autonomii |
-| `POST B/integrations/{id}/disconnect` | If-Match + reason → stan odłączony i lista zatrzymanych zależności |
+| `POST B/integration-connections` | `{provider,returnPath,storeUrl?}` → connection ID and a safe next step; returnPath from an allowlist |
+| `POST B/integration-connections/{id}/credentials` | Secrets only for a connector that needs a form → status without returning the values |
+| `POST B/integrations/{id}/checks` | → 202 + operation ID, a read-only access test |
+| `POST B/integrations/{id}/sync-jobs` | `{scope}`, no unbounded backfill → 202 + job ID |
+| `POST B/integrations/{id}/reauthorization` | → a renewal path, without automatically expanding autonomy |
+| `POST B/integrations/{id}/disconnect` | If-Match + reason → a disconnected state and a list of stopped dependencies |
 
-Callback po stronie backendu wiąże żądanie autoryzacji z właściwym użytkownikiem/sklepem; testuje zakres przed nadaniem statusu ready. **O-11:** wybór dostawcy e-mail i sposobu łączenia pozostaje otwarty, dlatego nie narzucamy konkretnego OAuth/IMAP/SMTP flow jako zatwierdzonej implementacji.
+The backend callback binds the authorization request to the right user/store and tests the scope before granting the ready status. **O-11:** the choice of the e-mail provider and the connection method stays open, so we do not impose a specific OAuth/IMAP/SMTP flow as an approved implementation.
 
 ## 11. Settings & Policies
 
-**Cel i scenariusze:** utrzymać dane sklepu, role, globalne granice działań, finanse, zasady odpowiedzi i kanały wewnętrzne. Uprawniony administrator może zatrzymać mutacje i przejrzeć skutki zmian.
+**Goal and scenarios:** maintain the store data, roles, global action boundaries, finances, reply rules and internal channels. A permitted administrator can stop mutations and review the effects of changes.
 
-**Układ i dane:** zakładki „Sklep”, „Polityki”, „Zespół”, „Powiadomienia”, „Dane finansowe”, „Zasady obsługi klientów”. Widoczny globalny stan zatrzymania, wersje polityk i dziedziczone wartości. Konfiguracja per automatyzacja linkuje do Automations, wykorzystując ten sam Policy Service. Dane: strefa/waluta sklepu, role i scope, limity, odbiorcy raportów, brakujące koszty, zatwierdzone źródła odpowiedzi oraz kategorie L2 Support.
+**Layout and data:** the tabs "Store", "Policies", "Team", "Notifications", "Financial data", "Customer support rules". A visible global stop state, policy versions and inherited values. Per-automation configuration links to Automations and uses the same Policy Service. Data: the store's time zone/currency, roles and scope, limits, report recipients, missing costs, approved reply sources and the Support L2 categories.
 
-**Akcje:** edytuj, obejrzyj diff i wpływ, zapisz wersję; przypisz uprawnienia; uzupełnij koszty; zatrzymaj mutacje; osobno i świadomie przywróć możliwość ich wykonywania. Globalny kill switch dotyczy zakresu zwróconego przez backend, w tym wysyłek do klientów objętych blokadą; nie tworzymy ukrytego obejścia dla przycisku człowieka. UI pokazuje, że już wysłanej akcji nie cofnie. Zatrzymanie nie kasuje wiadomości ani nie wyłącza dozwolonych odczytów.
+**Actions:** edit, view the diff and the impact, save a version; assign permissions; complete costs; stop mutations; separately and deliberately restore the ability to execute them. The global kill switch applies to the scope returned by the backend, including sends to customers covered by the block; we do not create a hidden bypass for a human button. The UI shows that an already sent action cannot be undone. Stopping does not delete messages or disable the allowed reads.
 
-**Nawigacja:** brak COGS w Analytics → odpowiedni formularz finansowy z kontekstem SKU; niedozwolona odpowiedź → SupportPolicy; efektywna reguła → używające jej automatyzacje i audyt zmian. Odczyt polityki nie daje prawa do jej edycji.
+**Navigation:** missing COGS in Analytics → the right financial form with the SKU context; a disallowed reply → SupportPolicy; an effective rule → the automations that use it and the change audit. Reading a policy does not grant the right to edit it.
 
-**Stany:** loading — formularz bez aktywnych save; empty — brak kosztów/odbiorców z wyjaśnieniem skutku; error — walidacja przy polach i blokada niepoprawnego zapisu; success — nowa wersja i zakres obowiązywania; conflict — diff względem nowszej wersji, bez cichego nadpisania; partial — niektóre źródła danych nieuzupełnione, pozostałe ustawienia nadal dostępne.
+**States:** loading — a form without active saves; empty — no costs/recipients with an explanation of the effect; error — validation next to the fields and a block on an invalid save; success — a new version and its scope of validity; conflict — a diff against a newer version, without a silent overwrite; partial — some data sources not completed, the other settings still available.
 
-**Backend i API:** Tenants/Identity przechowują konfigurację i scope, Policy Service wylicza efektywną politykę, a Audit rejestruje zmianę. Role robocze **[P]**: właściciel/admin polityk, operator decyzji, operator Support, analityk odczytu; konkretną macierz ustalamy w O-13. Są to role dostępu, nie tryby doświadczenia użytkownika.
+**Backend and API:** Tenants/Identity store the configuration and scope, the Policy Service computes the effective policy, and Audit records the change. Working roles **[P]**: owner/policy admin, decision operator, Support operator, read-only analyst; the specific matrix is settled in O-13. These are access roles, not user experience modes.
 
-| Endpoint | Wejście → wynik |
+| Endpoint | Input → result |
 |---|---|
-| `GET/PATCH B/settings/store` | Nazwa, timezone, waluta i uzgodnione ustawienia; If-Match → wersja |
-| `GET B/policies` / `GET B/policies/{id}` | → scope, wersja, reguły i źródła dziedziczenia |
-| `POST B/policies/{id}/preview` | Proponowana konfiguracja/baseVersion → diff i wpływ, bez zmiany stanu |
-| `POST B/policies/{id}/versions` | Konfiguracja + If-Match → nowa obowiązująca wersja i audyt |
-| `POST B/mutation-stop` | `{enabled,reason}`, If-Match aktualnego stop state → potwierdzony zakres i stan; wyłączenie wymaga odrębnej zgody uprawnionego użytkownika |
-| `GET/PATCH B/settings/notifications` | Kanały wewnętrzne, harmonogram, odbiorcy; wersjonowanie i test jako osobna jawna akcja |
-| `GET/PATCH B/settings/financial-inputs` | Koszty z okresem obowiązywania, źródłem i SKU; wynik walidacji i przeliczeń |
-| `GET B/team` / `PATCH B/team/{memberId}/permissions` | Dostępne role/scope; zmiana tylko w zakresie uprawnień administratora, If-Match |
+| `GET/PATCH B/settings/store` | Name, timezone, currency and agreed settings; If-Match → version |
+| `GET B/policies` / `GET B/policies/{id}` | → scope, version, rules and inheritance sources |
+| `POST B/policies/{id}/preview` | Proposed configuration/baseVersion → diff and impact, without a state change |
+| `POST B/policies/{id}/versions` | Configuration + If-Match → a new effective version and an audit |
+| `POST B/mutation-stop` | `{enabled,reason}`, If-Match of the current stop state → a confirmed scope and state; disabling requires a separate approval by a permitted user |
+| `GET/PATCH B/settings/notifications` | Internal channels, schedule, recipients; versioning and a test as a separate explicit action |
+| `GET/PATCH B/settings/financial-inputs` | Costs with a validity period, source and SKU; the validation and recalculation result |
+| `GET B/team` / `PATCH B/team/{memberId}/permissions` | Available roles/scope; changes only within the administrator's permissions, If-Match |
 
-SupportPolicy jest pozycją w tym samym katalogu polityk, nie nową implementacją Policy Engine. Zmiana waluty lub definicji kosztów wymaga informacji o sposobie przeliczenia historii; nie nadpisujemy historycznych dowodów decyzji.
+SupportPolicy is an item in the same policy catalog, not a new Policy Engine implementation. A change of the currency or of cost definitions requires information about how history is recalculated; we do not overwrite the historical evidence of decisions.
 
-## 12. Onboarding istniejącego sklepu [D, P]
+## 12. Onboarding an existing store [D, P]
 
-**Cel:** podłączyć istniejący sklep i włączyć monitoring z widoczną gotowością każdej domeny. Nie ma etapu „Utwórz sklep”, generowania witryny, katalogu ani storefrontu.
+**Goal:** connect an existing store and enable monitoring, with the readiness of each domain visible. There is no "Create store" step, no generation of a website, catalog or storefront.
 
-| Krok | Układ, dane i akcje | Warunek ukończenia / przejście |
+| Step | Layout, data and actions | Completion condition / transition |
 |---|---|---|
-| 1. Podłącz WooCommerce | Formularz istniejącego adresu i bezpieczne połączenie; nazwa sklepu, strefa, konto i test odczytu | Zweryfikowane połączenie i rozpoczęta synchronizacja; błędy hostingu/dostępu pokazane w miejscu wystąpienia |
-| 2. Podłącz narzędzia | Karty Meta, e-mail Support i opcjonalnego Slacka; wybór uprawnionego konta/skrzynki i zakresów | Każda domena otrzymuje własny stan gotowości. Można wrócić do konfiguracji; brak integracji blokuje zależny proces, nie cały Dashboard |
-| 3. Uzupełnij dane biznesowe | Koszty, waluta/strefa, zasady zapasu, polityki sklepu i mapowania; informacja o brakach | Braki mają listę skutków. Analiza sprzedaży działa przed uzupełnieniem wszystkich kosztów; L2 Inventory wymaga potwierdzonej semantyki i mapowań |
-| 4. Uruchom monitoring | Podsumowanie źródeł, zakres L0/L1 i właściciele eskalacji; „Uruchom monitoring” | Bez samoczynnego L2 reklam i odpowiedzi klientom. Przejście do Dashboardu z checklistą gotowości |
+| 1. Connect WooCommerce | A form for the existing address and a secure connection; store name, time zone, account and a read test | A verified connection and a started synchronization; hosting/access errors shown where they occur |
+| 2. Connect tools | Cards for Meta, Support e-mail and optional Slack; choosing a permitted account/mailbox and scopes | Each domain gets its own readiness state. Configuration can be revisited; a missing integration blocks the dependent process, not the whole Dashboard |
+| 3. Complete business data | Costs, currency/time zone, stock rules, store policies and mappings; information about gaps | Gaps have a list of effects. Sales analysis works before all costs are completed; Inventory L2 requires confirmed semantics and mappings |
+| 4. Start monitoring | A summary of sources, the L0/L1 scope and escalation owners; "Start monitoring" | No automatic L2 for ads and customer replies. Go to the Dashboard with a readiness checklist |
 
-Po pierwszej synchronizacji operator może osobno skonfigurować SupportPolicy, przetestować szkice i jawnie uruchomić dozwolone odpowiedzi L2. Podłączenie skrzynki odczytu nie oznacza zgody na wysyłkę. Pominięcie e-maila w trakcie onboardingu pozostawia widok Support dostępny z instrukcją podłączenia, a nie usuwa modułu z MVP. Brak konta Meta analogicznie pozostawia działającą analitykę sprzedaży i widoczne nieaktywne procesy reklamowe.
+After the first synchronization the operator can separately configure SupportPolicy, test drafts and explicitly enable the allowed L2 replies. Connecting a mailbox for reading does not mean consent to sending. Skipping e-mail during onboarding leaves the Support view available with connection instructions; it does not remove the module from the MVP. A missing Meta account likewise leaves sales analytics working and the ad processes visible but inactive.
 
-**Nawigacja:** stepper z zapisem postępu, Wstecz/Dalej, „Dokończ później” i powrót do konkretnej integracji. Sukces oznacza rzeczywistą gotowość monitoringu danego zakresu; trwały import ma postęp i osobny rezultat. Zakończenie wizardu nie ukrywa niepełnej synchronizacji.
+**Navigation:** a stepper that saves progress, Back/Next, "Finish later" and a return to the specific integration. Success means actual monitoring readiness for the given scope; a long import has progress and a separate result. Finishing the wizard does not hide an incomplete synchronization.
 
-**Stany:** loading — test połączenia albo import z etapem, bez fałszywego procentu; empty — źródło jeszcze niepodłączone; error — czytelna przyczyna i bezpieczne ponowienie; success — potwierdzone połączenie/dane lub monitoring, odrębnie; partial/stale — checklista brakujących źródeł i ograniczonych funkcji. Anulowanie autoryzacji wraca do tego samego kroku. Odświeżenie strony nie resetuje ukończonych etapów ani nie wysyła ponownie testowej wiadomości.
+**States:** loading — a connection test or an import with a stage, without a fake percentage; empty — the source is not connected yet; error — a clear reason and a safe retry; success — a confirmed connection/data or monitoring, separately; partial/stale — a checklist of missing sources and limited features. Cancelling an authorization returns to the same step. Refreshing the page does not reset completed steps or send a test message again.
 
-**Backend i API:** połączenia korzystają z endpointów Integrations, a ustawienia z Settings; onboarding nie powiela ich logiki.
+**Backend and API:** connections use the Integrations endpoints, and settings use Settings; onboarding does not duplicate their logic.
 
-| Endpoint | Wejście → wynik |
+| Endpoint | Input → result |
 |---|---|
-| `GET B/onboarding` | → etapy, readiness per domena, import status, warnings, wersja i nextStep |
-| `PATCH B/onboarding` | `{currentStep,completedAcknowledgements}`, If-Match → zapis postępu; backend sam ocenia gotowość |
-| `POST B/onboarding/monitoring-start` | `{requestedScopes}`, If-Match → 202 + monitoring operation, efektywny zakres L0/L1 i blokady |
+| `GET B/onboarding` | → steps, readiness per domain, import status, warnings, version and nextStep |
+| `PATCH B/onboarding` | `{currentStep,completedAcknowledgements}`, If-Match → progress saved; the backend assesses readiness itself |
+| `POST B/onboarding/monitoring-start` | `{requestedScopes}`, If-Match → 202 + monitoring operation, the effective L0/L1 scope and blocks |
 
-Zarejestrowanie istniejącego adresu sklepu w platformie jest technicznym powiązaniem konta, nie utworzeniem sklepu e-commerce. Backend waliduje uprawnienia, URL i zakres connectora, a UI nie przyjmuje deklaracji „gotowe” jako dowodu dostępu do danych.
+Registering an existing store address in the platform is a technical account link, not the creation of an e-commerce store. The backend validates permissions, the URL and the connector scope, and the UI does not accept a "ready" declaration as proof of data access.
 
-## 13. Przepływy użytkownika i mapowanie do domen [P]
+## 13. User flows and mapping to domains [P]
 
-| Przepływ | Kolejne widoki | Zachowywany kontekst i rezultat |
+| Flow | Views in order | Context kept and result |
 |---|---|---|
-| Ryzyko zapasu L1 | Dashboard → Decision Detail → Analytics Products → Detail → zgoda → Activity | Wariant, snapshot i okres; zgoda na konkretną rewizję; techniczny wynik pauzy. Logika: [Inventory Guardian](03-INVENTORY-GUARDIAN-E2E.md#14-powiązanie-procesu-z-ui-p) |
-| Wykonana akcja L2 | Dashboard / Activity → Decision Detail → Ads | Akcja, polityka, cel i czas; brak sztucznego pytania o zgodę po wykonaniu |
-| Eskalacja e-mail | Dashboard → Support z filtrem → Conversation Detail → takeover → edycja → send | Conversation, trigger i ownership version; status wysyłki pozostaje widoczny |
-| Analiza marży | Dashboard → Profitability → brakujący COGS → Settings → Profitability | Daty i SKU; przeliczenie opisane jako nowa wersja, bez zmiany historycznej decyzji |
-| Naprawa integracji | Ostrzeżenie → Integration Detail → reauthorization/sync → poprzedni widok | Konto, błąd i źródło; akcja biznesowa wymaga ponownej oceny |
-| Zwiększenie autonomii | Automations → preview polityki → potwierdzenie → Activity | Konkretny zakres akcji i nowa wersja; ograniczenia nadrzędne nadal obowiązują |
+| Stock risk L1 | Dashboard → Decision Detail → Analytics Products → Detail → approval → Activity | Variant, snapshot and period; approval of a specific revision; the technical pause result. Logic: [Inventory Guardian](03-INVENTORY-GUARDIAN-E2E.md#14-linking-the-process-to-the-ui-p) |
+| Executed L2 action | Dashboard / Activity → Decision Detail → Ads | Action, policy, target and time; no artificial approval question after execution |
+| E-mail escalation | Dashboard → Support with a filter → Conversation Detail → takeover → edit → send | Conversation, trigger and ownership version; the send status stays visible |
+| Margin analysis | Dashboard → Profitability → missing COGS → Settings → Profitability | Dates and SKU; the recalculation is described as a new version, without changing the historical decision |
+| Fixing an integration | Warning → Integration Detail → reauthorization/sync → previous view | Account, error and source; a business action requires a new evaluation |
+| Increasing autonomy | Automations → policy preview → confirmation → Activity | A specific action scope and a new version; parent restrictions still apply |
 
-UI używa wspólnego `AnalysisContext` i identyfikatorów korelacyjnych. Decision Inbox obsługuje decyzje biznesowe, Customer Support rozmowy, Analytics read models, Activity audyt, a Automations/Settings ten sam moduł polityk. Komponenty nie komunikują się bezpośrednio z dostawcami LLM, Meta ani poczty. Żaden ekran nie nadaje modelowi nowych tools.
+The UI uses a shared `AnalysisContext` and correlation identifiers. Decision Inbox handles business decisions, Customer Support conversations, Analytics read models, Activity the audit, and Automations/Settings the same policy module. Components do not communicate directly with LLM, Meta or mail providers. No screen grants the model new tools.
 
-## 14. Dostępność i zachowanie interakcji [P]
+## 14. Accessibility and interaction behavior [P]
 
-Wszystkie funkcje są dostępne z klawiatury, z widocznym fokusem, semantycznymi etykietami i logiczną kolejnością. Drawer/dialog zarządza fokusem i zwraca go do źródła; Escape zamyka nieszkodliwy podgląd, lecz nie odrzuca niezapisanego szkicu bez ostrzeżenia. Przy zmianie route fokus przechodzi do nagłówka, przy odświeżeniu danych nie jest przenoszony.
+All features are available from the keyboard, with a visible focus, semantic labels and a logical order. A drawer/dialog manages focus and returns it to the source; Escape closes a harmless preview but does not discard an unsaved draft without a warning. On a route change, focus moves to the heading; on a data refresh it is not moved.
 
-Wykres ma opis tekstowy i tabelę danych; tooltip jest dostępny z klawiatury. Kolor nie jest jedynym nośnikiem statusu, wzrost nie zawsze jest korzystny (np. CPA). Cel kontrastu: minimum 4,5:1 dla zwykłego tekstu i 3:1 dla dużego tekstu oraz istotnych elementów interaktywnych. Wymagane są pomiary wybranej palety; nie deklarujemy certyfikacji na podstawie specyfikacji. Powiększenie 200% nie usuwa dostępu do akcji. Animacje są ograniczone i respektują preferencję redukcji ruchu.
+A chart has a text description and a data table; a tooltip is reachable from the keyboard. Color is not the only carrier of status, and an increase is not always good (e.g. CPA). Contrast target: at least 4.5:1 for regular text and 3:1 for large text and essential interactive elements. Measurements of the chosen palette are required; we do not claim certification based on the specification. 200% zoom does not remove access to actions. Animations are limited and respect the reduced motion preference.
 
-Formularze mają etykiety, błędy przy polach i podsumowanie. Zmiany wysyłki są ogłaszane przez region statusu bez czytania całej historii od nowa. Ważny błąd pozostaje w widoku także po zniknięciu toastu. Duże tabele mają nagłówki i logiczne sortowanie, a wirtualizacja zachowuje dostępność. Touch targets mają docelowo co najmniej 44 × 44 px; gęste dane nie wymuszają równie małych przycisków.
+Forms have labels, errors next to the fields and a summary. Send changes are announced through a status region without reading the whole history again. An important error stays in the view even after the toast disappears. Large tables have headers and logical sorting, and virtualization keeps accessibility. Touch targets are at least 44 × 44 px; dense data does not force equally small buttons.
 
-Daty pokazujemy z nazwą strefy w kontekście, względny czas ma dokładny timestamp w dostępnym podglądzie. Waluty i procenty mają jednoznaczne jednostki. Język komunikatów opisuje sytuację i następny krok, bez technicznych wyjątków lub ukrywania niepewności.
+Dates are shown with the time zone name in context; relative time has the exact timestamp in an accessible preview. Currencies and percentages have unambiguous units. The message language describes the situation and the next step, without technical exceptions and without hiding uncertainty.
 
-## 15. Kryteria akceptacyjne UI [P]
+## 15. UI acceptance criteria [P]
 
-| ID | Scenariusz odbioru |
+| ID | Acceptance scenario |
 |---|---|
-| UX-01 | Osiem widoków i onboarding są dostępne zgodnie z uprawnieniami; brak kreatora sklepu i trybu ekspert/początkujący. |
-| UX-02 | Przejście Dashboard → decyzja → analityka → powrót zachowuje sklep, produkt, daty, filtry i rewizję. |
-| UX-03 | Liczby Summary/Explanation/Evidence dla danego snapshotu są zgodne; bieżące dane nie podmieniają historycznych dowodów. |
-| UX-04 | Cztery zakładki Analytics mają porównania, drill-down i definicje; brak kosztu daje Unavailable/Estimated z przyczyną, nie fałszywe zero. |
-| UX-05 | Zgoda na wygasłą lub zmienioną rewizję jest odrzucona; podwójne kliknięcie nie duplikuje akcji. |
-| UX-06 | UNKNOWN i przyjęcie komendy nie są prezentowane jako potwierdzony skutek; nie ma ślepego resend/retry. |
-| UX-07 | Eskalacja Support pokazuje podsumowanie, powód i szkic; takeover wyłącza możliwość nowej automatycznej odpowiedzi według stanu backendu. |
-| UX-08 | Nowy mail/zmiana właściciela w czasie edycji nie gubi lokalnego tekstu i blokuje wysyłkę nieaktualnego szkicu. |
-| UX-09 | ACCEPTED, DELIVERED, BOUNCED i UNKNOWN są odróżnione i mają źródła; autor AI/człowiek jest widoczny. |
-| UX-10 | Każdy z ośmiu widoków i onboarding przechodzi loading, empty, error, success, stale i partial z użytecznym kolejnym krokiem. |
-| UX-11 | Odnowienie integracji nie aktywuje samo L2; kill switch pokazuje skuteczny zakres i nie obiecuje cofnięcia już wysłanej akcji. |
-| UX-12 | Analityk bez uprawnień Support nie widzi treści maili w Dashboard, Activity, wyszukiwarce ani bezpośrednim linku. |
-| UX-13 | Kontekst sklepu i cache nie przeciekają przy przełączeniu konta lub roli; backend sprawdza każdą komendę. |
-| UX-14 | Krytyczne przepływy są wykonalne klawiaturą, na telefonie i przy powiększeniu; wykres ma alternatywę tabelaryczną. |
-| UX-15 | Onboarding można przerwać i wznowić; zakończenie bez e-mail/Meta pokazuje ograniczenia, a monitoring nadal startuje tylko dla gotowego zakresu. |
+| UX-01 | The eight views and onboarding are available according to permissions; no store builder and no expert/beginner mode. |
+| UX-02 | Moving Dashboard → decision → analytics → back keeps the store, product, dates, filters and revision. |
+| UX-03 | The Summary/Explanation/Evidence numbers for a given snapshot are consistent; current data does not replace historical evidence. |
+| UX-04 | The four Analytics tabs have comparisons, drill-down and definitions; a missing cost gives Unavailable/Estimated with a reason, not a false zero. |
+| UX-05 | An approval for an expired or changed revision is rejected; a double click does not duplicate the action. |
+| UX-06 | UNKNOWN and command acceptance are not presented as a confirmed effect; there is no blind resend/retry. |
+| UX-07 | A Support escalation shows the summary, the reason and the draft; a takeover disables new automatic replies according to the backend state. |
+| UX-08 | A new e-mail/owner change during editing does not lose the local text and blocks sending a stale draft. |
+| UX-09 | ACCEPTED, DELIVERED, BOUNCED and UNKNOWN are distinguished and have sources; the AI/human author is visible. |
+| UX-10 | Each of the eight views and onboarding goes through loading, empty, error, success, stale and partial with a useful next step. |
+| UX-11 | Renewing an integration does not activate L2 on its own; the kill switch shows its effective scope and does not promise to undo an already sent action. |
+| UX-12 | An analyst without Support permissions does not see e-mail content in the Dashboard, Activity, search or through a direct link. |
+| UX-13 | The store context and cache do not leak when switching accounts or roles; the backend checks every command. |
+| UX-14 | Critical flows can be completed with the keyboard, on a phone and with zoom; a chart has a tabular alternative. |
+| UX-15 | Onboarding can be interrupted and resumed; finishing without e-mail/Meta shows the limitations, and monitoring still starts only for the ready scope. |
 
-Weryfikacja obejmuje testy komponentów i kontraktów API, testy przeglądarkowe powyższych ścieżek, kontrolę dostępności i ręczne zadania z użytkownikami o różnym doświadczeniu. Makiety i dane demonstracyjne muszą być wyraźnie oznaczone. Te kryteria są planem odbioru, nie raportem przeprowadzonych testów aplikacji.
+Verification covers component and API contract tests, browser tests of the paths above, an accessibility check and manual tasks with users of different experience. Mockups and demo data must be clearly marked. These criteria are an acceptance plan, not a report of application tests already performed.
 
-## 16. Otwarte kwestie projektowe [O]
+## 16. Open design issues [O]
 
-| ID | Do rozstrzygnięcia | Wpływ |
+| ID | To resolve | Impact |
 |---|---|---|
-| O-11 | Dostawca poczty, synchronizacja Sent, statusy i deduplikacja wysyłki | Konkretne kroki połączenia i dostępne potwierdzenia w Conversation Detail |
-| O-12 | Reguły tożsamości, kategorie L2 i zatwierdzona wiedza sklepu | Zakres odpowiedzi i prezentacja brakujących danych |
-| O-13 | Macierz ról, SLA eskalacji, retencja i załączniki | Kolejki, uprawnienia, priorytety i widoczność historii |
-| O-14 | Wolumeny danych, czas odpowiedzi i eksporty analityczne | Paginacja, ciężkie zapytania i ewentualny eksport asynchroniczny |
-| O-15 | Polling czy SSE oraz dopuszczalne opóźnienie aktualizacji | Powiadomienia o nowych mailach, zmianie własności i stanie operacji |
-| O-16 | Finalny branding, walidacja palety i testy użyteczności | Wykończenie design systemu; bez zmiany zakresu ekranów |
-| O-17 | Domyślna długość historii importowanej przy onboardingu | Czas gotowości, analityka porównań i backlog poczty |
+| O-11 | Mail provider, Sent synchronization, statuses and send deduplication | Specific connection steps and the confirmations available in Conversation Detail |
+| O-12 | Identity rules, L2 categories and approved store knowledge | Reply scope and the presentation of missing data |
+| O-13 | Role matrix, escalation SLA, retention and attachments | Queues, permissions, priorities and history visibility |
+| O-14 | Data volumes, response time and analytics exports | Pagination, heavy queries and a possible asynchronous export |
+| O-15 | Polling or SSE and the acceptable update delay | Notifications about new e-mails, ownership changes and operation state |
+| O-16 | Final branding, palette validation and usability tests | Finishing the design system; without changing the screen scope |
+| O-17 | The default length of history imported during onboarding | Readiness time, comparison analytics and the mail backlog |
 
-D-04–D-07 nie są pytaniami otwartymi. Dobór providera, parametrów wizualnych i szczegółowych endpointów wymaga zatwierdzenia implementacyjnego, bez ponownego rozstrzygania obecności analityki i Support w MVP.
+D-04–D-07 are not open questions. Choosing the provider, the visual parameters and the detailed endpoints requires implementation approval, without reopening the presence of analytics and Support in the MVP.
 
-## Zakres pierwszej wersji dokumentu
+## Scope of the first version of the document
 
-Nowy dokument gromadzi jedną specyfikację nawigacji, design systemu, ośmiu widoków, onboardingu, stanów UI i proponowanych kontraktów API. Definicje biznesowe, polityki wykonania i logika Inventory Guardian pozostają w dokumentach 01–03, do których prowadzą odsyłacze.
+The new document gathers one specification of the navigation, the design system, the eight views, onboarding, UI states and the proposed API contracts. Business definitions, execution policies and the Inventory Guardian logic stay in documents 01–03, which the references point to.
 
-## 17. Uzupełnienie Business Knowledge & Decision Intelligence [D, P]
+## 17. Business Knowledge & Decision Intelligence addendum [D, P]
 
-Zachowujemy osiem widoków i progressive disclosure. Wiedza biznesowa nie wymaga dziewiątego głównego ekranu ani formularza pełnego arbitralnych progów KPI. Poniższa delta rozszerza istniejące widoki i kontrakty, bez powtarzania algorytmów z [05](05-DECISION-INTELLIGENCE-ARCHITECTURE.md).
+We keep the eight views and progressive disclosure. Business knowledge does not need a ninth main screen or a form full of arbitrary KPI thresholds. The delta below extends the existing views and contracts, without repeating the algorithms from [05](05-DECISION-INTELLIGENCE-ARCHITECTURE.md).
 
-| Widok | Uzupełnienie prezentacji i działań |
+| View | Presentation and action additions |
 |---|---|
-| Dashboard | Wskaż aktualny cel sklepu i odróżnij „proponujemy działanie”, „obserwujemy”, „bez potrzeby zmian” i „brakuje danych”. NO_ACTION nie musi zajmować kolejki pilnych decyzji. |
-| Decision Inbox/Detail | Badge rodzaju decyzji, krótkie „dlaczego” i wpływ celu sklepu. MONITOR pokazuje co/po co/do kiedy obserwujemy oraz kiedy nastąpi kolejna ocena. NO_ACTION pokazuje powód i zakończenie oceny. INSUFFICIENT_DATA wskazuje konkretny brak i następny krok; nie sugeruje świadomej decyzji o pozostawieniu kampanii. |
-| Analytics i Evidence | Przy każdej istotnej liczbie źródło, okres, observedAt, data maturity, jakość, estymacje/alokacje i link do definicji. Z panelu dowodu można sprawdzić wersję definicji, pochodzenie i ograniczenia wiarygodności. |
-| Activity | Oddzielny rezultat techniczny i karta obserwacji biznesowej z baseline, follow-up, oknem, jakością i zakłóceniami. Etykiety OBSERVED_ASSOCIATION/INCONCLUSIVE przedstawiaj jako „zaobserwowana zmiana”/„brak rozstrzygnięcia”, bez etykiety „AI zarobiło” na podstawie samego before/after. |
-| Settings & Policies | Podsekcja „Cele i strategia sklepu”: wybór rentowność/wzrost/równowaga, priorytety i tolerancja ryzyka. Autopozyskane koszty i budżety pokazują źródło i konflikty; edycja tworzy wersję profilu, nie automatycznie uprawnienia L2. |
-| Onboarding | W kroku danych biznesowych zapytaj o podstawowy cel i pokaż pozyskane z integracji koszty/ograniczenia. Poproś wyłącznie o brakujące informacje istotne dla dostępnych procesów; nie wymuszaj nieznanej marży jako zera. |
+| Dashboard | Show the store's current goal and distinguish "we propose an action", "we are monitoring", "no change needed" and "data is missing". NO_ACTION does not have to occupy the urgent decision queue. |
+| Decision Inbox/Detail | A decision kind badge, a short "why" and the impact of the store goal. MONITOR shows what/why/until when we monitor and when the next assessment happens. NO_ACTION shows the reason and the end of the assessment. INSUFFICIENT_DATA points to the specific gap and the next step; it does not suggest a deliberate decision to leave the campaign as is. |
+| Analytics and Evidence | For every significant number: the source, period, observedAt, data maturity, quality, estimates/allocations and a link to the definition. From the evidence panel the definition version, the provenance and the reliability limitations can be checked. |
+| Activity | A separate technical result and a business observation card with the baseline, follow-up, window, quality and confounders. Present the OBSERVED_ASSOCIATION/INCONCLUSIVE labels as "observed change"/"inconclusive", without an "AI earned this" label based only on before/after. |
+| Settings & Policies | A "Store goals and strategy" subsection: choice of profitability/growth/balance, priorities and risk tolerance. Automatically obtained costs and budgets show their source and conflicts; editing creates a profile version, not automatically L2 permissions. |
+| Onboarding | In the business data step, ask for the main goal and show the costs/constraints obtained from integrations. Ask only for missing information relevant to the available processes; do not force an unknown margin to be zero. |
 
-**Wyjaśnianie:** poziom 1 „Nie zmieniamy teraz budżetu, bo konwersje jeszcze spływają”; poziom 2 opisuje dowody, strategię i ryzyko; poziom 3 pokazuje właściwe KPI, okna atrybucji, próbę oraz źródła. To przykład komunikatu, nie reguła zawsze zalecająca czekanie. Opóźniony feed, mała próba i brak danych mają różne przyczyny, terminy i ścieżki naprawy. Model nie tworzy nowej wartości KPI do użycia w tekście.
+**Explaining:** level 1 "We are not changing the budget now, because conversions are still coming in"; level 2 describes the evidence, the strategy and the risk; level 3 shows the right KPIs, attribution windows, sample size and sources. This is a sample message, not a rule that always recommends waiting. A delayed feed, a small sample and missing data have different causes, deadlines and fix paths. The model does not create a new KPI value to use in the text.
 
-**DTO/API — delta [P]:** `DecisionPresentation` dodaje `decisionKind`, `knowledgeReleaseRef`, `storeProfileVersion`, `contextManifestRef`, `monitorPlan`, `insufficientDataReasons`, `outcomeRefs`. `decisionKind` jest normalizowaną projekcją backendu według reguł zgodności w dokumencie 05, nie zgadywaniem frontendu z tekstu. MetricDTO rozszerza się o `provenanceRef`, `maturity`, `availableAt`, `reliability`, `limitations`; istniejące pola quality/freshness zachowują znaczenie. Profile, metryki i źródła mają osobne poziomy wiarygodności — nie zastępujemy ich jednym „confidence AI”.
+**DTO/API — delta [P]:** `DecisionPresentation` adds `decisionKind`, `knowledgeReleaseRef`, `storeProfileVersion`, `contextManifestRef`, `monitorPlan`, `insufficientDataReasons`, `outcomeRefs`. `decisionKind` is a normalized backend projection according to the compatibility rules in document 05, not the frontend guessing from text. MetricDTO is extended with `provenanceRef`, `maturity`, `availableAt`, `reliability`, `limitations`; the existing quality/freshness fields keep their meaning. Profiles, metrics and sources have separate reliability levels — we do not replace them with one "AI confidence".
 
-| Endpoint (`B` jak w sekcji 3) | Wejście → wynik |
+| Endpoint (`B` as in section 3) | Input → result |
 |---|---|
-| `GET B/business-profile` | → wersjonowany profil, zatwierdzone/proponowane wartości, źródła, braki, konflikty, ETag i allowedActions |
-| `POST B/business-profile/preview` | Proponowane zmiany + baseVersion → wpływ na analizy i zależne decyzje; bez zapisu |
-| `POST B/business-profile/versions` | Zmiany + If-Match + Idempotency-Key → nowa zatwierdzona wersja; brak nadania uprawnień do akcji |
-| `GET B/decisions/{proposalId}/outcomes` | `revision,cursor` → plany i obserwacje, baseline/follow-up, maturity, confounders, attributionStrength |
-| `GET B/evidence/{evidenceId}/provenance` | → źródło i lineage dostępne roli/tenantowi, wersja definicji i ograniczenia; bez sekretów/niepotrzebnego PII |
+| `GET B/business-profile` | → the versioned profile, approved/proposed values, sources, gaps, conflicts, ETag and allowedActions |
+| `POST B/business-profile/preview` | Proposed changes + baseVersion → impact on analyses and dependent decisions; nothing is saved |
+| `POST B/business-profile/versions` | Changes + If-Match + Idempotency-Key → a new approved version; no action permissions are granted |
+| `GET B/decisions/{proposalId}/outcomes` | `revision,cursor` → plans and observations, baseline/follow-up, maturity, confounders, attributionStrength |
+| `GET B/evidence/{evidenceId}/provenance` | → the source and lineage available to the role/tenant, the definition version and limitations; no secrets/unnecessary PII |
 
-Istniejące formularze finansowe aktualizują swój system źródłowy; Store Profile referencjonuje zatwierdzone, wersjonowane dane kosztowe i polityki. Nie tworzymy drugiego niezależnego edytora tych samych kwot. Zmiana strategii wymaga uprawnienia do profilu i audytu; nie wolno agentowi samemu wybrać nowego celu po korzystnym Outcome.
+The existing financial forms update their source system; the Store Profile references approved, versioned cost data and policies. We do not create a second independent editor of the same amounts. A strategy change requires permission for the profile and an audit; the agent must not choose a new goal on its own after a favorable Outcome.
 
-**Stany dodatkowe:** przy loading zachowaj dotychczasowy zatwierdzony profil i wskaż odświeżenie; empty — brak skonfigurowanego celu lub brak zakończonego okna obserwacji, bez fikcyjnego defaultu zaakceptowanego przez klienta; error/conflict — pokaż konkurencyjne źródła i nową wersję; success — nowa wersja profilu lub zakończona obserwacja z jej jakością, bez implikacji skutku przyczynowego. Stare okno obserwacji może być SUPERSEDED/CENSORED, co nie usuwa starego rekordu.
+**Additional states:** during loading, keep the previously approved profile and indicate the refresh; empty — no configured goal or no completed observation window, without a fictitious default accepted by the customer; error/conflict — show the competing sources and the new version; success — a new profile version or a completed observation with its quality, without implying a causal effect. An old observation window may be SUPERSEDED/CENSORED, which does not delete the old record.
 
-**Dodatkowe kryteria odbioru [P]:** użytkownik rozróżnia MONITOR od NO_ACTION i braku danych; cel GROWTH nie odblokowuje przycisku zmiany budżetu; konflikt marży nie znika po odświeżeniu strony; spóźniony wynik konwersji tworzy rewizję obserwacji, nie nadpisuje historycznych dowodów; link źródła respektuje uprawnienia. Nowe pytania o profil, jakość źródeł i ocenę wyników zebrano jako O-18–O-23 w dokumencie 05.
+**Additional acceptance criteria [P]:** the user distinguishes MONITOR from NO_ACTION and from missing data; the GROWTH goal does not unlock a budget change button; a margin conflict does not disappear after a page refresh; a late conversion result creates a revision of the observation and does not overwrite historical evidence; a source link respects permissions. The new questions about the profile, source quality and outcome evaluation are gathered as O-18–O-23 in document 05.
 
-## Zmiany w wersji 1.1
+## Changes in version 1.1
 
-Dodano konfigurację Store Business Profile, rozróżnienie rodzajów decyzji, provenance/maturity metryk i prezentację Outcome. Rozszerzono wymagania istniejących ekranów oraz DTO/API, zachowując osiem widoków i zasadę „Simple by default. Powerful by design.”.
+Added the Store Business Profile configuration, the distinction of decision kinds, metric provenance/maturity and the Outcome presentation. Extended the requirements of the existing screens and the DTO/API, keeping the eight views and the "Simple by default. Powerful by design." principle.

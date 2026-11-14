@@ -1,25 +1,25 @@
 # Autonomous E-commerce Operator — Decision Intelligence Architecture
 
-Wersja: 1.0 · Data: 14 listopada 2026 · Status: szczegółowa specyfikacja do przeglądu
+Version: 1.0 · Date: 14 November 2026 · Status: detailed specification for review
 
-Powiązania: [01 — produkt i zakres MVP](01-PRODUCT-VISION-AND-ARCHITECTURE.md), [02 — Agent Runtime i wykonanie](02-AI-AGENT-ARCHITECTURE.md), [03 — Inventory Guardian E2E](03-INVENTORY-GUARDIAN-E2E.md), [04 — UI/UX](04-UI-UX-SPECIFICATION.md).
+Related: [01 — product and MVP scope](01-PRODUCT-VISION-AND-ARCHITECTURE.md), [02 — Agent Runtime and execution](02-AI-AGENT-ARCHITECTURE.md), [03 — Inventory Guardian E2E](03-INVENTORY-GUARDIAN-E2E.md), [04 — UI/UX](04-UI-UX-SPECIFICATION.md).
 
-Obowiązuje wspólna legenda **[D] decyzja / [U] uzgodniony kierunek / [P] propozycja / [Z] założenie / [O] pytanie otwarte**. D-08/D-09 zatwierdzają cztery źródła wiedzy i zakres Decision Intelligence w MVP. Szczegóły struktur, kontrakt `1.2`, nazwy pakietów i procedury tego dokumentu to **[P]**, a liczby przykładów to **[Z]**. Nie opisujemy istniejącej implementacji ani zweryfikowanej skuteczności strategii marketingowej.
+The common legend applies: **[D] decision / [U] agreed direction / [P] proposal / [Z] assumption / [O] open question**. D-08/D-09 approve the four knowledge sources and the scope of Decision Intelligence in the MVP. The details of the structures, the `1.2` contract, the package names and the procedures in this document are **[P]**, and the numbers in the examples are **[Z]**. We do not describe an existing implementation or a verified effectiveness of a marketing strategy.
 
-Zakres dokumentu: skąd pochodzi wiedza biznesowa, jak budować podstawy decyzji i jak oceniać wyniki. Własność pętli agenta, Spring AI, MCP, hooks, autoryzacja, idempotencja i Temporal zachowują specyfikację z dokumentu 02; nie są definiowane ponownie.
+Scope of the document: where business knowledge comes from, how to build the basis of decisions and how to evaluate results. The ownership of the agent loop, Spring AI, MCP, hooks, authorization, idempotency and Temporal keep the specification from document 02; they are not defined again.
 
-## A. Architektura wiedzy
+## A. Knowledge architecture
 
-### A1. Cztery źródła [D]
+### A1. Four sources [D]
 
-| Źródło | Co wnosi | Prawda operacyjna i przechowywanie | Główne ograniczenie |
+| Source | What it contributes | Operational truth and storage | Main limitation |
 |---|---|---|---|
-| Domain Knowledge | Jak analizować sytuację: Skills, Playbooks, referencje eksperckie | Wersjonowane pliki i metadata Knowledge Registry | Instrukcja nie nadaje uprawnień ani nie dowodzi trafności reguły w każdym sklepie |
-| Store Knowledge | Co jest ważne: cele, ekonomia, preferencje, zatwierdzona strategia | Store Business Profile w PostgreSQL i referencje do kosztów/polityk | Cel GROWTH nie uchyla limitów wydatku i ryzyka |
-| Operational Data | Co wiadomo o sklepie i reklamach w danym czasie | Znormalizowane obserwacje, Metrics & Evidence Engine, snapshoty | Raportowane, estymowane, niepełne i opóźnione dane mają różne ograniczenia |
-| Decision Experience | Co zaproponowano, wykonano i zaobserwowano | Decision History, ActionExecution, Outcome i oceny ekspertów | Korelacja w historii nie jest przyczynowym dowodem skuteczności |
+| Domain Knowledge | How to analyze a situation: Skills, Playbooks, expert references | Versioned files and Knowledge Registry metadata | An instruction does not grant permissions or prove that a rule is right in every store |
+| Store Knowledge | What matters: goals, economics, preferences, approved strategy | Store Business Profile in PostgreSQL and references to costs/policies | A GROWTH goal does not override spend and risk limits |
+| Operational Data | What is known about the store and ads at a given time | Normalized observations, the Metrics & Evidence Engine, snapshots | Reported, estimated, incomplete and delayed data have different limitations |
+| Decision Experience | What was proposed, executed and observed | Decision History, ActionExecution, Outcome and expert assessments | Correlation in history is not causal evidence of effectiveness |
 
-Wiedza bazowa modelu jest zdolnością interpretacji i języka, a nie piątym autorytatywnym źródłem faktów o sklepie. Gdy wymagany fakt nie występuje w czterech źródłach, agent wskazuje brak. Nie uzupełnia nieznanego COGS „typową marżą branżową”.
+The model's base knowledge is an ability to interpret and to use language, not a fifth authoritative source of facts about the store. When a required fact is not in the four sources, the agent points out the gap. It does not fill an unknown COGS with a "typical industry margin".
 
 ```mermaid
 flowchart TD
@@ -28,20 +28,20 @@ flowchart TD
   OD[Operational Data] --> ME[Metrics & Evidence Engine]
   ME --> KC
   DH[Decision History / Outcome] --> KC
-  KC --> RT[Istniejący Bounded Agent Runtime]
+  KC --> RT[Existing Bounded Agent Runtime]
   RT --> DV[Proposal / Evidence Validation]
-  DV --> PE[Istniejące Policy / Approval / Execution]
+  DV --> PE[Existing Policy / Approval / Execution]
   PE --> OE[Outcome Evaluator]
   OE --> DH
-  EV[Offline Evaluation / review] --> Release[Zatwierdzony release wiedzy]
+  EV[Offline Evaluation / review] --> Release[Approved knowledge release]
   Release --> DK
 ```
 
-Strzałka Outcome → History nie aktualizuje sama Registry, polityki ani strategii. Release wymaga kontrolowanego review. Wszystkie komponenty działają w modularnym monolicie Spring Boot; timery i procesy trwałe obsługuje dotychczasowy Temporal.
+The Outcome → History arrow does not update the Registry, the policy or the strategy on its own. A release requires a controlled review. All components run in the Spring Boot modular monolith; timers and durable processes are handled by the existing Temporal.
 
-### A2. Registry, Skill, Playbook i reguła [P]
+### A2. Registry, Skill, Playbook and rule [P]
 
-Knowledge Registry rozszerza SkillRegistry, zamiast tworzyć równoległy katalog. Zapewnia rozwiązywanie ID/wersji, hash, status wydania, scope, compatibility i pochodzenie. Przykładowa organizacja:
+The Knowledge Registry extends the SkillRegistry instead of creating a parallel catalog. It provides ID/version resolution, a hash, release status, scope, compatibility and provenance. Sample layout:
 
 ```text
 intelligence/knowledge/
@@ -66,47 +66,47 @@ intelligence/knowledge/
       expert-rubric.yaml
 ```
 
-| Artefakt | Odpowiedzialność | Przykład granicy |
+| Artifact | Responsibility | Boundary example |
 |---|---|---|
-| Skill | Procedura jednej kompetencji, dane wymagane, kryteria abstencji i wynik | Diagnozuje zmęczenie kreacji; nie publikuje nowej reklamy |
-| Playbook | Łączy scenariusze, kolejność kompetencji i warianty odpowiedzi | Spadek wyników → jakość danych → diagnoza → ewentualna rekomendacja |
-| Deterministyczna reguła | Obliczenie lub walidacja w kodzie z wersją | CPA, kompletność okresu, budżet, zgodność evidence |
-| Policy | Egzekwowalna granica dopuszczalności | Zakaz wzrostu wydatku w MVP, wymagane approval i scope |
-| Temporal Workflow | Trwała realizacja etapów i oczekiwanie | Zaplanuj ponowną analizę, zachowaj deadline |
+| Skill | The procedure of one competence, required data, abstention criteria and the result | Diagnoses creative fatigue; does not publish a new ad |
+| Playbook | Links scenarios, the order of competences and response variants | Performance drop → data quality → diagnosis → possibly a recommendation |
+| Deterministic rule | A calculation or validation in code with a version | CPA, period completeness, budget, evidence consistency |
+| Policy | An enforceable admissibility boundary | No spend increase in the MVP, required approval and scope |
+| Temporal Workflow | Durable execution of stages and waiting | Schedule a re-analysis, keep the deadline |
 
-Playbook nie jest dowolnym wykonywalnym workflow ani ukrytym skryptem. Jego reguły wyboru etapów są mapowane na zatwierdzone możliwości aplikacji. Nawet jeśli Skill rekomenduje poprawę budżetu, wykonanie zależy od istniejącego katalogu akcji i polityk; sam Marketing Pack nie rozszerza MVP o autonomiczne zwiększanie budżetów.
+A Playbook is not an arbitrary executable workflow or a hidden script. Its rules for choosing stages map to approved application capabilities. Even if a Skill recommends a budget improvement, execution depends on the existing action catalog and policies; the Marketing Pack alone does not extend the MVP with autonomous budget increases.
 
-### A3. Provenance, wiarygodność i aktualizacje [P]
+### A3. Provenance, reliability and updates [P]
 
-Każdy wpis wiedzy ma: `knowledgeId`, typ, wersję, content hash, autora/właściciela, źródło i URL lub identyfikator materiału, `publishedAt`, `retrievedAt`, `reviewedAt`, `reviewDueAt`, zakres platformy/API, założenia, applicability, review status oraz zatwierdzający release. Własny materiał eksperta ma autora, datę i zakres obserwacji; brak publicznego URL nie czyni go pozbawionym pochodzenia.
+Every knowledge entry has: `knowledgeId`, type, version, content hash, author/owner, the source and a URL or material identifier, `publishedAt`, `retrievedAt`, `reviewedAt`, `reviewDueAt`, the platform/API scope, assumptions, applicability, review status and the approving release. An expert's own material has an author, a date and the scope of observation; the lack of a public URL does not leave it without provenance.
 
-Poziomy źródeł **[P]**: `OFFICIAL_PLATFORM`, `EXPERT_REVIEWED`, `STORE_APPROVED`, `OBSERVATIONAL`, `UNVERIFIED`. To klasy pochodzenia, nie ranking automatycznie rozstrzygający każdą sprawę. Dla własności API podstawą jest zgodna wersja dokumentacji platformy; dla celu biznesowego — zatwierdzony profil sklepu; dla bieżącego zapasu — źródło operacyjne. Oficjalny poradnik marketingowy nie dowodzi rentowności sklepu. Niezweryfikowany materiał nie steruje samodzielnie akcją.
+Source levels **[P]**: `OFFICIAL_PLATFORM`, `EXPERT_REVIEWED`, `STORE_APPROVED`, `OBSERVATIONAL`, `UNVERIFIED`. These are provenance classes, not a ranking that automatically resolves every case. For API properties the basis is the matching version of the platform documentation; for a business goal, the approved store profile; for current stock, the operational source. An official marketing guide does not prove the store's profitability. Unverified material does not drive an action on its own.
 
-Zatwierdzony release wiąże wersje Skills, Playbooks, referencji, definicji metryk i minimalnych capabilities. Zmiana materialna wymaga nowej wersji i testów. Nowa wersja dokumentacji zewnętrznej nie podmienia automatycznie używanej procedury. Przeterminowany review lub wycofany materiał wywołuje kontrolę applicability; krytyczna niezgodność blokuje nową analizę do review, a nie usuwa historii.
+An approved release binds the versions of Skills, Playbooks, references, metric definitions and minimal capabilities. A material change requires a new version and tests. A new version of external documentation does not automatically replace the procedure in use. An overdue review or withdrawn material triggers an applicability check; a critical incompatibility blocks new analyses until review, without deleting history.
 
-Lifecycle: autor/ekspert przygotowuje zmianę → techniczny i biznesowy review → testy offline → shadow → zatwierdzenie → aktywacja dla wybranego zakresu → monitoring → ewentualny rollback. Trwający run pinuje release. Krytyczne wycofanie bezpieczeństwa może zatrzymać przyszłą mutację mimo wcześniejszego przypięcia wiedzy. Model nie ma toola zapisu do Registry i nie przyznaje statusu `APPROVED` własnemu wynikowi.
+Lifecycle: an author/expert prepares a change → technical and business review → offline tests → shadow → approval → activation for a selected scope → monitoring → possibly a rollback. An ongoing run pins the release. A critical safety withdrawal may stop a future mutation despite the knowledge pinned earlier. The model has no write tool for the Registry and does not grant the `APPROVED` status to its own output.
 
-Globalna wiedza jest współdzielona bez danych klientów; profile i doświadczenie sklepu mają scope tenant/store. Tenant overrides są jawnymi wersjami z review, nie dopisanym tekstem o wyższym priorytecie niż system/policy. Cache oraz retrieval filtrują scope przed doborem wyników. Przypadki z innych sklepów wymagają uprzedniego dopuszczenia i anonimizacji; MVP nie zakłada współdzielenia ich historii.
+Global knowledge is shared without customer data; profiles and store experience have a tenant/store scope. Tenant overrides are explicit versions with a review, not appended text with a higher priority than the system/policy. The cache and retrieval filter by scope before choosing results. Cases from other stores require prior admission and anonymization; the MVP does not assume sharing their history.
 
 ## B. Store Business Profile
 
-### B1. Model i cele [D, P]
+### B1. Model and goals [D, P]
 
-StoreBusinessProfile przechowuje intencję sklepu i referencje do ekonomii; nie zastępuje policy engine, katalogu kosztów ani integracji. Wersja jest niezmienna po zatwierdzeniu. Model danych:
+StoreBusinessProfile stores the store's intent and references to its economics; it does not replace the policy engine, the cost catalog or the integrations. A version is immutable after approval. Data model:
 
-| Grupa | Pola / semantyka |
+| Group | Fields / semantics |
 |---|---|
-| Tożsamość | Profile ID, tenant, store, wersja, status DRAFT/APPROVED/SUPERSEDED, effectiveFrom, approvedBy |
-| Cele | `PROFITABILITY`, `GROWTH`, `BALANCED`; priorytety i horyzont, opis preferowanego trade-off |
-| Ekonomia | Waluta i tax basis, ref do wersjonowanych COGS per SKU, fulfillment, fees, zwrotów i innych kosztów |
-| Budżet | Zadeklarowany plan wydatków z okresem, scope kont/kanałów, ref do twardych polityk; osobno observed budgets Meta |
-| Ryzyko | LOW/MEDIUM/HIGH jako preferencja, dopuszczona strata z walutą/horyzontem, minimalna marża jako cel; wartości mogą być nieznane |
-| Strategia | Np. cash preservation, ciągłość zapasu, pozyskanie klientów, sezonowe priorytety; daty i applicability |
-| Jakość | Missing fields, konflikty, provenance każdego istotnego pola, confidence źródła i potwierdzenia operatora |
+| Identity | Profile ID, tenant, store, version, status DRAFT/APPROVED/SUPERSEDED, effectiveFrom, approvedBy |
+| Goals | `PROFITABILITY`, `GROWTH`, `BALANCED`; priorities and horizon, a description of the preferred trade-off |
+| Economics | Currency and tax basis, refs to versioned per-SKU COGS, fulfillment, fees, returns and other costs |
+| Budget | A declared spend plan with a period, the account/channel scope, refs to hard policies; observed Meta budgets separately |
+| Risk | LOW/MEDIUM/HIGH as a preference, an acceptable loss with a currency/horizon, a minimum margin as a goal; values may be unknown |
+| Strategy | E.g. cash preservation, stock continuity, customer acquisition, seasonal priorities; dates and applicability |
+| Quality | Missing fields, conflicts, provenance of every significant field, source confidence and operator confirmations |
 
-PROFITABILITY priorytetyzuje znany wkład do marży i ryzyko straty; GROWTH pozwala rozważyć wzrost w dopuszczonych granicach; BALANCED wymaga uzgodnionego kompromisu. To kierunek rankingowania rekomendacji, nie z góry wyznaczony mnożnik budżetu. Żaden cel nie upoważnia do zwiększenia wydatków. **O-19:** jak sklep definiuje oczekiwany horyzont i kompromis, zanim włączymy rekomendacje zależne od tych danych.
+PROFITABILITY prioritizes the known contribution to margin and the risk of loss; GROWTH allows considering growth within the allowed limits; BALANCED requires an agreed compromise. This is a direction for ranking recommendations, not a predefined budget multiplier. No goal authorizes increasing spend. **O-19:** how a store defines the expected horizon and trade-off before we enable recommendations that depend on this data.
 
-Przykład **[Z]**, zatwierdzone dane i jawne braki:
+Example **[Z]**, approved data and explicit gaps:
 
 ```json
 {
@@ -138,46 +138,46 @@ Przykład **[Z]**, zatwierdzone dane i jawne braki:
 }
 ```
 
-30 000 PLN jest przykładem planu, a nie ogólnym limitem produktu. Brak tolerancji straty blokuje tylko analizy wymagające takiego założenia. Wybrane pole goal może być nieustawione w szkicu; nie podajemy modelowi niezatwierdzonego defaultu jako decyzji właściciela.
+PLN 30,000 is an example of a plan, not a general product limit. The missing loss tolerance blocks only the analyses that need such an assumption. The goal field may be unset in a draft; we do not give the model an unapproved default as the owner's decision.
 
-### B2. Automatyczne pozyskiwanie, konflikty i braki [P]
+### B2. Automatic acquisition, conflicts and gaps [P]
 
-Integracje dostarczają obserwacje: przychody, ceny, rabaty, zamówienia, budżety reklamowe, zapas i udostępnione koszty. Nie wszystkie sklepy Woo mają dostępny COGS; integracja nie dowodzi jego istnienia. Z danych możemy przygotować sugestię kosztów i celu, lecz cel/progi strat zatwierdza uprawniony użytkownik. Budget w Meta nie jest równoznaczny z całkowitym planem miesięcznym sklepu.
+Integrations provide observations: revenue, prices, discounts, orders, ad budgets, stock and available costs. Not all Woo stores have COGS available; the integration does not prove that it exists. From the data we can prepare a suggestion of costs and a goal, but the goal/loss thresholds are approved by a permitted user. A budget in Meta is not equivalent to the store's total monthly plan.
 
-Pole może mieć wartość zatwierdzoną, obserwowane kandydatury i konflikt. Precedence definiujemy per dziedzina: np. uzgodniony WMS dla zapasu, zatwierdzony katalog kosztowy dla COGS, bieżący Meta dla konfiguracji reklam. Manual override ma autora, uzasadnienie, datę obowiązywania i review/expiry. Nie wybieramy po cichu najnowszej lub najbardziej korzystnej marży.
+A field may have an approved value, observed candidates and a conflict. Precedence is defined per domain: e.g. the agreed WMS for stock, the approved cost catalog for COGS, current Meta for ad configuration. A manual override has an author, a justification, an effective date and a review/expiry. We do not quietly choose the newest or the most favorable margin.
 
-Zmiana źródłowego COGS tworzy rewizję economic model i propozycję przeliczenia; zachowujemy historię okresów obowiązywania. Istotny konflikt blokuje automatyczną decyzję zależną od tego pola, a nie wszystkie procesy sklepu. Profil wskazujący politykę sprzeczną z aktualnym Policy Engine nie uchyla jej. Każdy run otrzymuje konkretną wersję profilu; istotna zmiana między analizą a mutacją wymaga ponownej walidacji/reanalizy.
+A change of the source COGS creates a revision of the economic model and a recalculation proposal; we keep the history of validity periods. A material conflict blocks the automatic decision that depends on that field, not all processes of the store. A profile that points to a policy contradicting the current Policy Engine does not override it. Every run gets a specific profile version; a material change between the analysis and the mutation requires revalidation/re-analysis.
 
 ## C. Metrics & Evidence Engine
 
-### C1. Kontrakty i definicje [D, P]
+### C1. Contracts and definitions [D, P]
 
-Engine jest deterministycznym rozwinięciem obecnych agregacji Commerce/Reporting i rejestru Evidence. Wersjonuje definicje, liczy KPI, waliduje okresy i mianowniki, nadaje flagi jakości oraz zachowuje lineage. LLM może poprosić o metrykę lub wyjaśnić wynik; nie dostarcza autorytatywnej liczby obliczonej we własnym tekście.
+The Engine is a deterministic extension of the current Commerce/Reporting aggregations and the Evidence register. It versions definitions, computes KPIs, validates periods and denominators, assigns quality flags and keeps lineage. The LLM may ask for a metric or explain a result; it does not provide an authoritative number computed in its own text.
 
-| Metryka | Definicja / wymagane ograniczenie |
+| Metric | Definition / required restriction |
 |---|---|
-| Net Sales | Kwalifikująca się sprzedaż bez podatku, po rabatach i zwrotach przychodowych; jawne włączenie/wyłączenie opłat za dostawę |
-| Orders / AOV | Liczba kwalifikujących się zamówień; `AOV = NetSales / Orders` na tej samej bazie okresu i scope |
-| Refunds / return rate | Kwota refundacji i udział zwrotów w zdefiniowanej kohorcie; refundacja nie dowodzi powrotu zapasu |
-| COGS | Koszt jednostkowy obowiązujący dla sprzedanej jednostki; zwroty/recovery według jawnej metody, nie dzisiejszy koszt wszystkich historycznych zamówień |
-| Contribution profit | NetSales minus COGS, fulfillment, fees, reklamy i inne koszty zmienne; wzór C2 |
-| Spend | Koszt raportowany przez reklamodawcę w walucie i scope konta; dojrzałość rozliczeń jest osobną flagą |
-| Impressions / clicks | Liczniki z jawnym rodzajem kliknięcia; link clicks nie są zamiennie all clicks |
-| CPM / CPC / CTR | `1000*Spend/Impressions`; `Spend/Clicks`; `100*Clicks/Impressions`, przy tym samym rodzaju kliknięcia |
-| CPA | `Spend/AttributedActions` dla wybranego action type, celu i okna; purchase CPA nie jest CAC nowego klienta |
-| ROAS | `AttributedPurchaseValue/Spend`; wartość platformowa, nie zysk sklepu |
-| Reach / frequency | Reach według platformy dla właściwego scope; częstotliwość `Impressions/Reach`, z uwzględnieniem estymacji źródła |
-| Conversion rate | Zdefiniowana konwersja / zdefiniowana baza sesji lub kliknięć; bez danych sesji brak shop CVR |
-| Inventory coverage | Sprzedawalny zapas / tempo sprzedaży z wersjonowaną semantyką i oknem; reguły przykładu pozostają w dokumencie 03 |
-| Learning / change history | Stan diagnostyczny, czas i zakres zmian, nie KPI wyliczany z samych ROAS/CPA |
+| Net Sales | Qualifying sales without tax, after discounts and revenue refunds; explicit inclusion/exclusion of shipping fees |
+| Orders / AOV | The number of qualifying orders; `AOV = NetSales / Orders` on the same period and scope basis |
+| Refunds / return rate | The refund amount and the share of returns in a defined cohort; a refund does not prove the stock came back |
+| COGS | The unit cost valid for the sold unit; returns/recovery by an explicit method, not today's cost for all historical orders |
+| Contribution profit | NetSales minus COGS, fulfillment, fees, ads and other variable costs; formula C2 |
+| Spend | The cost reported by the advertiser in the currency and the account scope; billing maturity is a separate flag |
+| Impressions / clicks | Counters with an explicit click type; link clicks are not interchangeable with all clicks |
+| CPM / CPC / CTR | `1000*Spend/Impressions`; `Spend/Clicks`; `100*Clicks/Impressions`, with the same click type |
+| CPA | `Spend/AttributedActions` for the chosen action type, goal and window; purchase CPA is not the CAC of a new customer |
+| ROAS | `AttributedPurchaseValue/Spend`; a platform value, not the store's profit |
+| Reach / frequency | Reach according to the platform for the right scope; frequency `Impressions/Reach`, accounting for the source's estimation |
+| Conversion rate | A defined conversion / a defined base of sessions or clicks; without session data, no shop CVR |
+| Inventory coverage | Sellable stock / sales velocity with versioned semantics and a window; the example's rules stay in document 03 |
+| Learning / change history | A diagnostic state, the time and scope of changes, not a KPI computed from ROAS/CPA alone |
 
-Nie uśredniamy średnich ROAS/CPA/CTR bez poprawnych wag; agregat liczymy z właściwych składników. Reach nie sumuje się po dniach lub reklamach jako liczba unikalnych odbiorców. Przy zerowym/niedostępnym mianowniku wynik jest `null` z przyczyną; nie nieskończonością ani zerem. Metryki różnych walut są rozdzielne do jawnej konwersji z wersją kursu.
+We do not average ROAS/CPA/CTR averages without correct weights; the aggregate is computed from the right components. Reach does not add up across days or ads as a number of unique recipients. With a zero/unavailable denominator the result is `null` with a reason; not infinity or zero. Metrics in different currencies stay separate until an explicit conversion with an exchange rate version.
 
-Źródło techniczne: Meta Insights raportuje na poziomie konta, kampanii, adsetu i reklamy, z parametrami m.in. okresu i atrybucji. Adapter zapisuje użyty zakres i parametry z wynikiem. [Oficjalna dokumentacja Meta Insights](https://developers.facebook.com/documentation/ads-commerce/marketing-api/insights).
+Technical source: Meta Insights reports at the account, campaign, adset and ad level, with parameters such as the period and attribution. The adapter stores the scope and parameters used together with the result. [Official Meta Insights documentation](https://developers.facebook.com/documentation/ads-commerce/marketing-api/insights).
 
-### C2. Marża i break-even ROAS [P]
+### C2. Margin and break-even ROAS [P]
 
-Przyjmujemy spójną bazę bez podatku. W danej kohorcie/okresie `R = NetSales`, `V = COGS + Fulfillment + PaymentFees + OtherVariableCosts`, `A = AdSpend`. Koszty zwrotów uwzględniamy w odpowiednich składnikach; przychodów po zwrotach nie obniżamy drugi raz o tę samą refundację.
+We use a consistent basis without tax. In a given cohort/period `R = NetSales`, `V = COGS + Fulfillment + PaymentFees + OtherVariableCosts`, `A = AdSpend`. Return costs are accounted for in the appropriate components; revenue after returns is not reduced a second time by the same refund.
 
 ```text
 ContributionBeforeAds = R - V
@@ -187,29 +187,29 @@ ContributionMarginAfterAds = ContributionProfit / R
 BreakEvenROAS = 1 / PreAdContributionMarginRate
 ```
 
-Ostatni wzór wynika z warunku `m*R - A = 0`, czyli `R/A = 1/m`. Ma sens dla `R>0` i `m>0`, przy porównywalnym miksie sprzedaży/kosztów i przypisaniu przychodu do tego samego wydatku. Przy `m<=0` nie ma skończonego dodatniego break-even ROAS według tego modelu. Nie jest to próg zysku księgowego firmy: nie obejmuje automatycznie stałych kosztów, kapitału ani przyszłego LTV.
+The last formula follows from the condition `m*R - A = 0`, i.e. `R/A = 1/m`. It makes sense for `R>0` and `m>0`, with a comparable sales/cost mix and revenue attributed to the same spend. With `m<=0` there is no finite positive break-even ROAS under this model. It is not the company's accounting profit threshold: it does not automatically include fixed costs, capital or future LTV.
 
-**Przykład [Z]:** R=10 000 PLN, V=6 000 PLN, m=0,40, A=3 000 PLN. ContributionBeforeAds=4 000 PLN, ContributionProfit=1 000 PLN, break-even ROAS=2,5. Iloraz R/A=3,3333 dotyczy tej samej kohorty. Jeśli 10 000 to cała sprzedaż sklepu, iloraz jest blended revenue/ad spend, a nie campaign ROAS Meta. Nie porównujemy go bezpośrednio z atrybuowaną wartością brutto z Ads Managera.
+**Example [Z]:** R=PLN 10,000, V=PLN 6,000, m=0.40, A=PLN 3,000. ContributionBeforeAds=PLN 4,000, ContributionProfit=PLN 1,000, break-even ROAS=2.5. The ratio R/A=3.3333 concerns the same cohort. If 10,000 is the store's whole sales, the ratio is blended revenue/ad spend, not the Meta campaign ROAS. We do not compare it directly with the attributed gross value from Ads Manager.
 
-Dla kampanii wieloproduktowej potrzebny jest zgodny miks marż i metoda przypisania przychodu/kosztu. Prosta średnia marż SKU daje błędny próg; stosujemy wagę odpowiedniej sprzedaży lub jawny model estymacji. Niepewne koszty, oczekiwane zwroty lub alokowany ad spend nadają wynikowi ESTIMATED. Przy brakujących krytycznych składnikach nie liczymy pełnego break-even ROAS; można pokazać wynik częściowy z wyraźnym zakresem, ale nie nazwać go potwierdzoną rentownością.
+A multi-product campaign needs a consistent margin mix and a method of attributing revenue/cost. A simple average of SKU margins gives a wrong threshold; we use the weight of the relevant sales or an explicit estimation model. Uncertain costs, expected returns or allocated ad spend give the result ESTIMATED. With missing critical components we do not compute a full break-even ROAS; a partial result with a clear scope may be shown, but it is not called confirmed profitability.
 
-### C3. Jakość, czas i atrybucja [D, P]
+### C3. Quality, time and attribution [D, P]
 
-`CONFIRMED`, `ESTIMATED`, `UNAVAILABLE` opisują jakość wartości, niezależnie od kompletności, świeżości i dojrzałości. Deterministycznie obliczony wynik może być ESTIMATED, jeśli jego składniki lub alokacja są estymowane. „Pobrane z API” nie znaczy automatycznie CONFIRMED; np. źródłowo modelowane konwersje/reach zachowują ograniczenie źródła. Dla każdego typu metryki adapter dokumentuje klasyfikację i przesłanki.
+`CONFIRMED`, `ESTIMATED`, `UNAVAILABLE` describe the quality of a value, independently of completeness, freshness and maturity. A deterministically computed result may be ESTIMATED if its components or allocation are estimated. "Fetched from the API" does not automatically mean CONFIRMED; e.g. conversions/reach modeled at the source keep the source's limitation. For every metric type the adapter documents the classification and its premises.
 
-Engine zapisuje `period`, timezone, cohort/recognition basis, source refs, action type, attribution settings, definicję mianownika, completeness watermark i `maturity: PRELIMINARY|MATURE|UNKNOWN`. MATURE oznacza spełnienie zatwierdzonej reguły stabilizacji danych, nie gwarancję braku przyszłych korekt. Regułę budujemy z obserwowanych opóźnień, zakresu atrybucji i tolerancji sklepu; nie ustawiamy uniwersalnych „24 godzin do pełnej prawdy”.
+The Engine records the `period`, timezone, cohort/recognition basis, source refs, action type, attribution settings, the denominator definition, the completeness watermark and `maturity: PRELIMINARY|MATURE|UNKNOWN`. MATURE means that the approved data stabilization rule is met, not a guarantee of no future corrections. The rule is built from observed delays, the attribution scope and the store's tolerance; we do not set a universal "24 hours to the full truth".
 
-Osobno: `eventTime`, `sourceUpdatedAt`, `observedAt`, `ingestedAt`, `availableAt`, `computedAt`. Ostatnie pole availableAt wskazuje, kiedy konkretny rekord/rewizja stały się dostępne systemowi. Umożliwia replay bez wiedzy z przyszłości. Korekta historycznych konwersji tworzy rewizję, nie podmienia snapshotu wcześniejszej decyzji.
+Separately: `eventTime`, `sourceUpdatedAt`, `observedAt`, `ingestedAt`, `availableAt`, `computedAt`. The availableAt field indicates when a specific record/revision became available to the system. It enables a replay without knowledge from the future. A correction of historical conversions creates a revision; it does not replace the snapshot of an earlier decision.
 
-Porównując ROAS/CPA sprawdzamy: wspólny action type i ustawienia atrybucji, porównywalne okna (w tym dzień tygodnia), opóźnienia konwersji i synchronizacji, liczbę zdarzeń, sezonowość, dostawy/promocje, fazę uczenia oraz historię zmian. Nie sumujemy platformowych konwersji Meta i innych kanałów jako unikalnych zamówień. Atrybucja platformy nie zastępuje eksperymentu inkrementalnego.
+When comparing ROAS/CPA we check: a shared action type and attribution settings, comparable windows (including the day of the week), conversion and synchronization delays, the number of events, seasonality, deliveries/promotions, the learning phase and the change history. We do not add Meta platform conversions and other channels together as unique orders. Platform attribution does not replace an incrementality experiment.
 
-Dane o stanie uczenia pobieramy ze źródła, jeśli są dostępne; nie wywnioskujemy ich pewnie z samego wzrostu CPA. Ad Set API opisuje `learning_stage_info` i możliwość niestabilności wyników w trakcie uczenia. Dostępność pól i zachowanie sprawdzamy dla wybranej wersji oraz konta. [Oficjalny Meta Ad Set reference](https://developers.facebook.com/documentation/ads-commerce/marketing-api/reference/ad-campaign). Brak dostępu do informacji o uczeniu daje UNKNOWN i zwiększa ostrożność, zamiast tworzyć fałszywy stan „ustabilizowana”.
+We fetch the learning state from the source if it is available; we do not infer it with certainty from a CPA increase alone. The Ad Set API describes `learning_stage_info` and the possibility of unstable results during learning. The availability of fields and their behavior are checked for the chosen version and account. [Official Meta Ad Set reference](https://developers.facebook.com/documentation/ads-commerce/marketing-api/reference/ad-campaign). No access to learning information gives UNKNOWN and increases caution, instead of creating a false "stabilized" state.
 
 ### C4. Evidence [P]
 
-Dowód ma ID, tenant/store, zakres zasobu, typ (`OBSERVATION`, `DERIVED_METRIC`, `APPROVED_PROFILE`, `KNOWLEDGE_REFERENCE`), wersję i hash, wartość/jednostkę, czasy, jakość, applicability, definicję obliczenia i zależne evidence IDs. Wiedza ekspercka uzasadnia procedurę, lecz nie zastępuje operacyjnego dowodu spadku sprzedaży. Profil dowodzi celu zadeklarowanego przez sklep, nie faktu o wynikach reklamy.
+Evidence has an ID, tenant/store, a resource scope, a type (`OBSERVATION`, `DERIVED_METRIC`, `APPROVED_PROFILE`, `KNOWLEDGE_REFERENCE`), a version and a hash, a value/unit, times, quality, applicability, the calculation definition and dependent evidence IDs. Expert knowledge justifies a procedure but does not replace operational evidence of a sales drop. The profile proves the goal declared by the store, not a fact about ad results.
 
-Przykład metryki i jej identyfikowalności **[Z]**:
+Example of a metric and its traceability **[Z]**:
 
 ```json
 {
@@ -238,76 +238,76 @@ Przykład metryki i jej identyfikowalności **[Z]**:
 }
 ```
 
-48 PLN nie stanowi samodzielnego progu akcji. Historyczne KPI i ich source refs są przechowywane w scoped magazynie; cache, eksport i endpoint provenance respektują tę samą izolację co tool calls. Hash w przykładzie jest etykietą demonstracyjną; produkcja wylicza rzeczywisty digest kanonicznego rekordu.
+PLN 48 is not a standalone action threshold. Historical KPIs and their source refs are kept in scoped storage; the cache, export and the provenance endpoint respect the same isolation as tool calls. The hash in the example is a demonstration label; production computes the real digest of the canonical record.
 
 ## D. Knowledge & Context Building
 
-### D1. Dobór i złożenie kontekstu [P]
+### D1. Selecting and assembling the context [P]
 
-1. Z sygnału i typu procesu określ problem, scope, potrzebne metryki oraz dopuszczalne profile/Skills. Nie zaczynaj od załadowania całej wiedzy.
-2. Rozwiąż zatwierdzony Store Profile obowiązujący dla decyzji; zaznacz brak celu, konflikt albo nieznane koszty.
-3. Pobierz dane i stan jakości z Metrics & Evidence Engine. Minimalny snapshot zawiera również braki; poprawny format nie oznacza gotowości do działania.
-4. Wybierz zatwierdzony Playbook i wersję Skill po kategorii problemu i applicability. Dla Inventory Guardian wybór pozostaje deterministyczny; model może prosić o dodatkową zatwierdzoną kompetencję wyłącznie w granicach profilu.
-5. Dobierz historię zmian i decyzji tej samej jednostki/zakresu oraz relewantne Outcome. Oddziel obserwację od oceny eksperta i od wyniku samego modelu.
-6. Zbuduj manifest i budżet kontekstu. Priorytet mają aktualne ograniczenia, dowody decyzyjne, źródła i niepewności; potem instrukcje i potrzebne przykłady. Usunięcie krytycznego dowodu z powodu limitu wywołuje abstencję, nie udawaną kompletność.
-7. Wybierz Skill dla konkretnego uruchomienia i doładuj jego instrukcję oraz niezbędne referencje. Fazy Context Building i Skill Selection mogą mieć wspólny deterministyczny etap wstępny; nie wymagają dwóch wywołań LLM.
-8. Przekaż kanoniczny kontekst do istniejącego runtime. Każdy wynik toola musi wejść do rejestru dowodów i jawnej rewizji kontekstu.
+1. From the signal and the process type, determine the problem, the scope, the needed metrics and the allowed profiles/Skills. Do not start by loading all knowledge.
+2. Resolve the approved Store Profile valid for the decision; mark a missing goal, a conflict or unknown costs.
+3. Fetch the data and the quality state from the Metrics & Evidence Engine. The minimal snapshot also contains the gaps; a valid format does not mean readiness to act.
+4. Choose the approved Playbook and Skill version by the problem category and applicability. For Inventory Guardian the choice stays deterministic; the model may ask for an additional approved competence only within the profile's limits.
+5. Select the history of changes and decisions for the same entity/scope and the relevant Outcomes. Separate an observation from an expert assessment and from the model's own result.
+6. Build the manifest and the context budget. Current constraints, decision evidence, sources and uncertainties have priority; then instructions and the needed examples. Dropping critical evidence because of a limit triggers an abstention, not a pretended completeness.
+7. Choose the Skill for the specific run and load its instruction and the necessary references. The Context Building and Skill Selection phases may share a deterministic preliminary step; they do not need two LLM calls.
+8. Pass the canonical context to the existing runtime. Every tool result must enter the evidence register and an explicit context revision.
 
-Manifest obejmuje `contextManifestId`, cutoff/asOf, snapshot ID, `knowledgeReleaseRef`, Skill/Playbook refs, profile ID/version, metric definition versions, evidence IDs, history cutoff, pominięcia i braki, token budget oraz politykę wyboru modelu. Backend nadaje referencje; model nie może ich podmienić. Historia pobrana przez embeddingi nie jest potrzebna w MVP — scope, ID, kategoria i okres wystarczą dla pierwszych procesów.
+The manifest includes `contextManifestId`, cutoff/asOf, the snapshot ID, `knowledgeReleaseRef`, Skill/Playbook refs, profile ID/version, metric definition versions, evidence IDs, the history cutoff, omissions and gaps, the token budget and the model selection policy. The backend assigns the references; the model cannot replace them. History retrieved through embeddings is not needed in the MVP — scope, ID, category and period are enough for the first processes.
 
-**Minimalny kontrakt integracyjny [P]:** `KnowledgeRegistry.resolveRelease`, `StoreProfileService.getApprovedVersion`, `MetricsEvidenceService.query`, `DecisionHistory.findRelevant`, `OutcomeRepository.findObservations`, `KnowledgeContextBuilder.build`. To wewnętrzne porty modułów. Model otrzymuje odpowiednio ograniczone read tools, np. `get_store_business_profile`, `get_attribution_diagnostics`, `get_campaign_learning_state`, `get_recent_campaign_changes`, `get_creative_performance`, `get_decision_history`, `get_outcome_observations`. Istniejące `get_campaign_performance`, `get_product_profitability` i `get_inventory_forecast` korzystają z tego samego Engine; nie powstaje drugi silnik KPI.
+**Minimal integration contract [P]:** `KnowledgeRegistry.resolveRelease`, `StoreProfileService.getApprovedVersion`, `MetricsEvidenceService.query`, `DecisionHistory.findRelevant`, `OutcomeRepository.findObservations`, `KnowledgeContextBuilder.build`. These are internal module ports. The model gets appropriately restricted read tools, e.g. `get_store_business_profile`, `get_attribution_diagnostics`, `get_campaign_learning_state`, `get_recent_campaign_changes`, `get_creative_performance`, `get_decision_history`, `get_outcome_observations`. The existing `get_campaign_performance`, `get_product_profitability` and `get_inventory_forecast` use the same Engine; no second KPI engine is created.
 
-Nazwy nowych tools są propozycją kontraktu. Ich parametry, output schemas, wersje i allowlist realizują zasady z [Tool Registry](02-AI-AGENT-ARCHITECTURE.md#5-tool-registry-i-projektowanie-narzędzi). Dla klasyfikacji kontekstu koszty finansowe przekazujemy tylko tym profilom, które ich potrzebują; Support nie dostaje całego profilu kosztowego do pytania o przesyłkę.
+The names of the new tools are a contract proposal. Their parameters, output schemas, versions and allowlist follow the rules of the [Tool Registry](02-AI-AGENT-ARCHITECTURE.md#5-tool-registry-and-tool-design). For context classification, financial costs are passed only to the profiles that need them; Support does not get the whole cost profile for a shipping question.
 
-### D2. Przenośność i odtwarzalność [D, P]
+### D2. Portability and reproducibility [D, P]
 
-Kanoniczne wiadomości, dane i kontrakty pozostają własnością aplikacji. ModelGateway dopasowuje je do obsługiwanych ról, tools, schematu i limitu konkretnego modelu. Capability matrix oraz fallback zachowują [projekt gateway](02-AI-AGENT-ARCHITECTURE.md#4-modelgateway-i-spring-ai). Nie zakładamy natywnych Skills, wspólnego limitu kontekstu ani identycznej obsługi JSON Schema u wszystkich dostawców.
+Canonical messages, data and contracts remain owned by the application. The ModelGateway adapts them to the supported roles, tools, schema and limit of a specific model. The capability matrix and the fallback keep the [gateway design](02-AI-AGENT-ARCHITECTURE.md#4-modelgateway-and-spring-ai). We do not assume native Skills, a shared context limit or identical JSON Schema support across all providers.
 
-Run zapisuje manifest, wersję profilu, wiedzy i schematu, model/provider, ustawienia, wywołania narzędzi, wynik walidacji i koszty. Przechowujemy ustrukturyzowane uzasadnienie, nie prywatny chain-of-thought. Odtworzenie podstaw oznacza dostęp do tych samych danych i wersji; nie obiecuje identycznej odpowiedzi niedeterministycznego modelu.
+A run records the manifest, the profile, knowledge and schema versions, the model/provider, the settings, the tool calls, the validation result and the costs. We store a structured rationale, not a private chain-of-thought. Reproducing the basis means access to the same data and versions; it does not promise an identical answer from a non-deterministic model.
 
-Do promptu nie wchodzą sekrety i nadmiarowe PII. Tekst produktu, wiadomość klienta i zewnętrzny materiał referencyjny nie zmieniają hierarchii instrukcji. Użytkownik sklepu może zatwierdzić swój profil, ale nie może przez pole strategy podmienić polityki innego tenanta ani nakazać ignorowania walidatora.
+Secrets and excess PII do not enter the prompt. Product text, a customer message and external reference material do not change the instruction hierarchy. A store user may approve their profile, but cannot use the strategy field to replace another tenant's policy or order the validator to be ignored.
 
-## E. Decision-Making Pipeline i kontrakty
+## E. Decision-making pipeline and contracts
 
-### E1. Etapy i alternatywne wyniki [D, P]
+### E1. Stages and alternative results [D, P]
 
 `Signal Detection → Context Building → Skill Selection → Analysis → Decision Proposal → Evidence Validation → Policy Evaluation → Execution → Outcome Evaluation`.
 
-| Etap | Właściciel i sprawdzalny wynik |
+| Stage | Owner and verifiable result |
 |---|---|
-| Signal Detection | Kod/metryki wykrywają problem; sygnał ma źródło, wersję i scope, nie przesądza reakcji |
-| Context Building | Builder tworzy przypięty manifest czterech źródeł i flagi braków |
-| Skill Selection | Registry/profile dobiera zatwierdzoną kompetencję i jej wymagania |
-| Analysis | Bounded runtime interpretuje dane w kontekście celu sklepu i kryteriów Skill |
-| Decision Proposal | Model proponuje wynik i uzasadnienie; backend nadaje kopertę i wersje |
-| Evidence Validation | Backend sprawdza ID, zakres, aktualność, zgodność liczb/parametrów i wystarczalność wymaganych przesłanek |
-| Policy Evaluation | Istniejący Policy Engine ocenia dopuszczalność, potrzebę zgody, odroczenia lub odmowy |
-| Execution | Tylko dozwolona akcja korzysta z AuthorizedAction i Action Executor; pozostałe wyniki nie tworzą mutacji zewnętrznej |
-| Outcome Evaluation | Osobno wynik techniczny i obserwacje biznesowe, również dla decyzji o obserwacji lub braku działania |
+| Signal Detection | Code/metrics detect a problem; the signal has a source, a version and a scope, and does not decide the reaction |
+| Context Building | The Builder creates a pinned manifest of the four sources and gap flags |
+| Skill Selection | The Registry/profile selects the approved competence and its requirements |
+| Analysis | The bounded runtime interprets the data in the context of the store goal and the Skill criteria |
+| Decision Proposal | The model proposes a result and a rationale; the backend assigns the envelope and versions |
+| Evidence Validation | The backend checks the IDs, scope, freshness, consistency of numbers/parameters and the sufficiency of the required premises |
+| Policy Evaluation | The existing Policy Engine evaluates admissibility, the need for approval, deferral or denial |
+| Execution | Only an allowed action uses an AuthorizedAction and the Action Executor; the other results create no external mutation |
+| Outcome Evaluation | Separately the technical result and the business observations, also for decisions to monitor or to take no action |
 
-Przy niewystarczających danych walidator nie „naprawia” uzasadnienia przez wymyślenie faktów. Odrzuca propozycję akcji albo dopuszcza jawny wynik abstencji z identyfikowalnym brakiem. Istnienie evidence ID nie dowodzi sensu całego tekstu: wymagane są zgodność encji/okresów, poprawne wyliczenia i pokrycie przesłanek. Wnioski wymagające oceny eksperta trafiają do eskalacji; same testy struktury nie dowodzą jakości biznesowej.
+With insufficient data the validator does not "fix" the rationale by inventing facts. It rejects the action proposal or admits an explicit abstention result with a traceable gap. The existence of an evidence ID does not prove the sense of the whole text: consistency of entities/periods, correct calculations and coverage of the premises are required. Conclusions that need an expert assessment go to escalation; structural tests alone do not prove business quality.
 
-### E2. Proponowany DecisionProposal 1.2 [P, O-21]
+### E2. Proposed DecisionProposal 1.2 [P, O-21]
 
-Schematy `1.0` (Inventory Guardian) i `1.1` (Support) z dokumentu 02 pozostają niezmienne. Nowy schemat `1.2` zachowuje kopertę, akcje i ich zabezpieczenia, dodając manifest wiedzy/profilu i jawne gałęzie:
+The `1.0` (Inventory Guardian) and `1.1` (Support) schemas from document 02 stay unchanged. The new `1.2` schema keeps the envelope, the actions and their safeguards, adding the knowledge/profile manifest and explicit branches:
 
-| `recommendation.disposition` w 1.2 | Inwarianty | Skutek procesu |
+| `recommendation.disposition` in 1.2 | Invariants | Process effect |
 |---|---|---|
-| `RECOMMEND_ACTION` | Jedna typowana akcja, konkretne evidence refs, brak monitorPlan jako zamiennika akcji | Ocena polityki, ewentualna zgoda i wykonanie; wynik nie oznacza APPROVED |
-| `NO_ACTION` | `action=null`, wystarczające dane i uzasadnienie braku interwencji | Zakończenie bieżącej oceny; nowe sygnały nadal mogą otworzyć kolejny epizod |
-| `MONITOR` | `action=null`, dowody, warunki ponownej oceny i ograniczony plan obserwacji | `MONITORING`, trwały timer/sygnał i kolejna analiza; bez mutacji reklamy |
-| `INSUFFICIENT_DATA` | `action=null`, jawne required/missing evidence i wpływ braku | `WAITING_DATA`, dozwolone odświeżenie źródła lub interwencja, termin eskalacji |
-| `ESCALATE` | `action=null`, przyczyna wymagająca człowieka i dostępne dowody | Eskalacja; nie omija polityk dla późniejszej akcji |
+| `RECOMMEND_ACTION` | One typed action, specific evidence refs, no monitorPlan as a substitute for the action | Policy evaluation, possibly approval and execution; the result does not mean APPROVED |
+| `NO_ACTION` | `action=null`, sufficient data and a justification for not intervening | The current assessment ends; new signals may still open another episode |
+| `MONITOR` | `action=null`, evidence, re-assessment conditions and a bounded monitoring plan | `MONITORING`, a durable timer/signal and the next analysis; no ad mutation |
+| `INSUFFICIENT_DATA` | `action=null`, explicit required/missing evidence and the impact of the gap | `WAITING_DATA`, an allowed source refresh or intervention, an escalation deadline |
+| `ESCALATE` | `action=null`, the reason that requires a human and the available evidence | Escalation; it does not bypass policies for a later action |
 
-Przy MONITOR backend waliduje zakres odczytów, terminy, allowed metrics, koszt, maksymalną liczbę reanaliz i deadline. Nie daje modelowi dowolnego harmonogramu ani bezterminowej pętli. Warunek może być typowany: osiągnięcie dojrzałości danych, określona obserwacja lub zatwierdzony próg z profilu/polityki. Jeśli z góry nie wiadomo, czy prognoza/metryka jest wiarygodna, używamy INSUFFICIENT_DATA, a nie kosmetycznego MONITOR. Na deadline bez rozstrzygnięcia zapisujemy stan i eskalację według polityki.
+With MONITOR the backend validates the read scope, the deadlines, the allowed metrics, the cost, the maximum number of re-analyses and the deadline. It does not give the model an arbitrary schedule or an unbounded loop. A condition may be typed: reaching data maturity, a specific observation or an approved threshold from the profile/policy. If it is not known in advance whether a forecast/metric is reliable, we use INSUFFICIENT_DATA, not a cosmetic MONITOR. At the deadline without a resolution we record the state and escalate according to the policy.
 
-Mapowanie legacy: `ACT → RECOMMEND_ACTION`, `WAIT_FOR_DATA → INSUFFICIENT_DATA`, `NO_ACTION → NO_ACTION`, `ESCALATE → ESCALATE`. Nie zakładamy MONITOR na podstawie tekstu starej odpowiedzi. Starego NO_ACTION nie zmieniamy retroaktywnie w plan obserwacji. Adapter read model może wyświetlać zunifikowany `decisionKind`, lecz zapis źródłowy, schemaVersion i rewizja pozostają zachowane. Konsument nieobsługujący `1.2` odrzuca go jawnie; nie mapuje MONITOR na zamknięty NO_ACTION.
+Legacy mapping: `ACT → RECOMMEND_ACTION`, `WAIT_FOR_DATA → INSUFFICIENT_DATA`, `NO_ACTION → NO_ACTION`, `ESCALATE → ESCALATE`. We do not infer MONITOR from the text of an old answer. An old NO_ACTION is not retroactively turned into a monitoring plan. A read model adapter may display a unified `decisionKind`, but the source record, schemaVersion and revision are kept. A consumer that does not support `1.2` rejects it explicitly; it does not map MONITOR to a closed NO_ACTION.
 
-**Migracja [P]:** rejestracja nowego schematu → walidatory/allowlist profili → projekcje UI i Decision History → wersjonowany workflow z MONITORING i terminami → ewaluacja/fault tests → opt-in profilu. Nowa wersja nie zamienia automatycznie aktywnych workflow ani istniejących approvals. Obsługa pól Support z 1.1 zachowuje trigger, ownership i kontrolę draftów; samo rozszerzenie rodzajów decyzji nie znosi blokady wysyłki.
+**Migration [P]:** register the new schema → validators/profile allowlist → UI and Decision History projections → a versioned workflow with MONITORING and deadlines → evaluation/fault tests → profile opt-in. The new version does not automatically replace active workflows or existing approvals. The handling of the Support fields from 1.1 keeps the trigger, ownership and draft control; extending the decision kinds alone does not lift the send block.
 
-Kopertę nadal tworzy backend: `schemaVersion`, IDs/revision, subject (`opportunityId` lub Support refs), `createdAt/expiresAt`, `contextSnapshotId`, `contextManifestId`, `knowledgeReleaseRef`, `storeProfileRef`. Model zwraca recommendation i findings; backend rozwiązuje referencje i utrwala ich zatwierdzoną postać. `monitorPlan` i `observationPlan` są walidowane, a potem planowane przez aplikację. Pierwszy dotyczy decyzji „poczekaj i sprawdź”, drugi pomiaru po decyzji/akcji.
+The backend still creates the envelope: `schemaVersion`, IDs/revision, subject (`opportunityId` or Support refs), `createdAt/expiresAt`, `contextSnapshotId`, `contextManifestId`, `knowledgeReleaseRef`, `storeProfileRef`. The model returns the recommendation and findings; the backend resolves the references and persists their approved form. `monitorPlan` and `observationPlan` are validated and then scheduled by the application. The first concerns a "wait and check" decision, the second the measurement after a decision/action.
 
-Szkice kontraktów Java **[P]**, bez typów Spring AI i SDK dostawcy:
+Java contract sketches **[P]**, without Spring AI or provider SDK types:
 
 ```java
 public enum DecisionDisposition {
@@ -366,9 +366,9 @@ public interface OutcomeEvaluator {
 }
 ```
 
-To projekcje kontraktów, nie kompletna definicja wszystkich DTO: `ActionSpec`, `MetricQuery` i pozostałe typy odnoszą się do typowanych portów aplikacji. `action`/`monitorPlan` są nullable wyłącznie według tabeli inwariantów; walidujemy to przez warianty JSON Schema i walidator domenowy. Java `TrustedStoreScope` pochodzi z backendu, nie z argumentów LLM.
+These are projections of the contracts, not a complete definition of all DTOs: `ActionSpec`, `MetricQuery` and the other types refer to typed application ports. `action`/`monitorPlan` are nullable only according to the invariants table; we validate this through JSON Schema variants and the domain validator. The Java `TrustedStoreScope` comes from the backend, not from LLM arguments.
 
-Przykładowy pełny MONITOR **[Z]**:
+Sample complete MONITOR **[Z]**:
 
 ```json
 {
@@ -400,208 +400,208 @@ Przykładowy pełny MONITOR **[Z]**:
     ],
     "missingRequirements": [],
     "reasonCodes": ["CONVERSION_REPORTING_NOT_MATURE", "NO_CURRENT_HARD_LIMIT_BREACH"],
-    "summary": "Wyniki wymagają obserwacji do czasu dojrzewania konwersji; nie proponuję teraz zmiany budżetu.",
-    "uncertainties": ["Wartość CPA może zmienić się po aktualizacji raportowania."]
+    "summary": "The results need monitoring until conversions mature; I do not propose a budget change now.",
+    "uncertainties": ["The CPA value may change after the reporting update."]
   }
 }
 ```
 
-Przykładowy manifest rejestruje również `ev-roas-202` dla obserwowanego ROAS i `ev-budget-guard-202` dla deterministycznego sprawdzenia aktualnych twardych limitów; walidacja wymaga ich istnienia i zgodności scope. Terminy i limit reanaliz są parametrami przykładu, nie uniwersalną regułą. `expiresAt` dotyczy dopuszczenia propozycji do zaplanowania; przyjęty przed terminem MONITOR działa do zatwierdzonego deadline, a każda reanaliza ma nowy run, snapshot i ważność.
+The sample manifest also records `ev-roas-202` for the observed ROAS and `ev-budget-guard-202` for the deterministic check of the current hard limits; validation requires that they exist and match the scope. The deadlines and the re-analysis limit are parameters of the example, not a universal rule. `expiresAt` concerns admitting the proposal for scheduling; a MONITOR accepted before that time runs until the approved deadline, and every re-analysis has a new run, snapshot and validity.
 
-W 1.2 pole `evidence` z wersjami zastępuje listę `evidenceIds` wewnątrz recommendation; adapter mapuje ID legacy na wersje utrwalone w historycznym snapshotcie, nigdy na „najnowsze”. Zmiana jest jawnie wersjonowana. Test kontraktowy musi objąć tę różnicę; UI używa read modelu `evidenceRefs` niezależnego od transportu propozycji modelu.
+In 1.2 the versioned `evidence` field replaces the `evidenceIds` list inside the recommendation; the adapter maps legacy IDs to the versions persisted in the historical snapshot, never to "the newest". The change is explicitly versioned. A contract test must cover this difference; the UI uses an `evidenceRefs` read model independent of the transport of the model's proposal.
 
-## F. Decision Experience i Evaluation
+## F. Decision Experience and evaluation
 
-### F1. Historia i model obserwacji [D, P]
+### F1. History and the observation model [D, P]
 
-Decision History jest projekcją istniejących decyzji/audytu, nie drugim źródłem prawdy o wykonaniu. Łączy signal/opportunity/support case, snapshot/manifest, wersje wiedzy i profilu, proposal/revision, ocenę polityki, approval lub odmowę, action ledger, wynik techniczny i Outcome. Zachowuje również NO_ACTION, MONITOR, brak danych i odrzucenia; historia samych „sukcesów” zniekształca ocenę.
+Decision History is a projection of the existing decisions/audit, not a second source of truth about execution. It links the signal/opportunity/support case, the snapshot/manifest, knowledge and profile versions, the proposal/revision, the policy evaluation, the approval or rejection, the action ledger, the technical result and the Outcome. It also keeps NO_ACTION, MONITOR, missing data and rejections; a history of "successes" alone distorts the evaluation.
 
-`ObservationPlan` określa subject, baseline window, follow-up windows, metryki i ich definicje, okres dojrzewania, minimalną jakość/kompletność, znane confounders, sposób porównania, limit prób i właściciela eskalacji. Plan tworzymy przed oceną wyniku, aby nie dobierać okna dopiero do korzystnego wykresu. Techniczna weryfikacja nadal zachowuje swój krótki deadline i nie czeka na biznesowy follow-up.
+An `ObservationPlan` defines the subject, the baseline window, the follow-up windows, the metrics and their definitions, the maturation period, the minimum quality/completeness, known confounders, the comparison method, the attempt limit and the escalation owner. We create the plan before evaluating the result, so that the window is not chosen afterwards to fit a favorable chart. Technical verification still keeps its short deadline and does not wait for the business follow-up.
 
-`OutcomeObservation` ma `observationId/revision`, decision/action ref, plan ref, baseline/follow-up evidence, daty pomiaru i availableAt, brakujące dane, maturity, confounders, evaluation method i `attributionStrength`. Statusy jakości procesu: `PENDING`, `OBSERVED`, `INCONCLUSIVE`, `CENSORED`, `SUPERSEDED`. Ocena biznesowa może być `FAVORABLE`, `UNFAVORABLE`, `MIXED`, `UNDETERMINED` względem zadeklarowanego celu, niezależnie od statusu technicznego. Favorable nie znaczy caused by agent.
+An `OutcomeObservation` has an `observationId/revision`, a decision/action ref, a plan ref, baseline/follow-up evidence, measurement dates and availableAt, missing data, maturity, confounders, the evaluation method and `attributionStrength`. Process quality statuses: `PENDING`, `OBSERVED`, `INCONCLUSIVE`, `CENSORED`, `SUPERSEDED`. The business assessment may be `FAVORABLE`, `UNFAVORABLE`, `MIXED`, `UNDETERMINED` against the declared goal, independently of the technical status. Favorable does not mean caused by the agent.
 
-Proponowane okna **[Z]**:
+Proposed windows **[Z]**:
 
-| Proces | Pomiar | Ograniczenie |
+| Process | Measurement | Limitation |
 |---|---|---|
-| Pauza reklamy | Krótka weryfikacja stanu według dokumentu 03; obserwacja zapasu/sprzedaży/wydatku po 24 h i w dojrzałym oknie np. 7 dni | Dostawa, inna reklama i przesunięcie budżetu mogą zakłócać porównanie |
-| Diagnoza/budżet marketingowy | Baseline i follow-up o porównywalnych dniach oraz odpowiedniej dojrzałości konwersji | Każda kolejna zmiana adsetu może rozpocząć nowe okno lub ocenzurować stare |
-| MONITOR | Odczyt przy nextReviewAt lub warunku, koniec najpóźniej deadline | Mierzymy czy dane dojrzały i czy rekomendacja wymaga zmiany |
-| NO_ACTION | Ocena ekspercka/historyczny follow-up w wybranych przypadkach, bez obowiązkowej stałej pętli | Nie znamy automatycznie kontrfaktycznego wyniku wykonania akcji |
-| Support | Przyjęcie/dostarczenie według dostępnych dowodów oraz czas reakcji, ponowne otwarcie/eskalacje | Sama liczba automatycznych odpowiedzi nie dowodzi rozwiązania problemu |
+| Ad pause | A short state verification per document 03; an observation of stock/sales/spend after 24 h and in a mature window, e.g. 7 days | A delivery, another ad and a budget shift may confound the comparison |
+| Marketing diagnosis/budget | Baseline and follow-up on comparable days and with an appropriate conversion maturity | Every further adset change may start a new window or censor the old one |
+| MONITOR | A read at nextReviewAt or on the condition, ending at the deadline at the latest | We measure whether the data matured and whether the recommendation needs to change |
+| NO_ACTION | An expert assessment/historical follow-up in selected cases, without a mandatory fixed loop | We do not automatically know the counterfactual result of executing an action |
+| Support | Acceptance/delivery according to the available evidence and the reaction time, reopenings/escalations | The number of automatic replies alone does not prove the problem was solved |
 
-Przy późnej korekcie danych nowa rewizja obserwacji wskazuje poprzednią; oryginalny kontekst decyzji pozostaje niezmienny. Brak danych w deadline daje INCONCLUSIVE, nie sztuczne zero efektu. Zmiana strategii sklepu w oknie jest confounderem i może wymagać rozdzielenia pomiarów.
+With a late data correction, a new observation revision points to the previous one; the original decision context stays immutable. Missing data at the deadline gives INCONCLUSIVE, not an artificial zero effect. A change of the store strategy within the window is a confounder and may require splitting the measurements.
 
-### F2. Korelacja i przyczynowość [D, P]
+### F2. Correlation and causality [D, P]
 
-Domyślnie używamy `attributionStrength=OBSERVED_ASSOCIATION` albo `UNKNOWN`. Nie wyliczamy „oszczędności spowodowanej AI” przez samo odjęcie wydatku po pauzie. Sezonowość, promocja, cena, dostępność, miks produktów, zmiany innych kanałów i regresja do średniej mogą zmienić wynik.
+By default we use `attributionStrength=OBSERVED_ASSOCIATION` or `UNKNOWN`. We do not compute "savings caused by the AI" by simply subtracting the spend after a pause. Seasonality, promotions, price, availability, product mix, changes in other channels and regression to the mean may change the result.
 
-Wniosek przyczynowy wymaga osobnego projektu eksperymentu lub uzasadnionej metody z opisanymi założeniami, np. grupy kontrolnej i dopuszczonego porównania. W MVP nie wdrażamy automatycznie silnika eksperymentów; przechowujemy pole metody i ograniczenia, aby później móc go dodać. Retrospektywna poprawa CPA bez takiego projektu pozostaje obserwacją, niezależnie od confidence modelu.
+A causal conclusion requires a separate experiment design or a justified method with described assumptions, e.g. a control group and an admitted comparison. In the MVP we do not automatically deploy an experiment engine; we store the method field and the limitations so that it can be added later. A retrospective CPA improvement without such a design stays an observation, regardless of the model's confidence.
 
 ### F3. Offline Evaluation Framework [D, P]
 
-Każdy przypadek obejmuje snapshot danych dostępnych w chwili decyzji, cutoff, manifest wiedzy, profil, capabilities, dopuszczone akcje, oczekiwany zbiór poprawnych wyników i rubric eksperta. Historyczne źródła są dwuczasowe: filtrujemy nie tylko eventTime, lecz również availableAt. Później skorygowana konwersja/dostawa nie może zasilić analizy „jak gdyby była znana wcześniej”. Oddzielamy ocenę jakości decyzji ex ante od oceny obserwowanego wyniku ex post.
+Every case includes a snapshot of the data available at the time of the decision, a cutoff, the knowledge manifest, the profile, capabilities, the allowed actions, the expected set of correct results and an expert rubric. Historical sources are bitemporal: we filter not only by eventTime but also by availableAt. A later corrected conversion/delivery must not feed the analysis "as if it had been known earlier". We separate the ex ante assessment of the decision quality from the ex post assessment of the observed result.
 
-Jeśli starsze dane nie mają zachowanego as-of/availableAt, oznaczamy przypadek jako rekonstruowany i ujawniamy ograniczenie. Nie wymyślamy historycznych czasów dostępności ani nie włączamy takiego przypadku bez oznaczenia do ścisłego benchmarku replay. Od startu pilota archiwizujemy kolejne rewizje potrzebne do wiarygodnego odtwarzania.
+If older data does not have a preserved as-of/availableAt, we mark the case as reconstructed and disclose the limitation. We do not invent historical availability times or include such a case without a marker in a strict replay benchmark. From the start of the pilot we archive the successive revisions needed for a reliable replay.
 
-Zestawy dzielimy według czasu, sklepów i typu problemu na development, validation i zamrożony holdout. Scenariusze różnych okresów tej samej kampanii nie mogą przeciekać między zbiorami przez kopiowany kontekst. Ekspert opisuje uzasadnione alternatywy; poprawnym wynikiem może być MONITOR zamiast jednej arbitralnej akcji. Sporne etykiety przechodzą adjudykację, a nie automatyczne uznanie jednego sędziego LLM.
+We split the sets by time, store and problem type into development, validation and a frozen holdout. Scenarios from different periods of the same campaign must not leak between the sets through copied context. The expert describes justified alternatives; MONITOR may be a correct result instead of one arbitrary action. Disputed labels go through adjudication, not automatic acceptance of a single LLM judge.
 
-| Wymiar | Pomiar i bramka |
+| Dimension | Measurement and gate |
 |---|---|
-| Bezpieczeństwo wykonania | Nieautoryzowane cele, nieznane tools, naruszenie tenant/scope/policy; każda taka mutacja blokuje release |
-| Uzasadnienie | Pokrycie przesłanek dowodami, zgodność liczb, brak fikcyjnego źródła i przyczynowego overclaim |
-| Jakość decyzji | Zgodność z zakresem odpowiedzi eksperta, uwzględnienie celu i danych, koszt zbędnej interwencji |
-| Abstencja | Trafne odróżnienie MONITOR, INSUFFICIENT_DATA, NO_ACTION i ESCALATE; brak premiowania „zawsze nic nie rób” |
-| Operacyjność | Poprawność schematu, wymagane capabilities, liczba narzędzi, latency i koszt całego run |
-| Odporność | Braki, konflikty, prompt injection, wersje API, zmiana profilu i granice czasu |
+| Execution safety | Unauthorized targets, unknown tools, violations of tenant/scope/policy; any such mutation blocks the release |
+| Rationale | Coverage of the premises by evidence, consistency of numbers, no fictitious source and no causal overclaim |
+| Decision quality | Consistency with the expert's range of answers, accounting for the goal and the data, the cost of an unnecessary intervention |
+| Abstention | Correctly distinguishing MONITOR, INSUFFICIENT_DATA, NO_ACTION and ESCALATE; no reward for "always do nothing" |
+| Operability | Schema validity, required capabilities, the number of tools, latency and the cost of the whole run |
+| Robustness | Gaps, conflicts, prompt injection, API versions, profile changes and time limits |
 
-Porównujemy pary skill release/model przy tym samym profilu, danych i dostępnym budżecie. Wykonujemy kilka prób dla niedeterministycznych modeli i raportujemy rozrzut, wielkość próby oraz rozkład po klasach/sklepach; jedna średnia „accuracy” nie wystarczy. Ważne błędy opisujemy oddzielnie, np. false intervention na rentownej kampanii. **O-23:** konkretne progi jakości i minimalny zestaw wymagają danych eksperckich i uzgodnienia pilota.
+We compare skill release/model pairs with the same profile, data and available budget. We run several attempts for non-deterministic models and report the spread, the sample size and the distribution by class/store; one average "accuracy" is not enough. Important errors are described separately, e.g. a false intervention on a profitable campaign. **O-23:** the specific quality thresholds and the minimal set require expert data and a pilot agreement.
 
-Golden tests obejmują wzory i lineage bez LLM; testy kontraktowe obejmują wszystkie wersje propozycji i provider adapters; testy workflow obejmują MONITOR deadline, brak danych, korekty i idempotencję planowania. Shadow ocenia decyzje bez skutku zapisu; nie zastępuje testów executor/API z dokumentu 02.
+Golden tests cover formulas and lineage without an LLM; contract tests cover all proposal versions and provider adapters; workflow tests cover the MONITOR deadline, missing data, corrections and scheduling idempotency. Shadow evaluates decisions without a write effect; it does not replace the executor/API tests from document 02.
 
-### F4. Bezpieczna aktualizacja wiedzy [D, P]
+### F4. Safe knowledge updates [D, P]
 
-Outcome może utworzyć kandydaturę przypadku do review albo zgłoszenie problemu w Skill. Uprawniony ekspert ocenia ją, uzupełnia testy i przygotowuje release. Agent nie edytuje sam procedur, reguł, profilu strategii ani wag preferencji. Nawet seria dodatnich obserwacji bez wiarygodnej kontroli nie nadaje prawa do samodzielnego zwiększania budżetów.
+An Outcome may create a candidate case for review or a report of a problem in a Skill. A permitted expert assesses it, adds tests and prepares a release. The agent does not edit procedures, rules, the strategy profile or preference weights on its own. Even a series of positive observations without a reliable control does not grant the right to increase budgets autonomously.
 
-Aktywacja wersji wymaga przejścia regresji, oceny błędów krytycznych, jawnego zatwierdzenia i możliwości rollbacku do release. Historyczne decyzje zachowują oryginalną wersję; nowe wykonanie nadal podlega bieżącym politykom. Dokument 02 definiuje mechanikę wersjonowania runtime, a tutaj wersjonujemy wiedzę i sposób jej ewaluacji.
+Activating a version requires passing the regression, an assessment of critical errors, an explicit approval and the ability to roll back to a release. Historical decisions keep the original version; a new execution is still subject to the current policies. Document 02 defines the runtime versioning mechanics; here we version the knowledge and the way it is evaluated.
 
-## G. Marketing Knowledge Pack — pierwsza wersja
+## G. Marketing Knowledge Pack — first version
 
-### G1. Wspólny kontrakt i zakres [P]
+### G1. Shared contract and scope [P]
 
-Release `marketing-pack@1.0.0` obejmuje sześć Skills wymienionych poniżej, trzy Playbooks z A2, rejestr źródeł i przypadki ewaluacyjne. Każdy Skill ma metadata zgodne z formatem z dokumentu 02, required evidence, limitations, output schema, owners i eval refs. Domyślnie nie ładuje wszystkich pozostałych Skills; Playbook wybiera tylko potrzebne kompetencje. Nie wymaga osobnego agenta dla każdej kompetencji.
+The `marketing-pack@1.0.0` release includes the six Skills listed below, the three Playbooks from A2, a source register and evaluation cases. Every Skill has metadata in the format from document 02, required evidence, limitations, an output schema, owners and eval refs. By default it does not load all the other Skills; the Playbook selects only the needed competences. It does not require a separate agent for each competence.
 
-Na granicy modelu proponujemy `SkillResult<Findings> = {recommendation, findings}`: recommendation ma inwarianty z E2, a findings jest typowanym artefaktem diagnostycznym zapisywanym w AgentRun i wiązanym z propozycją. Kopertę DecisionProposal składa backend. Findings nie jest ActionSpec ani upoważnieniem; np. szkic wariantów budżetu nie trafia do executor jako niezweryfikowany kod. JSON Schema dla wybranego Skill zamyka zarówno recommendation, jak i jego findings; niezdefiniowane pola nie przechodzą walidacji.
+At the model boundary we propose `SkillResult<Findings> = {recommendation, findings}`: the recommendation has the invariants from E2, and the findings are a typed diagnostic artifact stored in the AgentRun and linked to the proposal. The backend assembles the DecisionProposal envelope. Findings are not an ActionSpec or an authorization; e.g. a draft of budget variants does not reach the executor as unverified code. The JSON Schema of the selected Skill closes both the recommendation and its findings; undefined fields fail validation.
 
-W każdym findings liczby pochodzą z `metricRefs`, a wiedza proceduralna z `knowledgeRefs`. Hipotezy mają `supportingEvidence`, `contradictingEvidence`, `uncertainties` i kolejny dozwolony krok diagnostyczny. Nie zapisujemy nieudokumentowanych liczb w tekście uzasadnienia jako faktów.
+In all findings the numbers come from `metricRefs`, and procedural knowledge from `knowledgeRefs`. Hypotheses have `supportingEvidence`, `contradictingEvidence`, `uncertainties` and the next allowed diagnostic step. We do not record undocumented numbers in the rationale text as facts.
 
-**Zakres wykonania MVP:** Marketing Pack dostarcza diagnostykę, obserwację i propozycje. Nie dodaje uprawnień do zwiększania budżetów, tworzenia kreacji ani kampanii. RECOMMEND_ACTION może wskazać tylko typ/zakres dostępny w danym profilu i Action Registry. Gdy pożądana operacja nie jest dopuszczona, Skill zwraca ESCALATE i opisuje wariant w findings jako materiał doradczy, bez wykonalnej akcji. Budżetowe kontrakty rozszerzeń z dokumentu 02 wymagają oddzielnego wdrożenia, polityki i testów.
+**MVP execution scope:** the Marketing Pack provides diagnostics, monitoring and proposals. It does not add permissions to increase budgets or to create creatives or campaigns. RECOMMEND_ACTION may point only to a type/scope available in the given profile and the Action Registry. When the desired operation is not allowed, the Skill returns ESCALATE and describes the variant in the findings as advisory material, without an executable action. The budget extension contracts from document 02 require a separate implementation, policy and tests.
 
 ### G2. `campaign-diagnosis`
 
-| Element | Specyfikacja |
+| Element | Specification |
 |---|---|
-| Cel | Rozróżnić wiarygodne pogorszenie wyników, problem danych i zmienność; wskazać prawdopodobne przyczyny bez automatycznej ingerencji. |
-| Dane i tools | Campaign performance, CPA/ROAS i składniki, okres porównawczy, attribution/maturity, marża, zapasy, historia zmian, cel sklepu. Tools: `get_campaign_performance`, `get_attribution_diagnostics`, `get_campaign_learning_state`, `get_recent_campaign_changes`, `get_product_profitability`, istniejący forecast. Brak mapowania SKU jest jawny. |
-| Procedura | 1. Zweryfikuj jakość i porównywalność okresów. 2. Sprawdź próbę, opóźnienia i learning. 3. Rozdziel zmianę CPM, kliknięć i konwersji, zachowując wspólną bazę. 4. Sprawdź marżę, zapas, promocje i zmiany. 5. Zbuduj hipotezy z dowodami za/przeciw. 6. Oceń, czy interwencja ma uzasadnienie względem celu sklepu. |
-| Kryteria rekomendacji | Dopuszczalna interwencja wymaga materialnego problemu na porównywalnych danych, zidentyfikowanego zakresu i proporcjonalnej dostępnej akcji. Stabilne wyniki zgodne z celem dają NO_ACTION; niedojrzałe, poprawnie zidentyfikowane wyniki mogą dać MONITOR. |
-| Warunki wstrzymania | Nieporównywalna atrybucja, brak krytycznych danych lub niespójny spend → INSUFFICIENT_DATA. Niejednoznaczna przyczyna wymagająca oceny człowieka → ESCALATE. Sam spadek ROAS nie wystarcza. |
-| Structured output | DecisionRecommendation + `CampaignDiagnosisFindings`: `hypotheses[]`, metricRefs, maturity assessment, learningRef, changeRefs, goalAlignment, requiredChecks. Hipoteza nie ma pola `provenCause=true` bez podstaw. |
-| Scenariusze testowe | ROAS 3,6→2,4 przy niedojrzałych konwersjach → MONITOR, jeśli nie naruszono twardych granic; taki sam spadek przy niezgodnych oknach → INSUFFICIENT_DATA; potwierdzony stabilny wynik zgodny z marżą → NO_ACTION; niska marża mimo wysokiego ROAS → diagnoza/eskalacja zamiast „skaluj”. |
+| Goal | Distinguish a reliable deterioration of results, a data problem and variability; point to the likely causes without automatic intervention. |
+| Data and tools | Campaign performance, CPA/ROAS and their components, the comparison period, attribution/maturity, margin, stock, change history, the store goal. Tools: `get_campaign_performance`, `get_attribution_diagnostics`, `get_campaign_learning_state`, `get_recent_campaign_changes`, `get_product_profitability`, the existing forecast. A missing SKU mapping is explicit. |
+| Procedure | 1. Verify the quality and comparability of the periods. 2. Check the sample, delays and learning. 3. Separate changes in CPM, clicks and conversions, keeping a shared base. 4. Check the margin, stock, promotions and changes. 5. Build hypotheses with evidence for/against. 6. Assess whether an intervention is justified given the store goal. |
+| Recommendation criteria | An admissible intervention requires a material problem on comparable data, an identified scope and a proportionate available action. Stable results consistent with the goal give NO_ACTION; immature, correctly identified results may give MONITOR. |
+| Stop conditions | Incomparable attribution, missing critical data or inconsistent spend → INSUFFICIENT_DATA. An ambiguous cause that needs a human assessment → ESCALATE. A ROAS drop alone is not enough. |
+| Structured output | DecisionRecommendation + `CampaignDiagnosisFindings`: `hypotheses[]`, metricRefs, maturity assessment, learningRef, changeRefs, goalAlignment, requiredChecks. A hypothesis has no `provenCause=true` field without grounds. |
+| Test scenarios | ROAS 3.6→2.4 with immature conversions → MONITOR if no hard limits are breached; the same drop with mismatched windows → INSUFFICIENT_DATA; a confirmed stable result consistent with the margin → NO_ACTION; a low margin despite a high ROAS → diagnosis/escalation instead of "scale". |
 
 ### G3. `budget-optimization`
 
-| Element | Specyfikacja |
+| Element | Specification |
 |---|---|
-| Cel | Ocenić zasadność i zakres propozycji budżetowej przy uwzględnieniu ekonomii, planu wydatków, ryzyka i możliwości realizacji. |
-| Dane i tools | Budżet na właściwym poziomie campaign/adset, strategia stawek/cel, pacing, spend, marża/CPA, maturity, learning, ograniczenia zapasu i ostatnie edycje. Tools: performance, store profile, profitability, learning, change history i scoped `get_budget_pacing`. |
-| Procedura | 1. Ustal właściciela budżetu i zakres współdzielenia. 2. Sprawdź plan vs wykonanie i kumulatywne zmiany. 3. Zbadaj ekonomikę oraz dojrzałość próby. 4. Oszacuj warianty tylko deterministycznymi metodami z jawnymi założeniami. 5. Oceń koszt ingerencji i ograniczenia. 6. Wybierz dozwoloną rekomendację, obserwację albo materiał do człowieka. |
-| Kryteria rekomendacji | Zmiana musi mieć potwierdzony scope, uzasadnienie względem celu i planu, dopuszczoną akcję oraz aktualny stan bazowy. Procent zmiany wynika z zatwierdzonego zakresu/polityki, nie „reguły branżowej”. W MVP niedopuszczona zmiana daje ESCALATE z analizą wariantów. |
-| Warunki wstrzymania | Nieznany poziom budżetu, konflikt profilu, niedojrzałe konwersje, kolejna ingerencja w trwającym oknie, brak kosztów wymaganych do oceny albo brak dostępnej akcji. Nie utożsamiaj daily budget z gwarantowanym sztywnym limitem dziennego spend. |
-| Structured output | DecisionRecommendation + `BudgetAssessmentFindings`: budgetScope, currentBudgetRef, pacingRefs, candidateScenarios, cumulativeChangeRefs, expectedTradeoffs i limitations. Wykonalny ActionSpec — tylko jeśli dostępny — zawiera bezwzględny desired amount/walutę i precondition, nie ponawialne „minus 10%”. |
-| Scenariusze testowe | Wiele małych zmian próbujących obejść limit → odmowa wykonania; próba zmiany adsetu z budżetem na campaign → brak niewłaściwej akcji; niedojrzałe konwersje → MONITOR; wzrost budżetu przy polityce MVP zabraniającej wzrostu → ESCALATE, brak mutacji. |
+| Goal | Assess the justification and scope of a budget proposal, accounting for the economics, the spend plan, the risk and the ability to execute it. |
+| Data and tools | The budget at the right campaign/adset level, the bidding strategy/goal, pacing, spend, margin/CPA, maturity, learning, stock constraints and recent edits. Tools: performance, store profile, profitability, learning, change history and a scoped `get_budget_pacing`. |
+| Procedure | 1. Determine the budget owner and the sharing scope. 2. Check the plan vs actuals and cumulative changes. 3. Examine the economics and the sample maturity. 4. Estimate variants only with deterministic methods with explicit assumptions. 5. Assess the cost of intervention and the constraints. 6. Choose an allowed recommendation, monitoring or material for a human. |
+| Recommendation criteria | A change must have a confirmed scope, a justification against the goal and the plan, an allowed action and a current base state. The change percentage follows from the approved scope/policy, not an "industry rule". In the MVP a disallowed change gives ESCALATE with a variant analysis. |
+| Stop conditions | An unknown budget level, a profile conflict, immature conversions, another intervention within an ongoing window, missing costs required for the assessment or no available action. Do not equate a daily budget with a guaranteed hard daily spend limit. |
+| Structured output | DecisionRecommendation + `BudgetAssessmentFindings`: budgetScope, currentBudgetRef, pacingRefs, candidateScenarios, cumulativeChangeRefs, expectedTradeoffs and limitations. An executable ActionSpec — only if available — contains an absolute desired amount/currency and a precondition, not a repeatable "minus 10%". |
+| Test scenarios | Many small changes trying to bypass a limit → execution denied; an attempt to change an adset whose budget is at the campaign level → no wrong action; immature conversions → MONITOR; a budget increase with an MVP policy that forbids increases → ESCALATE, no mutation. |
 
 ### G4. `creative-fatigue-analysis`
 
-| Element | Specyfikacja |
+| Element | Specification |
 |---|---|
-| Cel | Wykryć przesłanki możliwego zmęczenia kreacji i odróżnić je od zmian aukcji, odbiorców, oferty i danych. |
-| Dane i tools | Ad/creative mapping, daty i warianty kreacji, impressions/reach/frequency, CTR/CPC/CPM/CPA, grupy odbiorców, placement mix i change history. Tools: `get_creative_performance`, performance, attribution diagnostics, recent campaign changes. Dostępne breakdowns są capability connectora. |
-| Procedura | 1. Potwierdź tę samą kreację i porównywalny miks. 2. Zbadaj trendy częstotliwości i kliknięć wraz z konwersją. 3. Sprawdź zmianę CPM, audience i placementów. 4. Oceń próbę i maturity. 5. Sformułuj hipotezę oraz potrzebę testu/nowego materiału dla człowieka. |
-| Kryteria rekomendacji | Zbieżne, utrzymujące się przesłanki na porównywalnej bazie mogą uzasadniać ESCALATE z propozycją testu. Brak przesłanek daje NO_ACTION. Nie ma uniwersalnego frequency >X oznaczającego automatyczne zatrzymanie. |
-| Warunki wstrzymania | Brak reach lub zmiana zakresu estymacji, nowa kreacja pod starym ID, mała próba, istotna zmiana audience/placementów, brak możliwości rozdzielenia miksu. Przy przydatnych, lecz niedojrzałych danych — MONITOR; przy wymaganym braku — INSUFFICIENT_DATA. |
-| Structured output | DecisionRecommendation + `CreativeFatigueFindings`: creativeRef/fingerprint, fatigueHypothesis, supporting/contradicting evidence, mixChanges, suggestedTestBrief i uncertainty. Test brief nie publikuje reklamy. |
-| Scenariusze testowe | Rosnąca frequency bez pogorszenia metryk → brak automatycznej pauzy; CTR spada wskutek zmiany placement mix → nie ogłaszaj zmęczenia jako faktu; brak reach → brak zmyślonej częstotliwości; porównywalne pogorszenie zbieżnych wskaźników → uzasadniona propozycja testu dla człowieka. |
+| Goal | Detect signs of possible creative fatigue and distinguish them from changes in the auction, audiences, offer and data. |
+| Data and tools | Ad/creative mapping, creative dates and variants, impressions/reach/frequency, CTR/CPC/CPM/CPA, audience groups, placement mix and change history. Tools: `get_creative_performance`, performance, attribution diagnostics, recent campaign changes. The available breakdowns are a connector capability. |
+| Procedure | 1. Confirm it is the same creative and a comparable mix. 2. Examine frequency and click trends together with conversion. 3. Check changes in CPM, audience and placements. 4. Assess the sample and maturity. 5. Formulate a hypothesis and the need for a test/new material for a human. |
+| Recommendation criteria | Converging, persistent signs on a comparable base may justify ESCALATE with a test proposal. No signs give NO_ACTION. There is no universal frequency >X that means an automatic stop. |
+| Stop conditions | No reach or a change in the estimation scope, a new creative under an old ID, a small sample, a material change of audience/placements, no way to separate the mix. With useful but immature data — MONITOR; with a required gap — INSUFFICIENT_DATA. |
+| Structured output | DecisionRecommendation + `CreativeFatigueFindings`: creativeRef/fingerprint, fatigueHypothesis, supporting/contradicting evidence, mixChanges, suggestedTestBrief and uncertainty. The test brief does not publish an ad. |
+| Test scenarios | Rising frequency without worse metrics → no automatic pause; CTR drops because of a placement mix change → do not declare fatigue as a fact; no reach → no invented frequency; a comparable deterioration of converging indicators → a justified test proposal for a human. |
 
 ### G5. `profitability-analysis`
 
-| Element | Specyfikacja |
+| Element | Specification |
 |---|---|
-| Cel | Ocenić wkład sprzedaży/kampanii/SKU do marży po znanych kosztach i określić granice tej oceny. |
-| Dane i tools | NetSales, COGS, fulfillment, fees, returns, ad spend, podatkowa/walutowa baza i alokacje. Tools: `get_product_profitability`, `get_campaign_performance`, scoped `get_store_profitability`, store profile i evidence/provenance. |
-| Procedura | 1. Sprawdź bazę i kompletność kosztów. 2. Pobierz obliczenia z Engine. 3. Oddziel marżę przed reklamą od po reklamie. 4. Oceń zasadność porównania z break-even ROAS. 5. Sprawdź miks/zwroty/atrybucję. 6. Wyjaśnij wynik i niepewności w kontekście celu. |
-| Kryteria rekomendacji | Spójna ekonomia może uzasadnić brak działania, potrzebę diagnozy lub dopuszczoną reakcję. Margines blisko progu przy dużej niepewności nie daje fałszywej pewności. Niepotwierdzony campaign profit pozostaje estymacją. |
-| Warunki wstrzymania | Nieznany COGS krytycznej części sprzedaży, niespójny VAT/waluta, nieznana metoda alokacji, podwójne liczenie refundacji albo niezdefiniowany mianownik. Wtedy INSUFFICIENT_DATA lub ESCALATE zamiast dopisania typowej marży. |
-| Structured output | DecisionRecommendation + `ProfitabilityFindings`: scope, contributionBeforeAdsRef, contributionProfitRef, marginRateRef, breakEvenRoasRef lub null, costCoverage, allocationRefs, limitations i goalAlignment. |
-| Scenariusze testowe | Ten sam ROAS=3 przy m=0,50 i m=0,25 → różne wnioski, uproszczone progi 2 i 4 tylko przy zgodnej bazie; m<=0 → brak skończonego BE; brak COGS → Unavailable; refundacja już w NetSales → bez ponownego odjęcia; suma Meta+Google nie tworzy unikalnej sprzedaży. |
+| Goal | Assess the contribution of sales/campaign/SKU to the margin after known costs and define the limits of this assessment. |
+| Data and tools | NetSales, COGS, fulfillment, fees, returns, ad spend, the tax/currency basis and allocations. Tools: `get_product_profitability`, `get_campaign_performance`, a scoped `get_store_profitability`, store profile and evidence/provenance. |
+| Procedure | 1. Check the basis and the completeness of costs. 2. Fetch the calculations from the Engine. 3. Separate the margin before ads from the margin after ads. 4. Assess whether a comparison with the break-even ROAS is valid. 5. Check the mix/returns/attribution. 6. Explain the result and the uncertainties in the context of the goal. |
+| Recommendation criteria | Consistent economics may justify no action, the need for a diagnosis or an allowed reaction. A margin close to the threshold with high uncertainty does not give false certainty. An unconfirmed campaign profit stays an estimate. |
+| Stop conditions | Unknown COGS for a critical part of sales, an inconsistent VAT/currency, an unknown allocation method, double counting of refunds or an undefined denominator. Then INSUFFICIENT_DATA or ESCALATE instead of adding a typical margin. |
+| Structured output | DecisionRecommendation + `ProfitabilityFindings`: scope, contributionBeforeAdsRef, contributionProfitRef, marginRateRef, breakEvenRoasRef or null, costCoverage, allocationRefs, limitations and goalAlignment. |
+| Test scenarios | The same ROAS=3 with m=0.50 and m=0.25 → different conclusions, simplified thresholds of 2 and 4 only with a consistent basis; m<=0 → no finite BE; no COGS → Unavailable; a refund already in NetSales → not subtracted again; Meta+Google combined do not give unique sales. |
 
 ### G6. `campaign-learning-analysis`
 
-| Element | Specyfikacja |
+| Element | Specification |
 |---|---|
-| Cel | Określić, czy stan uczenia i historia zmian ograniczają wiarygodność oceny lub zasadność ingerencji. |
-| Dane i tools | Stan learning właściwego adsetu, cel optymalizacji, zdarzenia i ich dojrzałość, czas/typ edycji, stan dostarczania i problemy. Tools: `get_campaign_learning_state`, `get_recent_campaign_changes`, performance i attribution diagnostics. |
-| Procedura | 1. Ustal poziom hierarchii. 2. Odczytaj dostępny stan i czas. 3. Powiąż go ze zmianami i celem optymalizacji. 4. Oddziel niestabilność od naruszeń twardych limitów. 5. Określ dalszą obserwację lub potrzebę eksperckiej interwencji. |
-| Kryteria rekomendacji | MONITOR jest właściwy, gdy stan i jakość danych uzasadniają czekanie, a twarde limity nie są naruszone. NO_ACTION może oznaczać brak problemu uczenia. Learning nie blokuje ochrony przed potwierdzonym naruszeniem polityki lub brakiem zapasu. |
-| Warunki wstrzymania | Brak/nieaktualny learning state, brak źródłowej historii zmian, nieznany optimization event albo nieobsługiwana wersja pola. Nie zakładamy, że każda zmiana 20% lub dokładnie N konwersji stanowi uniwersalny próg. |
-| Structured output | DecisionRecommendation + `LearningAssessmentFindings`: learningStateRef, optimizationGoalRef, significantChangeRefs, assessmentLimitations, allowedObservationConditions i hardConstraintCheckRefs. |
-| Scenariusze testowe | Learning + zmienne CPA bez naruszeń → MONITOR; learning + potwierdzony niebezpieczny stan zapasu → nie blokuj osobnego Inventory Guardian; brak pola → UNKNOWN i abstencja zależna od wymagań; stara edycja nie może udawać właśnie rozpoczętej fazy. |
+| Goal | Determine whether the learning state and the change history limit the reliability of the assessment or the justification of an intervention. |
+| Data and tools | The learning state of the right adset, the optimization goal, events and their maturity, the time/type of edits, the delivery state and issues. Tools: `get_campaign_learning_state`, `get_recent_campaign_changes`, performance and attribution diagnostics. |
+| Procedure | 1. Determine the hierarchy level. 2. Read the available state and time. 3. Link it to the changes and the optimization goal. 4. Separate instability from breaches of hard limits. 5. Define further monitoring or the need for an expert intervention. |
+| Recommendation criteria | MONITOR is appropriate when the state and data quality justify waiting and hard limits are not breached. NO_ACTION may mean there is no learning problem. Learning does not block protection against a confirmed policy breach or a stockout. |
+| Stop conditions | A missing/stale learning state, no source change history, an unknown optimization event or an unsupported field version. We do not assume that every 20% change or exactly N conversions is a universal threshold. |
+| Structured output | DecisionRecommendation + `LearningAssessmentFindings`: learningStateRef, optimizationGoalRef, significantChangeRefs, assessmentLimitations, allowedObservationConditions and hardConstraintCheckRefs. |
+| Test scenarios | Learning + variable CPA without breaches → MONITOR; learning + a confirmed dangerous stock state → do not block the separate Inventory Guardian; a missing field → UNKNOWN and an abstention depending on the requirements; an old edit cannot pretend to be a phase that just started. |
 
 ### G7. `scaling-readiness`
 
-| Element | Specyfikacja |
+| Element | Specification |
 |---|---|
-| Cel | Ocenić gotowość do wzrostu przy ekonomii, dojrzałych danych, zapasie i możliwościach operacyjnych, bez utożsamiania dobrego historycznego ROAS z gwarancją skalowania. |
-| Dane i tools | Marża, CPA/ROAS i próba, learning, ostatnie zmiany, cash/budget plan, zapasy/dostawy i zdolność realizacji zamówień. Tools: profitability, performance, store profile, inventory forecast, learning i scoped `get_operational_capacity`. Brak capacity/cash jest jawny. |
-| Procedura | 1. Sprawdź cel wzrostu i limity. 2. Oceń dojrzałość rentowności oraz ryzyko miksu. 3. Sprawdź zapas i fulfillment. 4. Sprawdź ostatnie skalowanie i współdzielenie budżetu. 5. Opisz readiness i ograniczenia zamiast mechanicznego mnożenia wyników. |
-| Kryteria rekomendacji | Zgodna ekonomia, stabilne dane i możliwości operacyjne uzasadniają materiał do decyzji człowieka. W MVP wzrost budżetu pozostaje ESCALATE z planem oceny. NO_ACTION, gdy wzrost nie jest celem lub nie ma uzasadnienia. MONITOR, gdy trzeba poczekać na dojrzałość. |
-| Warunki wstrzymania | Nieznana marża, cash constraint, niepotwierdzona dostawa, niski zapas, konflikt strategii, brak danych o capacity, niedojrzałe konwersje lub zbyt świeża ingerencja. Wysoki ROAS nie znosi tych warunków. |
-| Structured output | DecisionRecommendation + `ScalingReadinessFindings`: `READY_FOR_HUMAN_REVIEW/NOT_READY/UNKNOWN`, economicEvidence, inventory/capacityRefs, riskFactors, proposedReviewPlan i unknowns. READY nie znaczy `AuthorizedAction`. |
-| Scenariusze testowe | Rentowna kampania, zapas na 2,6 dnia → brak rekomendacji automatycznego wzrostu; wysoki ROAS przy brakującym COGS → UNKNOWN; dojrzała rentowność i capacity, lecz zakaz wzrostu w MVP → ESCALATE bez mutacji; zmiana celu na PROFITABILITY nie uchyla twardych limitów ani nie nakazuje wzrostu. |
+| Goal | Assess readiness for growth given the economics, mature data, stock and operational capacity, without equating a good historical ROAS with a guarantee of scaling. |
+| Data and tools | Margin, CPA/ROAS and the sample, learning, recent changes, the cash/budget plan, stock/deliveries and order fulfillment capacity. Tools: profitability, performance, store profile, inventory forecast, learning and a scoped `get_operational_capacity`. Missing capacity/cash is explicit. |
+| Procedure | 1. Check the growth goal and the limits. 2. Assess the maturity of profitability and the mix risk. 3. Check stock and fulfillment. 4. Check recent scaling and budget sharing. 5. Describe the readiness and the constraints instead of mechanically multiplying results. |
+| Recommendation criteria | Consistent economics, stable data and operational capacity justify material for a human decision. In the MVP a budget increase stays ESCALATE with an assessment plan. NO_ACTION when growth is not the goal or has no justification. MONITOR when we need to wait for maturity. |
+| Stop conditions | An unknown margin, a cash constraint, an unconfirmed delivery, low stock, a strategy conflict, no capacity data, immature conversions or a too recent intervention. A high ROAS does not lift these conditions. |
+| Structured output | DecisionRecommendation + `ScalingReadinessFindings`: `READY_FOR_HUMAN_REVIEW/NOT_READY/UNKNOWN`, economicEvidence, inventory/capacityRefs, riskFactors, proposedReviewPlan and unknowns. READY does not mean `AuthorizedAction`. |
+| Test scenarios | A profitable campaign with stock for 2.6 days → no recommendation of an automatic increase; a high ROAS with missing COGS → UNKNOWN; mature profitability and capacity, but a growth ban in the MVP → ESCALATE without a mutation; changing the goal to PROFITABILITY does not lift hard limits or order growth. |
 
-### G8. Dane testowe i progi [P]
+### G8. Test data and thresholds [P]
 
-Każda procedura wiąże progi z konkretnym celem, marginesem błędu, wielkością próby, horyzontem i zatwierdzoną konfiguracją. Progi są wersjonowanymi inputami, z jednostką i zakresem, a nie ukrytymi liczbami w promptach. W każdym Skill testujemy także profil z brakującym progiem: model nie może wymyślić go w trakcie analizy i nadać mu statusu zatwierdzonego.
+Every procedure ties thresholds to a specific goal, error margin, sample size, horizon and approved configuration. Thresholds are versioned inputs with a unit and a range, not hidden numbers in prompts. In every Skill we also test a profile with a missing threshold: the model cannot invent it during the analysis and give it the approved status.
 
-Ekspert przygotowuje przypadki z odpowiedziami dopuszczalnymi, w tym kontrprzykłady do popularnych heurystyk. Wynik porównujemy na poziomie dyspozycji, zakresu, dowodów i niepewności. Kolejne Skills mogą czytać artefakt poprzedniego jako hipotezę, ale nadal odwołują się do pierwotnych dowodów; powtarzanie wniosku przez kilka modeli nie zwiększa automatycznie jego wiarygodności.
+The expert prepares cases with acceptable answers, including counterexamples to popular heuristics. We compare the result at the level of the disposition, scope, evidence and uncertainty. Subsequent Skills may read the previous one's artifact as a hypothesis, but they still refer to the original evidence; several models repeating a conclusion does not automatically increase its reliability.
 
-## H. Zakres MVP, wdrożenie i kwestie otwarte
+## H. MVP scope, rollout and open issues
 
-### H1. Minimalny zakres [D, P]
+### H1. Minimal scope [D, P]
 
-| Obszar | MVP | Dalszy rozwój po wykazaniu potrzeby |
+| Area | MVP | Further development once a need is shown |
 |---|---|---|
-| Domain Knowledge | Pliki Skills/Playbooks, metadata/provenance, przypięty release i review; Marketing Pack v1 | Większa biblioteka, retrieval przy skali |
-| Store Knowledge | Zatwierdzany profil, referencje kosztów/polityk, automatyczne kandydatury i konflikty | Rozbudowane scenariusze i personalizacja |
-| Operational Data | Deterministyczny Engine, Evidence, lineage, jakość i podstawowe maturity | Bogatsze modele opóźnień/niepewności i źródła |
-| Experience | Decision History, podstawowe okna Outcome i ocena ograniczeń | Kontrolowane eksperymenty i formalne metody przyczynowe |
-| Evaluation | Historyczne scenariusze, eksperci, regresja i benchmark skill/model | Większa automatyzacja benchmarków z zachowaniem nadzoru |
-| Runtime | Dotychczasowy gateway i bounded loop, rozszerzony kontekst i kontrakt | Wyłącznie rozszerzenia poparte ewaluacją |
-| RAG / Vector DB | Opcjonalne, bez wymogu infrastruktury w pierwszym wydaniu | Gdy katalog nieustrukturyzowanej wiedzy przekroczy praktyczne możliwości filtrowania/ładowania |
-| Fine-tuning / samodzielna strategia | Poza MVP | Odrębna decyzja po ocenie danych, jakości i bezpieczeństwa |
+| Domain Knowledge | Skills/Playbooks files, metadata/provenance, a pinned release and review; Marketing Pack v1 | A bigger library, retrieval at scale |
+| Store Knowledge | An approvable profile, references to costs/policies, automatic candidates and conflicts | Extended scenarios and personalization |
+| Operational Data | A deterministic Engine, Evidence, lineage, quality and basic maturity | Richer delay/uncertainty models and sources |
+| Experience | Decision History, basic Outcome windows and an assessment of limitations | Controlled experiments and formal causal methods |
+| Evaluation | Historical scenarios, experts, regression and a skill/model benchmark | More benchmark automation while keeping oversight |
+| Runtime | The existing gateway and bounded loop, an extended context and contract | Only extensions backed by evaluation |
+| RAG / Vector DB | Optional, without an infrastructure requirement in the first release | When the catalog of unstructured knowledge exceeds the practical capabilities of filtering/loading |
+| Fine-tuning / autonomous strategy | Outside the MVP | A separate decision after assessing data, quality and safety |
 
-Pakiet marketingowy może wystartować jako analiza L0/L1 w Profit Monitor/Ad Spend Guardian. Nie dokładamy sześciu nowych automatyzacji ani usług. Inventory Guardian i Support konsumują te same komponenty w odpowiednio ograniczonym zakresie. RAG nie jest synonimem czterech źródeł; profil, KPI i historia są głównie ustrukturyzowanymi danymi.
+The marketing pack may start as L0/L1 analysis in Profit Monitor/Ad Spend Guardian. We do not add six new automations or services. Inventory Guardian and Support consume the same components in an appropriately limited scope. RAG is not a synonym for the four sources; the profile, KPIs and history are mostly structured data.
 
-**[P] Kolejność implementacji:** rejestr źródeł i definicje metryk → wersjonowany Store Profile → manifest/snapshot i referencje → Registry/Marketing Pack z fixtures → ewaluacja offline → MONITOR/kontrakt 1.2 z read models → shadow/L1 → Outcome od pierwszych akcji → ograniczone L2 tylko w istniejącym dopuszczonym zakresie. Obserwacje nie muszą czekać na zaawansowane eksperymenty.
+**[P] Implementation order:** source register and metric definitions → versioned Store Profile → manifest/snapshot and references → Registry/Marketing Pack with fixtures → offline evaluation → MONITOR/contract 1.2 with read models → shadow/L1 → Outcome from the first actions → limited L2 only within the existing allowed scope. Observations do not have to wait for advanced experiments.
 
-### H2. Minimalne kryteria odbioru [P]
+### H2. Minimal acceptance criteria [P]
 
-1. Dla każdej propozycji można wskazać profil, release wiedzy, definicje, źródła i cutoff; obca referencja tenanta jest odrzucona.
-2. Engine przechodzi testy wzorów, podatkowej/walutowej bazy, zerowych mianowników, zwrotów, alokacji i maturity. LLM nie staje się obejściem brakującej metryki.
-3. NO_ACTION, MONITOR, INSUFFICIENT_DATA i RECOMMEND_ACTION są rozróżnione w schemacie, workflow, historii i UI; legacy `1.0/1.1` przechodzą regresję bez niejawnej zmiany semantyki.
-4. Aktualizacja profilu/wiedzy jest wersjonowana i audytowana; model nie ma ścieżki samodzielnej aktywacji zmiany.
-5. Outcome rozdziela potwierdzenie techniczne od efektu biznesowego, ujawnia confounders i nie deklaruje przyczynowości bez odpowiedniego pomiaru.
-6. Każdy z sześciu Skills ma testy ze scenariuszami abstencji i naruszeń; release przechodzi uzgodnione bramki eksperckie oraz bezpieczeństwa.
+1. For every proposal, the profile, the knowledge release, the definitions, the sources and the cutoff can be identified; a foreign tenant reference is rejected.
+2. The Engine passes tests of the formulas, the tax/currency basis, zero denominators, returns, allocations and maturity. The LLM does not become a workaround for a missing metric.
+3. NO_ACTION, MONITOR, INSUFFICIENT_DATA and RECOMMEND_ACTION are distinguished in the schema, the workflow, the history and the UI; legacy `1.0/1.1` pass the regression without an implicit change of semantics.
+4. A profile/knowledge update is versioned and audited; the model has no path to activate a change on its own.
+5. The Outcome separates technical confirmation from the business effect, discloses confounders and does not claim causality without an appropriate measurement.
+6. Each of the six Skills has tests with abstention and violation scenarios; the release passes the agreed expert and safety gates.
 
-### H3. Nowe kwestie wymagające decyzji [O]
+### H3. New issues that need a decision [O]
 
-| ID | Decyzja potrzebna przed wdrożeniem | Proponowany właściciel / wpływ |
+| ID | Decision needed before implementation | Proposed owner / impact |
 |---|---|---|
-| O-18 | Kto odpowiada za wiedzę, reviewDueAt, źródła dopuszczone i aktywację tenant override/release? | Product + ekspert marketingu + tech lead; blokuje produkcyjny Marketing Pack bez właściciela |
-| O-19 | Jak zatwierdzamy cel, ryzyko i horyzont; jakie precedence obowiązuje przy konflikcie COGS/budżetu/profilu? | Właściciel sklepu + domena Commerce; blokuje decyzje wymagające brakującego trade-off |
-| O-20 | Jakie recognition/tax/cost/allocation definitions, sample criteria i maturity rules obowiązują w pilocie? | Finance/data owner + marketing expert; dotyczy porównywalności KPI i progów |
-| O-21 | Czy przyjmujemy kontrakt 1.2, jego migrację, nowy MONITORING oraz limity reanalizy? | Backend/AI/UI leads; wymaga wspólnego testu konsumentów i aktywnych workflow |
-| O-22 | Jakie baseline/follow-up windows, warunki CENSORED i dopuszczalne twierdzenia o efekcie stosujemy? | Product + analityk/ekspert; wpływa na Outcome i prezentację wyników |
-| O-23 | Kto etykietuje przypadki, jaki jest holdout i progi release dla każdego skill/model oraz kosztu? | Ekspert domenowy + QA/AI; blokuje automatyczną promocję wersji bez ewaluacji |
+| O-18 | Who is responsible for the knowledge, reviewDueAt, the admitted sources and the activation of a tenant override/release? | Product + marketing expert + tech lead; blocks a production Marketing Pack without an owner |
+| O-19 | How do we approve the goal, risk and horizon; what precedence applies in a COGS/budget/profile conflict? | Store owner + the Commerce domain; blocks decisions that need a missing trade-off |
+| O-20 | Which recognition/tax/cost/allocation definitions, sample criteria and maturity rules apply in the pilot? | Finance/data owner + marketing expert; affects KPI comparability and thresholds |
+| O-21 | Do we adopt contract 1.2, its migration, the new MONITORING state and the re-analysis limits? | Backend/AI/UI leads; requires a shared test of consumers and active workflows |
+| O-22 | Which baseline/follow-up windows, CENSORED conditions and acceptable effect claims do we use? | Product + analyst/expert; affects the Outcome and the presentation of results |
+| O-23 | Who labels the cases, what is the holdout, and what are the release thresholds for each skill/model and for cost? | Domain expert + QA/AI; blocks automatic promotion of a version without evaluation |
 
-Te pytania dotyczą szczegółów realizacji D-08/D-09, nie ponownego rozstrzygnięcia, czy wiedza i ewaluacja są w MVP. Pozostałe pytania produktu i UI zachowują numery z dokumentów 01 i 04.
+These questions concern the details of implementing D-08/D-09, not reopening whether knowledge and evaluation are in the MVP. The other product and UI questions keep their numbers from documents 01 and 04.
 
-### H4. Źródła zewnętrzne i ograniczenia weryfikacji
+### H4. External sources and verification limits
 
-Podczas przygotowania sprawdzono oficjalne strony [Meta Insights](https://developers.facebook.com/documentation/ads-commerce/marketing-api/insights) oraz [Ad Set reference](https://developers.facebook.com/documentation/ads-commerce/marketing-api/reference/ad-campaign). Wspierają kontrakt raportowania i pozyskiwanie informacji o uczeniu; nie ustanawiają strategii rentowności konkretnego sklepu. Definicje finansowe C2 wynikają z jawnie podanego modelu algebraicznego i wymagają uzgodnienia bazy danych sklepu.
+During preparation the official [Meta Insights](https://developers.facebook.com/documentation/ads-commerce/marketing-api/insights) and [Ad Set reference](https://developers.facebook.com/documentation/ads-commerce/marketing-api/reference/ad-campaign) pages were checked. They support the reporting contract and fetching learning information; they do not establish a profitability strategy for a specific store. The financial definitions in C2 follow from an explicitly given algebraic model and need to be agreed against the store's data basis.
 
-Strona Meta Business Help o istotnych edycjach/learning wymagała logowania lub była niedostępna, a szczegółowe strony parametrów i metryk nie dały się odczytać. Nie traktujemy ich niezweryfikowanych progów jako zasad. Przed wdrożeniem connectora trzeba przypiąć i przetestować dostępne pola, parametry atrybucji i ograniczenia wersji API; każdy zaimportowany materiał do Registry otrzymuje własną datę przeglądu i applicability. Dokument nie importuje automatycznie poradników z internetu do wykonywalnej wiedzy agenta.
+The Meta Business Help page about significant edits/learning required signing in or was unavailable, and the detailed parameter and metric pages could not be read. We do not treat their unverified thresholds as rules. Before the connector is implemented, the available fields, attribution parameters and API version limitations must be pinned and tested; every material imported into the Registry gets its own review date and applicability. The document does not automatically import internet guides into the agent's executable knowledge.
 
-## Zakres pierwszej wersji dokumentu
+## Scope of the first version of the document
 
-Ustalono strukturę czterech źródeł, Registry, Store Profile, Metrics & Evidence Engine, kontekstu, pipeline, historii i ewaluacji. Zaproponowano wersjonowaną ewolucję kontraktu decyzji, sześć Skills Marketing Knowledge Pack i bramki MVP. Mechanika wykonania pozostaje w [02](02-AI-AGENT-ARCHITECTURE.md), przykład operacyjny w [03](03-INVENTORY-GUARDIAN-E2E.md), a prezentacja w [04](04-UI-UX-SPECIFICATION.md#17-uzupełnienie-business-knowledge--decision-intelligence-d-p).
+Established the structure of the four sources, the Registry, the Store Profile, the Metrics & Evidence Engine, the context, the pipeline, the history and the evaluation. Proposed a versioned evolution of the decision contract, the six Skills of the Marketing Knowledge Pack and the MVP gates. The execution mechanics stay in [02](02-AI-AGENT-ARCHITECTURE.md), the operational example in [03](03-INVENTORY-GUARDIAN-E2E.md), and the presentation in [04](04-UI-UX-SPECIFICATION.md#17-business-knowledge--decision-intelligence-addendum-d-p).

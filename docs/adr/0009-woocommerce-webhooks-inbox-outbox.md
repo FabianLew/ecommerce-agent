@@ -1,117 +1,118 @@
-# ADR-0009: Webhooki WooCommerce: rejestracja, podpis, inbox, normalizacja i outbox
+# ADR-0009: WooCommerce webhooks: registration, signature, inbox, normalization and outbox
 
-- Status: Zaakceptowany (wariant rejestracji ręcznej wybrany przez właściciela, 2026-11-14)
-- Data: 2026-11-14
-- Powiązania: dokument 01 §„Przepływ danych”, dokument 03 §3 i §11 (IG-04), dokument 04 §10, ADR-0004, ADR-0007,
-  ADR-0008, backlog B-14 (B-15 i B-16 korzystają z outboxa)
+- Status: Accepted (manual registration variant chosen by the owner, 2026-11-14)
+- Date: 2026-11-14
+- Related: document 01 §"Data flow", document 03 §3 and §11 (IG-04), document 04 §10, ADR-0004, ADR-0007,
+  ADR-0008, backlog B-14 (B-15 and B-16 use the outbox)
 
-## Kontekst
+## Context
 
-B-14 przyjmuje webhooki WooCommerce. To pierwszy publiczny endpoint bez OIDC: wywołuje go sklep, nie
-użytkownik. Trudne do odwrócenia są tu cztery rzeczy: jak webhooki powstają w sklepie (wpływa na uprawnienia
-klucza z ADR-0007 i na onboarding), jak rozpoznajemy sklep i weryfikujemy nadawcę, co zapisujemy (zamówienia w
-webhooku zawierają dane klientów) i jak chronimy stan przed starymi zdarzeniami (IG-04).
+B-14 accepts WooCommerce webhooks. It is the first public endpoint without OIDC: the store calls it, not a
+user. Four things are hard to reverse here: how webhooks are created in the store (it affects the key permissions
+from ADR-0007 and onboarding), how we identify the store and verify the sender, what we store (orders in a
+webhook contain customer data) and how we protect stock from old events (IG-04).
 
-Eksperyment na lokalnym WooCommerce 11.2.1 (webhooki przez wp-cli, odbiornik w sieci compose):
+Experiment on a local WooCommerce 11.2.1 (webhooks through wp-cli, a receiver in the compose network):
 
-| Obserwacja | Wynik |
+| Observation | Result |
 | --- | --- |
-| Utworzenie aktywnego webhooka | POST `application/x-www-form-urlencoded` `webhook_id=N`, **bez podpisu** (ping) |
-| Nagłówki dostawy | `X-WC-Webhook-Topic`, `-Resource`, `-Event`, `-ID`, `-Delivery-ID`, `-Source`, `-Signature` |
-| Podpis | `base64(HMAC-SHA256(surowe body, sekret))`, zgodny z naszym wyliczeniem |
-| Zmiana stanu wariacji | `product.updated` z obiektem wariacji (`type=variation`, `parent_id`), nowy `date_modified_gmt` |
-| Zamówienie `processing` | `order.created`, `order.updated` (identyczne body) i `product.updated` produktu ze zmniejszonym stanem i nowym `date_modified_gmt` |
-| Anulowanie zamówienia | `order.updated` i `product.updated` ze zwróconym stanem |
-| Body zamówienia | pełne `billing`, `shipping`, `customer_ip_address`, `customer_user_agent` |
-| Wersja API webhooka | wp-cli tworzy `wp_api_v2` (brak `stock_status` w produkcie); panel domyślnie `wp_api_v3` |
-| Dostawa | `wp_safe_remote_request`: blokuje hosty prywatne i porty inne niż 80, 443, 8080; domyślnie asynchronicznie przez Action Scheduler |
+| Creating an active webhook | POST `application/x-www-form-urlencoded` `webhook_id=N`, **without a signature** (ping) |
+| Delivery headers | `X-WC-Webhook-Topic`, `-Resource`, `-Event`, `-ID`, `-Delivery-ID`, `-Source`, `-Signature` |
+| Signature | `base64(HMAC-SHA256(raw body, secret))`, matches our computation |
+| Variation stock change | `product.updated` with the variation object (`type=variation`, `parent_id`), a new `date_modified_gmt` |
+| `processing` order | `order.created`, `order.updated` (identical body) and `product.updated` of the product with reduced stock and a new `date_modified_gmt` |
+| Order cancellation | `order.updated` and `product.updated` with the stock returned |
+| Order body | full `billing`, `shipping`, `customer_ip_address`, `customer_user_agent` |
+| Webhook API version | wp-cli creates `wp_api_v2` (no `stock_status` in the product); the admin panel defaults to `wp_api_v3` |
+| Delivery | `wp_safe_remote_request`: blocks private hosts and ports other than 80, 443, 8080; asynchronous through Action Scheduler by default |
 
-## Decyzja
+## Decision
 
-1. **Rejestracja ręczna, klucz API zostaje tylko do odczytu.** Tworzenie webhooków przez REST wymaga klucza z
-   zapisem, a ADR-0007 zakłada wyłącznie odczyt. W Integracjach pokazujemy adres dostawy i listę tematów:
-   `Order created`, `Order updated`, `Product created`, `Product updated`, wersja API „WP REST API Integration
-   v3”. Użytkownik tworzy je w panelu Woo (Ustawienia → Zaawansowane → Webhooki) z jednym wspólnym sekretem.
-   Sekret generuje przeglądarka (`crypto.getRandomValues`, 32 bajty), użytkownik wkleja go w Woo i wysyła do nas
-   przez Server Action. Backend przechowuje go jak klucze API (`integration_credential`, nazwa `webhook_secret`,
-   AES-GCM z ADR-0007) i nigdy go nie zwraca. Brakujący lub wyłączony webhook wykryje polling i rekonsyliacja
-   (B-16), więc webhook jest przyspieszeniem, nie jedynym źródłem.
-2. **Endpoint.** `POST /api/v1/webhooks/woocommerce/{endpointKey}`, bez OIDC. `endpointKey` to losowy,
-   128-bitowy klucz połączenia (`integration_connection.webhook_endpoint_key`), nie identyfikator połączenia ani
-   sklepu. Sklep i organizację bierzemy z połączenia znalezionego po kluczu, nigdy z payloadu ani nagłówków.
-   Kolejność: rozmiar ≤ 1 MiB (inaczej 413) → klucz istnieje (inaczej 404) → ping (`webhook_id=N`,
-   form-urlencoded) daje 200 bez zapisu, także przed zapisaniem sekretu → zapisany sekret i podpis HMAC-SHA256
-   na surowych bajtach, porównanie w stałym czasie (inaczej 401) →
-   temat z listy dozwolonej i JSON z polem `id` (inaczej 200 i brak zapisu, żeby Woo nie wyłączył webhooka po
-   5 błędach) → zapis do inbox i 200. Body nie trafia do logów. To jedyne miejsce, gdzie zapytanie bez
-   `TrustedStoreScope` szuka połączenia (po kluczu); dalej działa zakres systemowy `woo-webhook` z
-   `StoreAccess.systemScope` (ADR-0004).
-3. **Inbox z deduplikacją i minimalizacją.** Tabela `webhook_inbox`: połączenie, sklep, temat, ID webhooka i
-   dostawy z Woo, `payload_sha256` (z surowego body), zminimalizowany payload, czas przyjęcia, status
-   (`RECEIVED`, `PROCESSED`, `IGNORED`, `FAILED`), liczba prób, wynik. `UNIQUE (connection_id, topic,
-   payload_sha256)`: powtórzona dostawa tego samego body to ten sam wiersz i 200 bez kolejnej mutacji. Zamiast
-   surowego body zapisujemy tylko pola z listy dozwolonej, takie same jak w imporcie (ADR-0008): dla zamówień
-   status, daty, kwoty, waluta i pozycje, dla produktów pola katalogu i stanu. Dane klienta są odrzucane przed
-   zapisem. To świadome odstępstwo od „raw event” z dokumentu 03 §3; skrót surowego body wystarcza do
-   deduplikacji i diagnozy.
-4. **Normalizacja w workerze.** `WebhookInboxProcessor` (profil `worker`) co 2 s pobiera wiersze `RECEIVED`
-   (`FOR UPDATE SKIP LOCKED`, paczki po 50). Dla każdego w jednej transakcji: aktualizacja danych handlu, zapis
-   zdarzeń outbox i status wiersza. Błąd wycofuje transakcję i zwiększa licznik prób (ponowienie z odstępem do 5
-   prób, potem `FAILED`, widoczne w Integration Health z B-16).
-5. **Bez cofania stanu (IG-04).** Dla każdego wariantu z payloadu porównujemy `date_modified_gmt` z
-   `source_updated_at` ostatniej obserwacji stanu:
-   - starszy: zdarzenie przestarzałe, bez zapisu (`IGNORED`, wynik `STALE`);
-   - równy i ten sam stan: duplikat, bez zapisu;
-   - równy, ale inny stan (dwie zmiany w tej samej sekundzie): niejednoznaczne, bez zapisu i ze zdarzeniem
-     `commerce.inventory.verification-requested.v1` (autorytatywny odczyt w B-15/B-16);
-   - nowszy: nowa obserwacja `WEBHOOK` i `commerce.inventory.changed.v1`.
-   Payload produktu bez `stock_status` (webhook w wersji v1/v2) nie zmienia stanu, tylko prosi o weryfikację.
-   Produkt zmienny ze stanem na rodzicu aktualizuje warianty `PARENT`. Wariacja nieznanego produktu prosi o
-   weryfikację katalogu. Zamówienia używają istniejącego upsertu z ochroną po `source_updated_at` i emitują
-   `commerce.order.changed.v1` z listą wariantów. Webhooki nie rozszerzają `order_sync_coverage`: kompletność
-   potwierdza tylko import albo rekonsyliacja z licznikiem (ADR-0008, B-16).
-6. **Outbox.** Tabela `outbox_event`: sklep, typ zdarzenia, agregat (`variant`, `order`, `product`), payload
-   v1, `dedup_key` unikalny w sklepie, czas utworzenia, wysłania i następnej próby. Klucz opisuje stan, nie dostawę:
-   `inventory:{wariant}:{sourceUpdatedAt}:{stan}:{status}`, `order:{id}:{sourceUpdatedAt}:{status}`, a prośba o weryfikację
-   `verify:{inbox}:{agregat}`. Ten sam stan z dwóch tematów (`order.created` i `order.updated`) albo ponowne
-   przetworzenie wiersza inbox nie tworzy drugiego zdarzenia. Wysyłkę do Temporal (signalWithStart z
-   deterministycznym ID) dodaje B-15; do tego czasu zdarzenia czekają z `dispatched_at = null`.
-7. **Lokalnie.** Woo w Dockerze dostarcza na `http://host.docker.internal:8080` (wpis `host-gateway` w compose).
-   Seed instaluje mu-plugin dopuszczający hosty prywatne (`http_request_host_is_external`) tylko w lokalnym
-   compose. Adres publiczny backendu podaje `operator.integration.webhook-base-url`.
+1. **Manual registration; the API key stays read-only.** Creating webhooks through REST requires a key with
+   write access, and ADR-0007 assumes read-only access. In Integrations we show the delivery URL and the list of
+   topics: `Order created`, `Order updated`, `Product created`, `Product updated`, API version "WP REST API
+   Integration v3". The user creates them in the Woo admin (Settings → Advanced → Webhooks) with one shared secret.
+   The browser generates the secret (`crypto.getRandomValues`, 32 bytes); the user pastes it into Woo and sends it
+   to us through a Server Action. The backend stores it like the API keys (`integration_credential`, name
+   `webhook_secret`, AES-GCM from ADR-0007) and never returns it. A missing or disabled webhook is detected by
+   polling and reconciliation (B-16), so the webhook is an accelerator, not the only source.
+2. **Endpoint.** `POST /api/v1/webhooks/woocommerce/{endpointKey}`, without OIDC. `endpointKey` is a random
+   128-bit connection key (`integration_connection.webhook_endpoint_key`), not the connection or store
+   identifier. The store and the organization come from the connection found by the key, never from the payload or
+   headers. Order: size ≤ 1 MiB (otherwise 413) → the key exists (otherwise 404) → a ping (`webhook_id=N`,
+   form-urlencoded) gets 200 without being stored, also before the secret is saved → a stored secret and an
+   HMAC-SHA256 signature over the raw bytes, compared in constant time (otherwise 401) →
+   a topic from the allowlist and JSON with an `id` field (otherwise 200 and nothing stored, so that Woo does not
+   disable the webhook after 5 errors) → write to the inbox and 200. The body never reaches the logs. This is the only
+   place where a query without a `TrustedStoreScope` looks up a connection (by key); after that the system scope
+   `woo-webhook` from `StoreAccess.systemScope` applies (ADR-0004).
+3. **Inbox with deduplication and minimization.** The `webhook_inbox` table: connection, store, topic, Woo webhook
+   and delivery IDs, `payload_sha256` (of the raw body), minimized payload, receive time, status
+   (`RECEIVED`, `PROCESSED`, `IGNORED`, `FAILED`), number of attempts, outcome. `UNIQUE (connection_id, topic,
+   payload_sha256)`: a repeated delivery of the same body is the same row and a 200 without another mutation. Instead
+   of the raw body we store only allowlisted fields, the same as in the import (ADR-0008): for orders the
+   status, dates, amounts, currency and line items, for products the catalog and stock fields. Customer data is
+   dropped before the write. This is a deliberate deviation from the "raw event" in document 03 §3; the hash of the
+   raw body is enough for deduplication and diagnosis.
+4. **Normalization in the worker.** `WebhookInboxProcessor` (`worker` profile) fetches `RECEIVED` rows every 2 s
+   (`FOR UPDATE SKIP LOCKED`, batches of 50). For each one, in one transaction: update of the commerce data, write of
+   the outbox events and the row status. An error rolls back the transaction and increments the attempt counter
+   (retry with backoff up to 5 attempts, then `FAILED`, visible in Integration Health from B-16).
+5. **Stock never goes back (IG-04).** For each variant in the payload we compare `date_modified_gmt` with the
+   `source_updated_at` of the latest stock observation:
+   - older: a stale event, nothing stored (`IGNORED`, outcome `STALE`);
+   - equal and the same stock: a duplicate, nothing stored;
+   - equal but different stock (two changes in the same second): ambiguous, nothing stored, and a
+     `commerce.inventory.verification-requested.v1` event (authoritative read in B-15/B-16);
+   - newer: a new `WEBHOOK` observation and `commerce.inventory.changed.v1`.
+   A product payload without `stock_status` (a v1/v2 webhook) does not change stock; it only requests verification.
+   A variable product with stock on the parent updates the `PARENT` variants. A variation of an unknown product
+   requests catalog verification. Orders use the existing upsert protected by `source_updated_at` and emit
+   `commerce.order.changed.v1` with the list of variants. Webhooks do not extend `order_sync_coverage`: completeness
+   is confirmed only by the import or by reconciliation with a count (ADR-0008, B-16).
+6. **Outbox.** The `outbox_event` table: store, event type, aggregate (`variant`, `order`, `product`), v1 payload,
+   a `dedup_key` unique within the store, creation, dispatch and next attempt times. The key describes the state, not
+   the delivery: `inventory:{variant}:{sourceUpdatedAt}:{stock}:{status}`, `order:{id}:{sourceUpdatedAt}:{status}`,
+   and for a verification request `verify:{inbox}:{aggregate}`. The same state from two topics (`order.created` and
+   `order.updated`) or reprocessing an inbox row does not create a second event. Dispatch to Temporal
+   (signalWithStart with a deterministic ID) is added by B-15; until then events wait with `dispatched_at = null`.
+7. **Locally.** Woo in Docker delivers to `http://host.docker.internal:8080` (a `host-gateway` entry in compose).
+   The seed installs a mu-plugin that allows private hosts (`http_request_host_is_external`) only in the local
+   compose. The public backend address is set by `operator.integration.webhook-base-url`.
 
-## Rozważane alternatywy
+## Alternatives considered
 
-- **Klucz z zapisem i automatyczna rejestracja przez `POST /webhooks`.** Najwygodniejsze, ale łamie zasadę
-  najmniejszych uprawnień z ADR-0007 dla każdego klienta. Do ponownej oceny przy onboardingu (F6), razem z
-  flow `/wc-auth`. Odrzucone w Pilocie.
-- **Sekret generowany przez backend i pokazany raz.** Wygodne, ale backend zwracałby sekret wbrew 04 §10.
-  Odrzucone na rzecz sekretu z przeglądarki.
-- **Identyfikator połączenia w adresie.** Ujawnia identyfikator wewnętrzny i nie da się go zmienić bez
-  usunięcia połączenia. Odrzucone na rzecz osobnego klucza.
-- **Normalizacja w żądaniu HTTP.** Szybsza ścieżka, ale druga droga obok ponowień z inbox. Woo i tak dostarcza
-  asynchronicznie. Odrzucone.
-- **Deduplikacja po `X-WC-Webhook-Delivery-ID`.** Woo nadaje nowy identyfikator przy każdej dostawie, więc
-  ręczne „wyślij ponownie” i identyczne `order.created`/`order.updated` nie byłyby duplikatami. Zapisujemy go
-  tylko do diagnozy.
-- **Ufanie kolejności przyjęcia.** Woo nie gwarantuje kolejności (Action Scheduler, ponowne wysłanie). Odrzucone.
+- **A key with write access and automatic registration through `POST /webhooks`.** The most convenient, but it
+  breaks the least-privilege rule from ADR-0007 for every customer. To be reassessed for onboarding (F6), together
+  with the `/wc-auth` flow. Rejected for the Pilot.
+- **A secret generated by the backend and shown once.** Convenient, but the backend would return a secret,
+  contrary to 04 §10. Rejected in favor of a secret from the browser.
+- **The connection identifier in the URL.** It exposes an internal identifier and cannot be changed without
+  deleting the connection. Rejected in favor of a separate key.
+- **Normalization inside the HTTP request.** A faster path, but a second route next to the inbox retries. Woo
+  delivers asynchronously anyway. Rejected.
+- **Deduplication by `X-WC-Webhook-Delivery-ID`.** Woo assigns a new identifier on every delivery, so a manual
+  "resend" and identical `order.created`/`order.updated` would not be duplicates. We store it only for diagnosis.
+- **Trusting the order of arrival.** Woo does not guarantee order (Action Scheduler, resends). Rejected.
 
-## Konsekwencje
+## Consequences
 
-- Onboarding ma jeden ręczny krok więcej (4 webhooki w panelu Woo). UI musi go jasno prowadzić.
-- `date_modified_gmt` ma dokładność sekundy; dwie zmiany w jednej sekundzie dają weryfikację zamiast zapisu.
-- Endpoint publiczny przyjmuje ruch bez uwierzytelnienia do momentu sprawdzenia podpisu. Limit rozmiaru i
-  wyszukiwanie po indeksie ograniczają koszt; limit częstości i proxy brzegowe przyjdą w F4.
-- Webhook z niepoprawnym sekretem po stronie Woo kończy się 401, a Woo po 5 błędach wyłącza webhook. Health
-  (B-16) pokaże brak zdarzeń mimo zmian wykrytych przez polling.
-- Inbox i outbox rosną; retencja (np. 30 dni dla przetworzonych) wejdzie razem z retencją audytu w F4.
+- Onboarding has one more manual step (4 webhooks in the Woo admin). The UI must guide it clearly.
+- `date_modified_gmt` has one-second precision; two changes within one second trigger a verification instead of a
+  write.
+- The public endpoint accepts unauthenticated traffic until the signature is checked. The size limit and the
+  index lookup limit the cost; rate limiting and an edge proxy come in F4.
+- A webhook with a wrong secret on the Woo side ends with 401, and Woo disables the webhook after 5 errors. Health
+  (B-16) shows the lack of events despite changes detected by polling.
+- The inbox and the outbox grow; retention (e.g. 30 days for processed rows) comes together with audit retention in
+  F4.
 
-## Weryfikacja
+## Verification
 
-- Eksperyment z tabeli powyżej (wp-cli i odbiornik w sieci compose).
-- `WooWebhookApiTest`: ping, zły i brakujący podpis (401), nieznany klucz (404), za duże body (413), duplikat
-  dostawy (jeden wiersz), brak danych klienta w inbox, izolacja sklepów.
-- `WebhookNormalizationTest` (IG-04): stary event po nowym, duplikat, ta sama sekunda z innym stanem,
-  wariacja `PARENT`, zamówienie starsze od zapisanego, jedno zdarzenie outbox przy ponownym przetworzeniu.
-- Ręcznie: webhooki z lokalnego Woo do backendu przez `host.docker.internal`, zmiana stanu widoczna jako
-  obserwacja `WEBHOOK`.
+- The experiment from the table above (wp-cli and a receiver in the compose network).
+- `WooWebhookApiTest`: ping, bad and missing signature (401), unknown key (404), too large body (413), duplicate
+  delivery (one row), no customer data in the inbox, store isolation.
+- `WebhookNormalizationTest` (IG-04): an old event after a new one, a duplicate, the same second with different stock,
+  a `PARENT` variation, an order older than the stored one, one outbox event on reprocessing.
+- Manually: webhooks from the local Woo to the backend through `host.docker.internal`, a stock change visible as a
+  `WEBHOOK` observation.

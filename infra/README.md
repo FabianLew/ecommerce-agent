@@ -1,6 +1,6 @@
-# infra: lokalne środowisko (B-05)
+# infra: local environment (B-05)
 
-Wszystkie hasła i klucze w tym katalogu są **wyłącznie lokalne**. Nie używaj ich w żadnym innym środowisku.
+Every password and key in this directory is **local only**. Never use them in any other environment.
 
 ## Start
 
@@ -8,65 +8,66 @@ Wszystkie hasła i klucze w tym katalogu są **wyłącznie lokalne**. Nie używa
 docker compose -f infra/docker-compose.yml up -d --wait
 ```
 
-Pierwszy start trwa ok. 1–2 min. Jednorazowy kontener `woo-seed` instaluje WordPress i WooCommerce i tworzy
-sklep testowy, po czym kończy się kodem 0. Kolejne starty pomijają seed (`operator_seed_version`).
-Pełny reset: `docker compose -f infra/docker-compose.yml down -v`.
+The first start takes about 1–2 minutes. The one-off `woo-seed` container installs WordPress and WooCommerce,
+creates the test store and exits with code 0. Later starts skip the seed (`operator_seed_version`).
+Full reset: `docker compose -f infra/docker-compose.yml down -v`.
 
-## Usługi
+## Services
 
-| Usługa | Adres | Dostęp |
+| Service | Address | Access |
 | --- | --- | --- |
-| PostgreSQL 17 | `localhost:5432` | baza `operator`, użytkownik/hasło `operator`; Keycloak ma osobną bazę `keycloak` |
-| Temporal (dev server) | `localhost:7233`, UI http://localhost:8233 | brak auth |
+| PostgreSQL 17 | `localhost:5432` | database `operator`, user/password `operator`; Keycloak has a separate database `keycloak` |
+| Temporal (dev server) | `localhost:7233`, UI http://localhost:8233 | no auth |
 | Keycloak 26 | http://localhost:8180 | admin: `admin`/`admin`; realm `operator` |
-| Mailpit | SMTP `localhost:1025`, UI http://localhost:8025 | brak auth |
-| Jaeger 2 | OTLP HTTP `localhost:4318`, UI http://localhost:16686 | brak auth; backend z `OTEL_EXPORT_ENABLED=true` |
+| Mailpit | SMTP `localhost:1025`, UI http://localhost:8025 | no auth |
+| Jaeger 2 | OTLP HTTP `localhost:4318`, UI http://localhost:16686 | no auth; backend with `OTEL_EXPORT_ENABLED=true` |
 | WooCommerce 11.2 (WordPress 7.1) | http://localhost:8081 | wp-admin: `admin`/`admin` |
 
-Backend (`backend/`) łączy się domyślnie z tą bazą: `./gradlew bootRun --args='--spring.profiles.active=api'`.
+The backend (`backend/`) connects to this database by default: `./gradlew bootRun --args='--spring.profiles.active=api'`.
 
 ## Keycloak: realm `operator`
 
-Importowany z [`keycloak/operator-realm.json`](keycloak/operator-realm.json) przy pierwszym starcie.
+Imported from [`keycloak/operator-realm.json`](keycloak/operator-realm.json) on the first start.
 
-- Klient `operator-web`: poufny (sesja po stronie serwera Next.js, B-09), Authorization Code + PKCE,
-  redirect tylko `http://localhost:3000/auth/callback`, sekret `local-operator-web-secret`.
-- Klient `operator-dev-cli`: publiczny, tylko password grant, **wyłącznie lokalnie** — do wywołań API z curl.
-- Oba klienty dodają do tokenu audience `operator-api`; backend odrzuca tokeny bez niego.
-- Access token jest ważny 60 s, żeby odświeżanie sesji frontendu było stale ćwiczone (ADR-0006).
-- Użytkownicy `owner-a` i `owner-b` (hasło = login) mają stałe ID (`1111…`, `2222…`), na które wskazuje
-  profil `local` backendu. Role per sklep nie są w Keycloak, tylko w naszej bazie (ADR-0004).
+- Client `operator-web`: confidential (server-side session in Next.js, B-09), Authorization Code + PKCE, redirect
+  only `http://localhost:3000/auth/callback`, secret `local-operator-web-secret`.
+- Client `operator-dev-cli`: public, password grant only, **local only** — for API calls with curl.
+- Both clients add the `operator-api` audience to the token; the backend rejects tokens without it.
+- The access token is valid for 60 s, so the frontend's session refresh is exercised all the time (ADR-0006).
+- Users `owner-a` and `owner-b` (password = login) have fixed IDs (`1111…`, `2222…`) that the backend's `local`
+  profile refers to. Per-store roles are not in Keycloak but in our database (ADR-0004).
 
-Zmiany w realmie: edytuj JSON i zrób `down -v` (import działa tylko dla nowego realmu).
+Changing the realm: edit the JSON and run `down -v` (the import only works for a new realm).
 
-## WooCommerce: dane testowe
+## WooCommerce: test data
 
-| Produkt | SKU | Stan |
+| Product | SKU | Stock |
 | --- | --- | --- |
-| Koszulka Basic (wariantowy, atrybut Rozmiar) | `TSHIRT-BASIC-S` / `-M` / `-L` | 18 / 3 / 0 |
-| Kubek Logo (prosty) | `MUG-LOGO` | 49 |
+| Koszulka Basic (variable, attribute Rozmiar/size) | `TSHIRT-BASIC-S` / `-M` / `-L` | 18 / 3 / 0 |
+| Kubek Logo (simple) | `MUG-LOGO` | 49 |
 
-Waluta PLN, kraj PL, strefa czasowa UTC, zarządzanie stanem włączone.
+Currency PLN, country PL, timezone UTC, stock management enabled. Product names are Polish on purpose: the test
+store mirrors a Polish shop.
 
-Klucz REST API (tylko odczyt): `ck_local_operator_0000000000000000000000` /
+REST API key (read only): `ck_local_operator_0000000000000000000000` /
 `cs_local_operator_0000000000000000000000`.
 
-> Lokalny sklep działa po HTTP. WooCommerce przyjmuje wtedy wyłącznie podpis **OAuth 1.0a**
-> (Basic Auth i klucze w query string działają tylko po HTTPS). Adapter WooCommerce (B-12) musi to
-> uwzględnić albo lokalny sklep dostanie TLS; decyzja w B-12.
+> The local store runs over HTTP. WooCommerce then accepts only an **OAuth 1.0a** signature (Basic Auth and keys in
+> the query string work only over HTTPS). The WooCommerce adapter (B-12) has to handle this, or the local store
+> gets TLS; decided in B-12.
 
-### Webhooki lokalnie (B-14, ADR-0009)
+### Webhooks locally (B-14, ADR-0009)
 
-Woo w Dockerze dostarcza webhooki do API na hoście przez `http://host.docker.internal:8080` (wpis
-`host-gateway` w compose). Seed instaluje mu-plugin `operator-local-webhooks.php`, który dopuszcza adresy
-prywatne w `wp_safe_remote_request`; to ustawienie wyłącznie dla lokalnego sklepu.
+Woo in Docker delivers webhooks to the API on the host through `http://host.docker.internal:8080` (the
+`host-gateway` entry in compose). The seed installs the mu-plugin `operator-local-webhooks.php`, which allows
+private addresses in `wp_safe_remote_request`; this setting is for the local store only.
 
-1. W Integracjach (profil `api,local`) wygeneruj i zapisz sekret webhooków, skopiuj adres dostawy.
-2. W wp-admin → WooCommerce → Ustawienia → Zaawansowane → Webhooki dodaj 4 webhooki (Order created/updated,
-   Product created/updated), status „Aktywny”, wersja API „WP REST API Integration v3”, ten adres i sekret.
-3. Woo dostarcza asynchronicznie (Action Scheduler na WP-Cron), więc po zmianie odwiedź dowolną stronę sklepu
-   albo uruchom `wp action-scheduler run`. Kontener wp-cli uruchamiany osobno potrzebuje
-   `--add-host host.docker.internal:host-gateway`, bo to on wtedy wysyła webhooki.
+1. In Integrations (profile `api,local`) generate and save the webhook secret, then copy the delivery URL.
+2. In wp-admin → WooCommerce → Settings → Advanced → Webhooks add 4 webhooks (Order created/updated,
+   Product created/updated), status "Active", API version "WP REST API Integration v3", with that URL and secret.
+3. Woo delivers asynchronously (Action Scheduler on WP-Cron), so after a change visit any store page or run
+   `wp action-scheduler run`. A wp-cli container started separately needs
+   `--add-host host.docker.internal:host-gateway`, because it is the one that sends the webhooks then.
 
-Instalacja offline: ustaw `WOOCOMMERCE_SOURCE` w usłudze `woo-seed` na ścieżkę zamontowanego pliku
-`woocommerce.zip` (domyślnie pobierany jest release z GitHub).
+Offline installation: set `WOOCOMMERCE_SOURCE` in the `woo-seed` service to the path of a mounted
+`woocommerce.zip` (by default the GitHub release is downloaded).

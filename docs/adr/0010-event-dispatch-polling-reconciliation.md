@@ -1,93 +1,94 @@
-# ADR-0010: Przekazywanie zdarzeń do Temporal, polling i rekonsyliacja WooCommerce, Integration Health
+# ADR-0010: Event dispatch to Temporal, WooCommerce polling and reconciliation, Integration Health
 
-- Status: Zaakceptowany (2026-11-14)
-- Data: 2026-11-14
-- Powiązania: dokument 01 §„Przepływ danych”, dokument 03 §3 i §11, dokument 04 §10, ADR-0004, ADR-0008,
+- Status: Accepted (2026-11-14)
+- Date: 2026-11-14
+- Related: document 01 §"Data flow", document 03 §3 and §11, document 04 §10, ADR-0004, ADR-0008,
   ADR-0009, backlog B-15, B-16
 
-## Kontekst
+## Context
 
-B-14 zapisuje zdarzenia domenowe w `outbox_event`. B-15 ma je przekazać do Temporal tak, żeby powtórka nie
-tworzyła drugiego workflow. B-16 ma uzupełnić webhooki pollingiem i rekonsyliacją, prowadzić watermarki i
-pokazać zdrowie integracji, a rekonsyliacja ma wykryć zgubiony webhook. Trudne do odwrócenia są: identyfikatory
-workflow (od nich zależy deduplikacja i przyszły epizod Inventory Guardian), co uznajemy za autorytatywny
-odczyt stanu, semantyka watermarków i kiedy integracja blokuje analizę jako nieaktualna.
+B-14 writes domain events to `outbox_event`. B-15 has to forward them to Temporal so that a redelivery does not
+create a second workflow. B-16 has to complement webhooks with polling and reconciliation, maintain watermarks and
+show integration health, and reconciliation has to detect a missed webhook. Hard to reverse are: the workflow
+identifiers (deduplication and the future Inventory Guardian episode depend on them), what we consider an
+authoritative stock read, the watermark semantics and when an integration blocks analysis as stale.
 
-## Decyzja
+## Decision
 
-1. **Dispatcher (B-15).** `OutboxDispatcher` w profilu `worker` co 1 s blokuje paczkę niewysłanych zdarzeń
-   (`FOR UPDATE SKIP LOCKED`, 100), dla każdego wykonuje `signalWithStart` i w tej samej transakcji ustawia
-   `dispatched_at`. Błąd Temporal zwiększa `attempts` i odkłada zdarzenie (`next_attempt_at`, do 1 h). Gdy
-   sygnał przeszedł, a commit nie, zdarzenie pójdzie drugi raz: workflow odrzuca znany `eventId`.
-2. **Deterministyczne identyfikatory.**
-   - `inventory-{storeId}-{variantId}`: `VariantInventoryWorkflow`, długotrwały, jeden na wariant. Dostaje
-     `inventory.changed`, `inventory.verification-requested` i `order.changed` (jeden sygnał na każdy wariant
-     z listy, `eventId:variantId`). Stąd w I7 wystartuje epizod Inventory Guardian.
-   - `store-sync-{connectionId}`: `StoreSyncWorkflow`, prośby o weryfikację katalogu (`product`).
-   `signalWithStart` na działający workflow tylko dodaje sygnał, więc powtórzone zdarzenie nie tworzy drugiego
-   workflow. Workflow pamięta ostatnie 500 identyfikatorów zdarzeń i przenosi je przez `continueAsNew` (co 500
-   sygnałów), więc historia pozostaje mała.
-3. **Autorytatywny odczyt wariantu.** `VariantInventoryWorkflow` po prośbie o weryfikację, a także po
-   `order.changed`, jeśli w ciągu 60 s nie przyszedł nowszy stan wariantu, czyta wariant (albo produkt
-   nadrzędny przy `PARENT`) prosto z Woo i zapisuje obserwację `POLL`. Odczyt świeży jest prawdą w chwili
-   odczytu, więc zapisujemy go także przy tej samej sekundzie co ostatni zapis (rozstrzyga `AMBIGUOUS`). Nie
-   zapisujemy tylko identycznego stanu. Kilka próśb w oknie 60 s daje jeden odczyt.
-4. **Polling (B-16).** Temporal Schedule `woo-poll-{connectionId}` co 5 min uruchamia `IncrementalSyncWorkflow` (rodzaj `POLL`):
-   `products?modified_after={watermark − 2 min}` oraz wariacje zmienionych produktów zmiennych. Zmiany zapisuje jak
-   odczyt autorytatywny. Watermark `PRODUCTS` (największy `date_modified_gmt`) przesuwa się dopiero po
-   przejściu wszystkich stron.
-5. **Rekonsyliacja (B-16).** Schedule `woo-reconcile-{connectionId}` co godzinę: wszystkie zamówienia
-   `modified_after={watermark ORDERS − 2 min}`, bez górnej granicy, z porównaniem `X-WP-Total` jak w ADR-0008.
-   Zamówienie złożone przed startem przebiegu ma datę modyfikacji nie wcześniejszą niż złożenia, więc pełny
-   odczyt obejmuje wszystkie zamówienia złożone do startu. Górna granica (`modified_before`) zrobiłaby dziurę:
-   zamówienie złożone przed startem i zmienione w trakcie przebiegu wypadłoby z odczytu. Przy zgodności
-   licznika przedłużamy `order_sync_coverage` do startu przebiegu i przesuwamy tam watermark. Przy niezgodności
-   nic nie przesuwamy, a health pokazuje rosnące opóźnienie kompletności. Nocny przegląd całego katalogu (pełny
-   stan) zostaje na później.
-6. **Zgubiony webhook.** Polling porównuje każdą zmianę z ostatnią obserwacją. Jeśli połączenie ma zapisany
-   sekret webhooków, a zmiana z Woo jest nowsza od naszego stanu i starsza niż 2 minuty, liczymy ją jako
-   zgubiony webhook. Liczba trafia do przebiegu (`sync_check.missed_webhooks`). Zamówienia z rekonsyliacji,
-   których nie było w bazie albo były w starszym stanie, liczą się tak samo. Zmiana sprzed zapisania sekretu
-   się nie liczy.
-7. **Integration Health** (pole `health` w `GET /stores/{storeId}/integrations`), liczone przy odczycie:
-   - `NOT_READY`: brak udanego importu początkowego;
-   - `STALE`: polling bez sukcesu od 15 min albo kompletność zamówień starsza niż 2 h. Blokuje analizę (03 §11);
-   - `DEGRADED`: zgubione webhooki w ostatnich 24 h, brak sekretu webhooków, wpisy `FAILED` w inbox albo
-     zaległy outbox starszy niż 5 min;
-   - `HEALTHY`: pozostałe przypadki.
-   Każdy powód ma kod i krok naprawy w UI.
-8. **Harmonogramy.** Worker przy starcie i co minutę tworzy (idempotentnie) brakujące Schedule dla połączeń
-   `CONNECTED` z udanym importem, więc sklep dostaje polling najpóźniej minutę po imporcie. Kontekst sklepu
-   (aktor `woo-sync`) jest zapisany w nagłówku akcji Schedule, a pierwszy przebieg startuje od razu. Polityka nakładania: `SKIP`, okno nadrabiania 10 min. Interwały
-   są parametrami pilota (`operator.integration.woocommerce.poll-interval`, `reconcile-interval`).
-9. **Aktor.** Workflow działają jako aktor systemowy `woo-sync` z zakresem `STORE_READ` (ADR-0004). Zakres
-   pochodzi z nagłówków startu, a interceptor aktywności weryfikuje go w bazie.
+1. **Dispatcher (B-15).** `OutboxDispatcher` in the `worker` profile locks a batch of undispatched events every 1 s
+   (`FOR UPDATE SKIP LOCKED`, 100), runs `signalWithStart` for each and sets `dispatched_at` in the same
+   transaction. A Temporal error increments `attempts` and postpones the event (`next_attempt_at`, up to 1 h). When
+   the signal went through but the commit did not, the event is sent again: the workflow rejects a known `eventId`.
+2. **Deterministic identifiers.**
+   - `inventory-{storeId}-{variantId}`: `VariantInventoryWorkflow`, long-running, one per variant. It receives
+     `inventory.changed`, `inventory.verification-requested` and `order.changed` (one signal per variant in the
+     list, `eventId:variantId`). The Inventory Guardian episode starts from here in I7.
+   - `store-sync-{connectionId}`: `StoreSyncWorkflow`, catalog verification requests (`product`).
+   `signalWithStart` on a running workflow only adds a signal, so a repeated event does not create a second
+   workflow. The workflow remembers the last 500 event identifiers and carries them through `continueAsNew` (every
+   500 signals), so the history stays small.
+3. **Authoritative variant read.** After a verification request, and also after `order.changed` if no newer
+   variant stock arrived within 60 s, `VariantInventoryWorkflow` reads the variant (or the parent product for
+   `PARENT`) directly from Woo and writes a `POLL` observation. A fresh read is the truth at the moment of reading,
+   so we store it even within the same second as the last write (it resolves `AMBIGUOUS`). We skip only identical
+   stock. Several requests within a 60 s window give one read.
+4. **Polling (B-16).** The Temporal Schedule `woo-poll-{connectionId}` runs `IncrementalSyncWorkflow` (kind `POLL`)
+   every 5 min: `products?modified_after={watermark − 2 min}` and the variations of changed variable products. Changes
+   are stored like an authoritative read. The `PRODUCTS` watermark (the largest `date_modified_gmt`) moves only after
+   all pages succeeded.
+5. **Reconciliation (B-16).** The Schedule `woo-reconcile-{connectionId}` every hour: all orders
+   `modified_after={ORDERS watermark − 2 min}`, without an upper bound, with an `X-WP-Total` comparison as in
+   ADR-0008. An order placed before the run started has a modification date no earlier than its placement, so a
+   complete read covers all orders placed up to the start. An upper bound (`modified_before`) would leave a gap:
+   an order placed before the start and changed during the run would fall out of the read. When the count matches,
+   we extend `order_sync_coverage` to the start of the run and move the watermark there. When it does not, nothing
+   moves, and health shows a growing completeness delay. A nightly review of the whole catalog (full stock) is left
+   for later.
+6. **Missed webhook.** Polling compares every change with the latest observation. If the connection has a stored
+   webhook secret, and a change from Woo is newer than our state and older than 2 minutes, we count it as a missed
+   webhook. The number is stored with the run (`sync_check.missed_webhooks`). Orders from reconciliation that were
+   not in the database or were in an older state count the same way. A change from before the secret was saved does
+   not count.
+7. **Integration Health** (the `health` field in `GET /stores/{storeId}/integrations`), computed on read:
+   - `NOT_READY`: no successful initial import;
+   - `STALE`: polling without success for 15 min or order completeness older than 2 h. Blocks analysis (03 §11);
+   - `DEGRADED`: missed webhooks in the last 24 h, no webhook secret, `FAILED` entries in the inbox or
+     an outbox backlog older than 5 min;
+   - `HEALTHY`: all other cases.
+   Every reason has a code and a fix step in the UI.
+8. **Schedules.** At startup and every minute the worker creates (idempotently) the missing Schedules for
+   `CONNECTED` connections with a successful import, so a store gets polling at most a minute after the import. The
+   store context (actor `woo-sync`) is stored in the Schedule action header, and the first run starts right away.
+   Overlap policy: `SKIP`, catch-up window 10 min. The intervals are pilot parameters
+   (`operator.integration.woocommerce.poll-interval`, `reconcile-interval`).
+9. **Actor.** The workflows run as the system actor `woo-sync` with a `STORE_READ` scope (ADR-0004). The scope
+   comes from the start headers, and the activity interceptor verifies it against the database.
 
-## Rozważane alternatywy
+## Alternatives considered
 
-- **Jeden workflow na sklep dla wszystkich zdarzeń.** Mniej workflow, ale wąskie gardło i długa historia.
-  Detektor ryzyka działa per wariant (03 §3). Odrzucone.
-- **Workflow per zdarzenie (ID = eventId).** Łatwa deduplikacja, ale brak miejsca na stan wariantu i
-  debounce. Odrzucone.
-- **Polling bez `modified_after`, pełny katalog co 5 min.** Proste, ale koszt rośnie z katalogiem i limitami
-  hostingu sklepu. Pełny przegląd zostaje na noc, później.
-- **Cron w Springu zamiast Temporal Schedules.** Brak historii przebiegów, ponowień i pauzy per sklep.
-  Odrzucone (dokument 01: Temporal dla procesów w tle).
+- **One workflow per store for all events.** Fewer workflows, but a bottleneck and a long history.
+  The risk detector works per variant (03 §3). Rejected.
+- **A workflow per event (ID = eventId).** Easy deduplication, but no place for the variant state and
+  debounce. Rejected.
+- **Polling without `modified_after`, the full catalog every 5 min.** Simple, but the cost grows with the catalog
+  and the store hosting limits. A full review stays a nightly job, later.
+- **Spring cron instead of Temporal Schedules.** No run history, retries or per-store pause.
+  Rejected (document 01: Temporal for background processes).
 
-## Konsekwencje
+## Consequences
 
-- Liczba workflow rośnie z liczbą wariantów, które mają zdarzenia. Długotrwałe workflow wymagają wersjonowania
-  (`Workflow.getVersion`) przy każdej zmianie logiki, jak w B-08.
-- Serwer testowy Temporal nie obsługuje Schedules. Testy wołają workflow bezpośrednio, a tworzenie
-  harmonogramów sprawdzamy na lokalnym Temporal (CI-smoke).
-- `modified_after` wymaga WooCommerce ≥ 5.8. Sklepy ze starszą wersją dostaną błąd w teście połączenia.
+- The number of workflows grows with the number of variants that have events. Long-running workflows need
+  versioning (`Workflow.getVersion`) on every logic change, as in B-08.
+- The Temporal test server does not support Schedules. Tests call the workflow directly, and schedule creation is
+  checked on the local Temporal (CI smoke).
+- `modified_after` requires WooCommerce ≥ 5.8. Stores with an older version get an error in the connection check.
 
-## Weryfikacja
+## Verification
 
-- `OutboxDispatchTest`: powtórzone zdarzenie i powtórny dispatch dają jeden workflow i jeden obsłużony
-  sygnał; `order.changed` trafia do workflow każdego wariantu; błąd Temporal odkłada zdarzenie.
-- `VariantInventoryWorkflowTest`: debounce weryfikacji, odczyt autorytatywny rozstrzyga `AMBIGUOUS`,
-  `continueAsNew` zachowuje identyfikatory, test replay z zapisaną historią.
-- `IncrementalSyncTest` z atrapą Woo: watermark tylko po komplecie stron, wykrycie zgubionego
-  webhooka, przedłużenie pokrycia tylko przy zgodnym liczniku.
-- `IncrementalSyncTest`: przejścia health `NOT_READY` → `STALE` → `DEGRADED` → `HEALTHY` → `DEGRADED` → `STALE`.
+- `OutboxDispatchTest`: a repeated event and a repeated dispatch give one workflow and one handled
+  signal; `order.changed` reaches the workflow of every variant; a Temporal error postpones the event.
+- `VariantInventoryWorkflowTest`: verification debounce, the authoritative read resolves `AMBIGUOUS`,
+  `continueAsNew` keeps the identifiers, a replay test with a recorded history.
+- `IncrementalSyncTest` with a fake Woo: the watermark moves only after all pages, a missed webhook is detected,
+  coverage is extended only with a matching count.
+- `IncrementalSyncTest`: health transitions `NOT_READY` → `STALE` → `DEGRADED` → `HEALTHY` → `DEGRADED` → `STALE`.
