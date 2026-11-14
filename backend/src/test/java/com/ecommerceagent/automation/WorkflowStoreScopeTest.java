@@ -3,7 +3,6 @@ package com.ecommerceagent.automation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
-import java.util.Set;
 import java.util.UUID;
 
 import com.ecommerceagent.Correlation;
@@ -13,6 +12,7 @@ import com.ecommerceagent.automation.diagnostics.ScopeCheckWorkflowImpl;
 import com.ecommerceagent.automation.temporal.StoreContextPropagator;
 import com.ecommerceagent.automation.temporal.StoreScopeActivityInterceptor;
 import com.ecommerceagent.automation.temporal.WorkflowStoreContext;
+import com.ecommerceagent.identity.StoreAccess;
 import com.ecommerceagent.identity.StoreRole;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import io.temporal.client.WorkflowClient;
@@ -56,6 +56,13 @@ class WorkflowStoreScopeTest {
     @Autowired
     JdbcClient jdbc;
 
+    @Autowired
+    StoreAccess storeAccess;
+
+    TrustedStoreScope memberScope() {
+        return storeAccess.scopeFor(MEMBER, STORE).orElseThrow();
+    }
+
     @BeforeEach
     void tenant() {
         jdbc.sql("DELETE FROM store_membership WHERE organization_id = ?").param(ORG).update();
@@ -84,22 +91,70 @@ class WorkflowStoreScopeTest {
     void verifiedScopeAndCorrelationReachTheActivity() {
         MDC.put(Correlation.CORRELATION_ID, "flow-temporal-test-1");
 
-        ScopeCheckResult result = diagnostics.checkStoreScope(
-                new TrustedStoreScope(ORG, STORE, MEMBER, Set.of(StoreRole.ANALYST)));
+        TrustedStoreScope scope = memberScope();
+        // A role revoked after the scope was built must not reach the activity.
+        jdbc.sql("DELETE FROM store_membership WHERE user_id = ? AND role = 'DECISION_OPERATOR'").param(MEMBER)
+                .update();
+
+        ScopeCheckResult result = diagnostics.checkStoreScope(scope);
 
         assertThat(result.organizationId()).isEqualTo(ORG.toString());
         assertThat(result.storeId()).isEqualTo(STORE.toString());
+        assertThat(result.actorKind()).isEqualTo("USER");
         assertThat(result.userId()).isEqualTo(MEMBER.toString());
+        assertThat(result.service()).isNull();
         // Roles come from the database at activity time, not from the caller's scope object.
-        assertThat(result.roles()).containsExactly("ANALYST", "DECISION_OPERATOR");
+        assertThat(scope.roles()).containsExactly(StoreRole.DECISION_OPERATOR, StoreRole.ANALYST);
+        assertThat(result.roles()).containsExactly("ANALYST");
+        assertThat(result.permissions()).containsExactly("STORE_READ");
         assertThat(result.correlationId()).isEqualTo("flow-temporal-test-1");
         assertThat(result.workflowId()).startsWith("scope-check-" + STORE);
     }
 
     @Test
+    void systemActorRunsWithoutAUserAndOnlyReads() {
+        TrustedStoreScope system = storeAccess.systemScope("inventory-monitor", ORG, STORE).orElseThrow();
+
+        ScopeCheckResult result = diagnostics.checkStoreScope(system);
+
+        assertThat(result.actorKind()).isEqualTo("SYSTEM");
+        assertThat(result.service()).isEqualTo("inventory-monitor");
+        assertThat(result.userId()).isNull();
+        assertThat(result.roles()).isEmpty();
+        assertThat(result.permissions()).containsExactly("STORE_READ");
+    }
+
+    @Test
+    void systemClaimForAStoreOutsideTheOrganizationIsRejected() {
+        assertThat(failureOf(new WorkflowStoreContext(UUID.randomUUID(), STORE, null, "inventory-monitor", null))
+                .getType()).isEqualTo(StoreScopeActivityInterceptor.SCOPE_REJECTED);
+        assertThat(failureOf(new WorkflowStoreContext(ORG, UUID.randomUUID(), null, "inventory-monitor", null))
+                .getType()).isEqualTo(StoreScopeActivityInterceptor.SCOPE_REJECTED);
+        assertThat(failureOf(new WorkflowStoreContext(ORG, STORE, null, "Not A Service", null))
+                .getType()).isEqualTo(StoreScopeActivityInterceptor.SCOPE_REJECTED);
+    }
+
+    @Test
+    void claimWithBothUserAndServiceIsTreatedAsMissing() {
+        ApplicationFailure failure = failureOf(new WorkflowStoreContext(ORG, STORE, MEMBER, "inventory-monitor", null));
+
+        assertThat(failure.getType()).isEqualTo(StoreScopeActivityInterceptor.SCOPE_MISSING);
+    }
+
+    @Test
+    void revokedMembershipStopsTheNextActivity() {
+        TrustedStoreScope scope = memberScope();
+        jdbc.sql("DELETE FROM store_membership WHERE user_id = ?").param(MEMBER).update();
+
+        ApplicationFailure failure = failureOf(WorkflowStoreContext.of(scope, "flow-revoked"));
+
+        assertThat(failure.getType()).isEqualTo(StoreScopeActivityInterceptor.SCOPE_REJECTED);
+    }
+
+    @Test
     void forgedStoreClaimIsRejectedWithoutRetry() {
         // The member is not in OTHER_STORE: a header claim alone must not grant access.
-        ApplicationFailure failure = failureOf(new WorkflowStoreContext(ORG, OTHER_STORE, MEMBER, "flow-forged"));
+        ApplicationFailure failure = failureOf(new WorkflowStoreContext(ORG, OTHER_STORE, MEMBER, null, "flow-forged"));
 
         assertThat(failure.getType()).isEqualTo(StoreScopeActivityInterceptor.SCOPE_REJECTED);
         assertThat(failure.isNonRetryable()).isTrue();
@@ -111,7 +166,7 @@ class WorkflowStoreScopeTest {
 
     @Test
     void claimWithMismatchedOrganizationIsRejected() {
-        ApplicationFailure failure = failureOf(new WorkflowStoreContext(UUID.randomUUID(), STORE, MEMBER, null));
+        ApplicationFailure failure = failureOf(new WorkflowStoreContext(UUID.randomUUID(), STORE, MEMBER, null, null));
 
         assertThat(failure.getType()).isEqualTo(StoreScopeActivityInterceptor.SCOPE_REJECTED);
     }
@@ -129,15 +184,14 @@ class WorkflowStoreScopeTest {
         // Regression: pooled workflow threads kept the previous execution's context when the next
         // execution had no header, so an unscoped workflow ran with someone else's store scope.
         for (int i = 0; i < 3; i++) {
-            diagnostics.checkStoreScope(new TrustedStoreScope(ORG, STORE, MEMBER, Set.of(StoreRole.ANALYST)));
+            diagnostics.checkStoreScope(memberScope());
             assertThat(failureOf(null).getType()).isEqualTo(StoreScopeActivityInterceptor.SCOPE_MISSING);
         }
     }
 
     @Test
     void completedHistoryReplaysDeterministically() throws Exception {
-        ScopeCheckResult result = diagnostics.checkStoreScope(
-                new TrustedStoreScope(ORG, STORE, MEMBER, Set.of(StoreRole.ANALYST)));
+        ScopeCheckResult result = diagnostics.checkStoreScope(memberScope());
 
         WorkflowExecutionHistory history = client.fetchHistory(result.workflowId());
         WorkflowReplayer.replayWorkflowExecution(history, ScopeCheckWorkflowImpl.class);

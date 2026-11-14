@@ -4,6 +4,7 @@ import com.ecommerceagent.Correlation;
 import com.ecommerceagent.automation.ScopeCheckResult;
 import com.ecommerceagent.automation.TaskQueues;
 import com.ecommerceagent.automation.temporal.ActivityStoreScope;
+import com.ecommerceagent.identity.Actor.SystemActor;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import io.temporal.activity.Activity;
 import io.temporal.spring.boot.ActivityImpl;
@@ -20,8 +21,11 @@ public class ScopeCheckActivitiesImpl implements ScopeCheckActivities {
         return new ScopeCheckResult(
                 scope.organizationId().toString(),
                 scope.storeId().toString(),
-                scope.userId().toString(),
+                scope.actor().kind(),
+                scope.userId().map(Object::toString).orElse(null),
+                scope.actor() instanceof SystemActor system ? system.service() : null,
                 scope.roles().stream().map(Enum::name).sorted().toList(),
+                scope.permissions().stream().map(Enum::name).toList(),
                 MDC.get(Correlation.CORRELATION_ID),
                 Activity.getExecutionContext().getInfo().getWorkflowId());
     }

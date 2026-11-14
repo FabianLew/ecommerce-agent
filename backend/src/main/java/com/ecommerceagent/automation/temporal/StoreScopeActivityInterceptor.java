@@ -1,6 +1,7 @@
 package com.ecommerceagent.automation.temporal;
 
 import java.util.Map;
+import java.util.Optional;
 
 import com.ecommerceagent.Correlation;
 import com.ecommerceagent.identity.AuditEntry;
@@ -15,7 +16,7 @@ import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 
 /**
- * Re-verifies the store claim from the Temporal header against memberships before every activity and
+ * Rebuilds the store scope from the Temporal header claim in {@link StoreAccess} before every activity and
  * exposes the result as {@link ActivityStoreScope}. A missing or unverifiable claim fails the activity
  * with a non-retryable error: Temporal headers are not trusted on their own (ADR-0004).
  */
@@ -60,13 +61,30 @@ public class StoreScopeActivityInterceptor extends WorkerInterceptorBase {
         if (context == null || !context.hasStoreClaim()) {
             throw ApplicationFailure.newNonRetryableFailure("Activity started without a store scope", SCOPE_MISSING);
         }
-        return storeAccess.scopeFor(context.userId(), context.storeId())
+        return rebuild(context)
                 .filter(scope -> scope.organizationId().equals(context.organizationId()))
                 .orElseThrow(() -> {
-                    audit.record(new AuditEntry("STORE_ACCESS_DENIED", null, null, context.userId(), "store",
+                    audit.record(new AuditEntry("STORE_ACCESS_DENIED", null, null, context.userId(),
+                            context.userId() == null ? truncate(context.service()) : null, "store",
                             context.storeId().toString(), Map.of("channel", "temporal-activity")));
                     return ApplicationFailure.newNonRetryableFailure(
                             "Store scope could not be verified", SCOPE_REJECTED);
                 });
+    }
+
+    /** The header names the actor; only {@link StoreAccess} decides whether it may act in the store. */
+    private Optional<TrustedStoreScope> rebuild(WorkflowStoreContext context) {
+        if (context.userId() != null) {
+            return storeAccess.scopeFor(context.userId(), context.storeId());
+        }
+        try {
+            return storeAccess.systemScope(context.service(), context.organizationId(), context.storeId());
+        } catch (IllegalArgumentException invalidServiceName) {
+            return Optional.empty();
+        }
+    }
+
+    private static String truncate(String value) {
+        return value.length() <= 64 ? value : value.substring(0, 64);
     }
 }

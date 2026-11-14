@@ -22,6 +22,7 @@ public class StoreContextPropagator implements ContextPropagator {
     static final String ORGANIZATION_ID = "operator-organization-id";
     static final String STORE_ID = "operator-store-id";
     static final String USER_ID = "operator-user-id";
+    static final String SERVICE = "operator-service";
     static final String CORRELATION_ID = "operator-correlation-id";
 
     private static final ThreadLocal<WorkflowStoreContext> CURRENT = new ThreadLocal<>();
@@ -53,7 +54,7 @@ public class StoreContextPropagator implements ContextPropagator {
             return context;
         }
         String correlationId = MDC.get(Correlation.CORRELATION_ID);
-        return correlationId == null ? null : new WorkflowStoreContext(null, null, null, correlationId);
+        return correlationId == null ? null : WorkflowStoreContext.correlationOnly(correlationId);
     }
 
     /**
@@ -82,6 +83,7 @@ public class StoreContextPropagator implements ContextPropagator {
             put(header, ORGANIZATION_ID, c.organizationId());
             put(header, STORE_ID, c.storeId());
             put(header, USER_ID, c.userId());
+            put(header, SERVICE, c.service());
             put(header, CORRELATION_ID, c.correlationId());
         }
         return header;
@@ -94,10 +96,8 @@ public class StoreContextPropagator implements ContextPropagator {
         }
         WorkflowStoreContext context = new WorkflowStoreContext(
                 uuid(header, ORGANIZATION_ID), uuid(header, STORE_ID), uuid(header, USER_ID),
-                string(header, CORRELATION_ID));
-        boolean empty = context.organizationId() == null && context.storeId() == null && context.userId() == null
-                && context.correlationId() == null;
-        return empty ? null : context;
+                string(header, SERVICE), string(header, CORRELATION_ID));
+        return context.isEmpty() ? null : context;
     }
 
     private static void put(Map<String, Payload> header, String key, Object value) {

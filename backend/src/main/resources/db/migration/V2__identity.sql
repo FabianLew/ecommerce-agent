@@ -1,4 +1,6 @@
--- B-06: tenancy model (ADR-0004). Every business table carries organization_id and store_id.
+-- B-06: tenancy model (ADR-0004). Every store-scoped business table carries organization_id and store_id
+-- with a composite FOREIGN KEY (store_id, organization_id) REFERENCES store (id, organization_id).
+-- The rule is enforced by IdentitySchemaTest; audit_event is the documented exception.
 
 CREATE TABLE organization (
     id          uuid PRIMARY KEY,
@@ -39,17 +41,21 @@ CREATE TABLE store_membership (
 
 CREATE INDEX store_membership_user_idx ON store_membership (user_id);
 
--- Append-only audit trail. Tenant columns are nullable for events without a resolved scope.
+-- Append-only audit trail. Tenant columns are nullable for events without a resolved scope, so it has no
+-- composite FK. The trigger guards against application mistakes, not against a privileged database
+-- administrator; retention and PII minimization are required by ADR-0004.
 CREATE TABLE audit_event (
     id               uuid PRIMARY KEY,
     occurred_at      timestamptz NOT NULL,
     organization_id  uuid,
     store_id         uuid,
     actor_user_id    uuid,
+    actor_service    text,
     action           text        NOT NULL,
     resource_type    text,
     resource_id      text,
-    details          jsonb       NOT NULL DEFAULT '{}'::jsonb
+    details          jsonb       NOT NULL DEFAULT '{}'::jsonb,
+    CHECK (actor_user_id IS NULL OR actor_service IS NULL)
 );
 
 CREATE INDEX audit_event_store_idx ON audit_event (store_id, occurred_at);

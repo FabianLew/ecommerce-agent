@@ -3,7 +3,7 @@ package com.ecommerceagent.identity;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.util.Set;
+import java.util.List;
 import java.util.UUID;
 
 import com.ecommerceagent.TestcontainersConfiguration;
@@ -13,6 +13,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @Import(TestcontainersConfiguration.class)
@@ -23,6 +25,9 @@ class IdentitySchemaTest {
 
     @Autowired
     AuditTrail audit;
+
+    @Autowired
+    PlatformTransactionManager transactionManager;
 
     @Test
     void auditEventsCannotBeChangedOrDeleted() {
@@ -58,12 +63,68 @@ class IdentitySchemaTest {
     }
 
     @Test
-    void scopeRequiresAtLeastOneRoleAndIsImmutable() {
-        assertThatThrownBy(() -> new TrustedStoreScope(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), Set.of()))
-                .isInstanceOf(IllegalArgumentException.class);
-        TrustedStoreScope scope = new TrustedStoreScope(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-                new java.util.HashSet<>(Set.of(StoreRole.ANALYST)));
-        assertThat(scope.hasRole(StoreRole.ANALYST)).isTrue();
-        assertThatThrownBy(() -> scope.roles().add(StoreRole.OWNER)).isInstanceOf(UnsupportedOperationException.class);
+    void auditEntryHasEitherAUserOrASystemActor() {
+        audit.record(new AuditEntry("TEST_SYSTEM_EVENT", null, null, null, "inventory-monitor", "test", "1", null));
+
+        assertThatThrownBy(() -> new AuditEntry("X", null, null, UUID.randomUUID(), "inventory-monitor", null, null,
+                null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> jdbc.sql("""
+                        INSERT INTO audit_event (id, occurred_at, actor_user_id, actor_service, action)
+                        VALUES (?, now(), ?, 'svc', 'X')
+                        """).params(UUID.randomUUID(), UUID.randomUUID()).update())
+                .isInstanceOf(DataAccessException.class);
+    }
+
+    /**
+     * ADR-0004: every store-scoped table references store (id, organization_id) with a composite foreign
+     * key, so a row can never pair a store with another organization. New tables are checked automatically.
+     */
+    @Test
+    void everyStoreScopedTableHasCompositeStoreForeignKey() {
+        assertThat(storeScopedTables()).contains("store_membership");
+        assertThat(tablesMissingCompositeStoreKey()).isEmpty();
+    }
+
+    @Test
+    void compositeKeyGuardDetectsAViolatingTable() {
+        TransactionTemplate tx = new TransactionTemplate(transactionManager);
+        tx.executeWithoutResult(status -> {
+            jdbc.sql("CREATE TABLE guard_probe (organization_id uuid, store_id uuid REFERENCES store (id))").update();
+            assertThat(tablesMissingCompositeStoreKey()).containsExactly("guard_probe");
+            status.setRollbackOnly();
+        });
+        assertThat(tablesMissingCompositeStoreKey()).isEmpty();
+    }
+
+    private List<String> storeScopedTables() {
+        return jdbc.sql("""
+                        SELECT c.table_name FROM information_schema.columns c
+                        JOIN information_schema.tables t
+                          ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+                        WHERE c.table_schema = current_schema() AND c.column_name = 'store_id'
+                          AND t.table_type = 'BASE TABLE'
+                        ORDER BY 1
+                        """).query(String.class).list();
+    }
+
+    private List<String> tablesMissingCompositeStoreKey() {
+        return jdbc.sql("""
+                        SELECT c.table_name FROM information_schema.columns c
+                        JOIN information_schema.tables t
+                          ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+                        WHERE c.table_schema = current_schema() AND c.column_name = 'store_id'
+                          AND t.table_type = 'BASE TABLE'
+                          AND c.table_name NOT IN ('audit_event')
+                          AND NOT EXISTS (
+                            SELECT 1 FROM pg_constraint k
+                            WHERE k.contype = 'f'
+                              AND k.conrelid = to_regclass(quote_ident(c.table_name))
+                              AND k.confrelid = 'store'::regclass
+                              AND (SELECT array_agg(a.attname::text ORDER BY a.attname)
+                                   FROM unnest(k.conkey) AS n(attnum)
+                                   JOIN pg_attribute a ON a.attrelid = k.conrelid AND a.attnum = n.attnum)
+                                  = ARRAY['organization_id', 'store_id'])
+                        ORDER BY 1
+                        """).query(String.class).list();
     }
 }

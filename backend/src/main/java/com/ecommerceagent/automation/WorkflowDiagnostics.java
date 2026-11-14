@@ -29,8 +29,7 @@ public class WorkflowDiagnostics {
                 .setWorkflowId("scope-check-" + scope.storeId() + "-" + UUID.randomUUID())
                 .setWorkflowExecutionTimeout(Duration.ofMinutes(1))
                 .build());
-        WorkflowStoreContext context = new WorkflowStoreContext(scope.organizationId(), scope.storeId(),
-                scope.userId(), MDC.get(Correlation.CORRELATION_ID));
+        WorkflowStoreContext context = WorkflowStoreContext.of(scope, MDC.get(Correlation.CORRELATION_ID));
         return StoreContextPropagator.callWith(context, workflow::check);
     }
 }
