@@ -163,6 +163,15 @@ np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_A
 - `VariantInventoryWorkflow` (wersja `risk-detection`) ocenia ryzyko po zmianie stanu i po świeżym odczycie, a gdy
   seria się buduje, po `min-gap` potwierdza stan kolejnym odczytem ze sklepu.
 
+## Kontrakt DecisionProposal v1 (B-21)
+
+- Schemat `knowledge/schemas/decision-proposal-v1.schema.json` (JSON Schema 2020-12) trafia do classpath jako
+  `schemas/…` i jest jedynym źródłem kształtu kontraktu (ADR-0012); przykłady są w `knowledge/schemas/examples`.
+- `DecisionProposals.submit` opakowuje rekomendację proposera w kopertę v1 i sprawdza ją `ProposalValidator`
+  (schemat, reguły procesu z `ProposalRules`, dowody i cel w snapshocie). Ważna propozycja to kolejna rewizja
+  epizodu (poprzednia przechodzi w `SUPERSEDED`); nieważna to tylko wpis w `proposal_rejection` z kodami (IG-10).
+- `AdEvidence` (moduł `metrics`) zapisuje dowody stanu reklamy i mapowania, na których opiera się walidacja celu.
+
 ## Zasady
 
 - Moduły to podpakiety `com.ecommerceagent`; dozwolone zależności są w `package-info.java` każdego modułu.

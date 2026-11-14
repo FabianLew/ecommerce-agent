@@ -23,6 +23,8 @@ val springModulithVersion = "2.1.2"
 val temporalVersion = "1.40.0"
 // OpenAPI contract for the generated frontend client (B-09, ADR-0006).
 val springdocVersion = "3.1.1"
+// JSON Schema validation of DecisionProposal v1 (ADR-0012); 3.x is built on Jackson 3.
+val jsonSchemaValidatorVersion = "3.0.1"
 
 dependencies {
     implementation(platform(SpringBootPlugin.BOM_COORDINATES))
@@ -37,6 +39,7 @@ dependencies {
     implementation("org.springframework.modulith:spring-modulith-starter-core")
     implementation("io.temporal:temporal-spring-boot-starter:$temporalVersion")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:$springdocVersion")
+    implementation("com.networknt:json-schema-validator:$jsonSchemaValidatorVersion")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
@@ -52,6 +55,14 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+}
+
+// Contract schemas live in /knowledge and are shared with tests and prompts (ADR-0012).
+tasks.processResources {
+    from("../knowledge/schemas") {
+        include("*.schema.json")
+        into("schemas")
+    }
 }
 
 tasks.withType<JavaCompile>().configureEach {
