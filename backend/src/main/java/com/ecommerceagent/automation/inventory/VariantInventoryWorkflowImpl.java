@@ -20,13 +20,18 @@ import org.slf4j.Logger;
 /**
  * Deduplicates events by ID (the last {@value #RECENT_IDS} are kept across {@code continueAsNew}), and reads
  * the source when stock is uncertain: on an explicit verification request, and after an order change that is
- * not followed by a newer stock state within the order delay (ADR-0010).
+ * not followed by a newer stock state within the order delay (ADR-0010). From version {@value #RISK_DETECTION}
+ * of {@code risk-detection} it also assesses inventory risk after each stock change and each fresh read, and
+ * while a risk series builds up it confirms the stock with another fresh read when the detector asks (B-19,
+ * ADR-0011).
  */
 @WorkflowImpl(taskQueues = TaskQueues.MAIN)
 public class VariantInventoryWorkflowImpl implements VariantInventoryWorkflow {
 
     static final int RECENT_IDS = 500;
     static final int CONTINUE_AFTER = 500;
+    static final String RISK_CHANGE = "risk-detection";
+    static final int RISK_DETECTION = 1;
 
     private static final Logger log = Workflow.getLogger(VariantInventoryWorkflowImpl.class);
 
@@ -50,13 +55,21 @@ public class VariantInventoryWorkflowImpl implements VariantInventoryWorkflow {
     private int handled;
     private int duplicates;
     private int verifications;
+    private boolean riskEnabled;
+    private boolean riskDue;
+    private Long riskCheckAtMillis;
+    private int riskChecks;
+    private String riskOutcome;
+    private String opportunityId;
 
     @Override
     public void run(VariantInventoryState state) {
         state.recentEventIds().forEach(this::remember);
         latest = parse(state.latestSourceUpdatedAt());
+        riskEnabled = Workflow.getVersion(RISK_CHANGE, Workflow.DEFAULT_VERSION, RISK_DETECTION) >= RISK_DETECTION;
         while (true) {
-            if (verifyAtMillis == null) {
+            Long dueAt = nextDue();
+            if (dueAt == null) {
                 if (handled >= CONTINUE_AFTER && inbox.isEmpty()) {
                     Workflow.continueAsNew(new VariantInventoryState(state.variantId(), List.copyOf(recent),
                             latest == null ? null : latest.toString(), state.verifyDelaySeconds(),
@@ -64,16 +77,28 @@ public class VariantInventoryWorkflowImpl implements VariantInventoryWorkflow {
                 }
                 Workflow.await(() -> !inbox.isEmpty());
             } else {
-                long wait = verifyAtMillis - Workflow.currentTimeMillis();
+                long wait = dueAt - Workflow.currentTimeMillis();
                 if (wait > 0) {
                     Workflow.await(Duration.ofMillis(wait), () -> !inbox.isEmpty());
                 }
             }
             drain(state);
-            if (verifyAtMillis != null && Workflow.currentTimeMillis() >= verifyAtMillis) {
+            long now = Workflow.currentTimeMillis();
+            boolean verifyDue = verifyAtMillis != null && now >= verifyAtMillis;
+            boolean riskCheckDue = riskCheckAtMillis != null && now >= riskCheckAtMillis;
+            if (verifyDue || riskCheckDue) {
                 verify(state.variantId());
+            } else if (riskDue) {
+                assessRisk(state.variantId());
             }
         }
+    }
+
+    private Long nextDue() {
+        if (verifyAtMillis == null) {
+            return riskCheckAtMillis;
+        }
+        return riskCheckAtMillis == null ? verifyAtMillis : Math.min(verifyAtMillis, riskCheckAtMillis);
     }
 
     @Override
@@ -84,7 +109,8 @@ public class VariantInventoryWorkflowImpl implements VariantInventoryWorkflow {
     @Override
     public VariantInventoryStatus status() {
         return new VariantInventoryStatus(handled, duplicates, verifications, verifyAtMillis != null,
-                latest == null ? null : latest.toString());
+                latest == null ? null : latest.toString(), riskChecks, riskCheckAtMillis != null, riskOutcome,
+                opportunityId);
     }
 
     private void drain(VariantInventoryState state) {
@@ -104,6 +130,7 @@ public class VariantInventoryWorkflowImpl implements VariantInventoryWorkflow {
                     if (at != null && (latest == null || at.isAfter(latest))) {
                         latest = at;
                     }
+                    riskDue = riskEnabled;
                     if (orderOnly && latest != null && orderTime != null && !latest.isBefore(orderTime)) {
                         // The stock change caused by the order arrived: no read needed.
                         verifyAtMillis = null;
@@ -141,11 +168,41 @@ public class VariantInventoryWorkflowImpl implements VariantInventoryWorkflow {
         orderOnly = false;
         orderTime = null;
         try {
-            activities.verify(variantId);
+            if (riskEnabled) {
+                riskDue = false;
+                riskCheckAtMillis = null;
+                record(activities.verifyAndAssess(variantId));
+            } else {
+                activities.verify(variantId);
+            }
             verifications++;
         } catch (ActivityFailure failure) {
             // Polling (B-16) reads the variant again; a failed read must not stop the workflow.
             log.warn("Stock verification of variant {} failed: {}", variantId, failure.getMessage());
+        }
+    }
+
+    private void assessRisk(String variantId) {
+        riskDue = false;
+        try {
+            record(activities.assessRisk(variantId));
+        } catch (ActivityFailure failure) {
+            // The next stock change or fresh read assesses again.
+            log.warn("Risk assessment of variant {} failed: {}", variantId, failure.getMessage());
+        }
+    }
+
+    private void record(RiskCheck check) {
+        riskChecks++;
+        riskOutcome = check.outcome();
+        if (check.opportunityId() != null) {
+            opportunityId = check.opportunityId();
+        }
+        // A pending check keeps its time: further stock changes must not postpone the confirming read.
+        if (check.nextCheckInSeconds() == null) {
+            riskCheckAtMillis = null;
+        } else if (riskCheckAtMillis == null) {
+            riskCheckAtMillis = Workflow.currentTimeMillis() + check.nextCheckInSeconds() * 1000;
         }
     }
 

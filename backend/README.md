@@ -152,6 +152,17 @@ np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_A
 - Do czasu adaptera Meta (F2) lokalny worker co minutę wczytuje `infra/fixtures/meta-ads.json`
   (`operator.commerce.ad-fixture-file`): dedykowaną reklamę `ad-9001` dla `TSHIRT-BASIC-S` i katalogową `ad-9002`.
 
+## Detektor ryzyka i Opportunity (B-19)
+
+- `InventoryRiskDetector` (`inventory-risk/1`, moduł `decisions`) zapisuje obserwację przy każdej ocenie: ryzyko to
+  pokrycie poniżej `threshold-days`; stan starszy niż `max-stock-age` albo niedostępna metryka daje `UNKNOWN`, które
+  przerywa serię. Epizod otwiera się po `min-observations` aktualnych obserwacjach ryzyka odległych o `min-gap`
+  (`operator.inventory-guardian.risk.*`).
+- `Opportunities`: co najwyżej jeden aktywny epizod na wariant (indeks unikalny, IG-05), przejścia statusów przez
+  maszynę stanów z kontrolą wersji.
+- `VariantInventoryWorkflow` (wersja `risk-detection`) ocenia ryzyko po zmianie stanu i po świeżym odczycie, a gdy
+  seria się buduje, po `min-gap` potwierdza stan kolejnym odczytem ze sklepu.
+
 ## Zasady
 
 - Moduły to podpakiety `com.ecommerceagent`; dozwolone zależności są w `package-info.java` każdego modułu.

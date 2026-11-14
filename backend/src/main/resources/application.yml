@@ -57,6 +57,15 @@ operator:
       poll-interval: 5m
       reconcile-interval: 1h
 
+  inventory-guardian:
+    risk:
+      # Detector inventory-risk/1 (ADR-0011): risk is days of cover below the threshold; an episode opens after
+      # min-observations current risk observations at least min-gap apart, with stock no older than max-stock-age.
+      threshold-days: 3
+      min-observations: 2
+      min-gap: 5m
+      max-stock-age: 120s
+
 springdoc:
   api-docs:
     # The contract is generated in tests (OpenApiContractTest) and committed; not served by default.

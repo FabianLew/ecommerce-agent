@@ -8,8 +8,11 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -27,6 +30,9 @@ import com.ecommerceagent.commerce.CommerceSource;
 import com.ecommerceagent.commerce.InventoryReading;
 import com.ecommerceagent.commerce.InventoryRepository;
 import com.ecommerceagent.commerce.ObservationSource;
+import com.ecommerceagent.commerce.OrderData;
+import com.ecommerceagent.commerce.OrderLineData;
+import com.ecommerceagent.commerce.OrderRepository;
 import com.ecommerceagent.commerce.ProductData;
 import com.ecommerceagent.commerce.ReservationSemantics;
 import com.ecommerceagent.commerce.StockStatus;
@@ -85,6 +91,10 @@ class OutboxDispatchTest {
     WorkflowClient client;
     @Autowired
     JdbcClient jdbc;
+    @Autowired
+    OrderRepository orders;
+    @Autowired
+    Clock clock;
 
     HttpServer woo;
     final List<String> requests = new CopyOnWriteArrayList<>();
@@ -219,16 +229,58 @@ class OutboxDispatchTest {
         WorkflowExecutionHistory history = client.fetchHistory(
                 VariantInventoryWorkflow.workflowId(STORE, other.toString()));
         WorkflowReplayer.replayWorkflowExecution(history, VariantInventoryWorkflowImpl.class);
-        // ./gradlew test -PrecordTemporalFixtures refreshes the fixture after an intentional, versioned change.
+    }
+
+    @Test
+    void riskSeriesIsConfirmedByAFreshReadAndOpensOneEpisode() throws Exception {
+        // 7 units a day for the last 7 full days and 3 in the shop: well under the 3-day threshold.
+        Instant today = clock.instant().truncatedTo(ChronoUnit.DAYS);
+        for (int day = 1; day <= 7; day++) {
+            Instant placedAt = today.minus(Duration.ofDays(day)).plus(Duration.ofHours(10));
+            orders.upsert(scope, CommerceSource.WOOCOMMERCE, new OrderData("r-" + day, "processing", "PLN",
+                    new BigDecimal("70.00"), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, placedAt, placedAt,
+                    null, placedAt, List.of(new OrderLineData("rl-" + day, "14", "14", "MUG", 7,
+                            new BigDecimal("10.00"), BigDecimal.ZERO))));
+        }
+        orders.recordCoverage(scope, CommerceSource.WOOCOMMERCE, today.minus(Duration.ofDays(30)), clock.instant());
+        outbox.append(scope, OutboxEvents.INVENTORY_VERIFICATION_REQUESTED, "variant", mug.toString(),
+                Map.of("reason", "AMBIGUOUS_SOURCE_TIME", "variantId", mug.toString()), "r1");
+        dispatch.dispatchPending(10);
+
+        // First read: risk, not yet an episode; the detector asks for a confirming read after the gap.
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() ->
+                assertThat(status(mug).opportunityId()).isNotNull());
+        VariantInventoryStatus status = status(mug);
+        assertThat(status.lastRiskOutcome()).isEqualTo("AT_RISK");
+        assertThat(status.riskCheckPending()).isFalse();
+        assertThat(status.verifications()).isGreaterThanOrEqualTo(2);
+        // The confirming read waits for the gap instead of polling the shop.
+        assertThat(requests.stream().filter("products/14"::equals).count()).isBetween(2L, 3L);
+        assertThat(jdbc.sql("SELECT count(*) FROM opportunity WHERE subject_id = ? AND status = 'OPEN'").param(mug)
+                .query(Long.class).single()).isEqualTo(1);
+        assertThat(jdbc.sql("""
+                SELECT count(*) FROM inventory_risk_observation
+                WHERE variant_id = ? AND outcome = 'AT_RISK' AND stock_confirmed_at IS NOT NULL
+                """).param(mug).query(Long.class).single()).isGreaterThanOrEqualTo(2);
+
+        WorkflowExecutionHistory history = client.fetchHistory(VariantInventoryWorkflow.workflowId(STORE,
+                mug.toString()));
+        WorkflowReplayer.replayWorkflowExecution(history, VariantInventoryWorkflowImpl.class);
+        // ./gradlew test -PrecordTemporalFixtures refreshes the fixture after an intentional, versioned change;
+        // variant-inventory-v1.json stays as recorded before risk detection.
         if (Boolean.getBoolean("recordTemporalFixtures")) {
-            Files.writeString(Path.of("src/test/resources/temporal/variant-inventory-v1.json"), history.toJson(true));
+            Files.writeString(Path.of("src/test/resources/temporal/variant-inventory-risk-v1.json"),
+                    history.toJson(true));
         }
     }
 
     @Test
-    void recordedVariantHistoryStillReplays() throws Exception {
-        // Guards against non-deterministic changes to VariantInventoryWorkflowImpl (recorded with the v1 code).
+    void recordedVariantHistoriesStillReplay() throws Exception {
+        // Guards against non-deterministic changes to VariantInventoryWorkflowImpl: a history from before risk
+        // detection (B-15) and one with the risk-detection version (B-19).
         WorkflowReplayer.replayWorkflowExecutionFromResource("temporal/variant-inventory-v1.json",
+                VariantInventoryWorkflowImpl.class);
+        WorkflowReplayer.replayWorkflowExecutionFromResource("temporal/variant-inventory-risk-v1.json",
                 VariantInventoryWorkflowImpl.class);
     }
 
