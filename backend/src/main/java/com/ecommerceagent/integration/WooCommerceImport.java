@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -111,6 +112,19 @@ public class WooCommerceImport {
 
     public java.util.Optional<SyncRun> latestRun(TrustedStoreScope scope, UUID connectionId) {
         return runs.latest(scope, connectionId);
+    }
+
+    /** Confirms that the run's workflow has started (FIX-02); repeated calls change nothing. */
+    public void markWorkflowStarted(TrustedStoreScope scope, UUID runId) {
+        runs.markWorkflowStarted(scope, runId);
+    }
+
+    /**
+     * Running imports of all stores, for the system reconciler only (FIX-02). Identifiers only; the
+     * reconciler builds a system scope for each run's store before touching it.
+     */
+    public List<SyncRunDispatch> runningRuns(int limit) {
+        return runs.running(limit);
     }
 
     /** Imports all products and variants with their current stock. */
@@ -243,8 +257,15 @@ public class WooCommerceImport {
                 gmt(stockSource, "date_modified_gmt"), observedAt));
     }
 
+    /**
+     * Steps work only on a running run: a run closed by the reconciler (e.g. its start expired) never
+     * imports, even if a late workflow start reaches it (FIX-02).
+     */
     private Source source(TrustedStoreScope scope, UUID runId) {
         SyncRun run = run(scope, runId);
+        if (run.status() != SyncRunStatus.RUNNING) {
+            throw new InvalidIntegrationRequestException("run", "RUN_CLOSED", "The import run has already ended");
+        }
         IntegrationConnection connection = connections.get(scope, run.connectionId());
         return new Source(connection, connections.wooCredentials(scope, connection));
     }
