@@ -1,0 +1,70 @@
+#!/bin/sh
+# Seeds the local WooCommerce test store (B-05). Idempotent: safe to run on every `compose up`.
+# Local-only credentials. Products and API keys are fixtures for development and tests.
+set -eu
+
+cd /var/www/html
+
+echo "Waiting for WordPress files and wp-config.php..."
+i=0
+until [ -f wp-config.php ] && wp db check >/dev/null 2>&1; do
+  i=$((i + 1))
+  [ "$i" -gt 90 ] && { echo "WordPress not ready after 180 s" >&2; exit 1; }
+  sleep 2
+done
+
+if wp option get operator_seed_version >/dev/null 2>&1; then
+  echo "Store already seeded (operator_seed_version=$(wp option get operator_seed_version))."
+  exit 0
+fi
+
+wp core install --url="$WOO_URL" --title="Operator Test Store" \
+  --admin_user=admin --admin_password=admin --admin_email=admin@shop.local --skip-email
+
+wp option update timezone_string UTC
+wp rewrite structure '/%postname%/' --hard
+
+# WOOCOMMERCE_SOURCE may point to a local zip (offline installs); default is the GitHub release.
+WOOCOMMERCE_SOURCE=${WOOCOMMERCE_SOURCE:-"https://github.com/woocommerce/woocommerce/releases/download/${WOOCOMMERCE_VERSION}/woocommerce.zip"}
+wp plugin install "$WOOCOMMERCE_SOURCE" --activate
+
+wp option update woocommerce_currency PLN
+wp option update woocommerce_default_country PL
+wp option update woocommerce_manage_stock yes
+wp option update woocommerce_onboarding_profile '{"skipped":true}' --format=json
+wp option update woocommerce_coming_soon no
+
+# Variable product with three size variants and per-variant stock.
+PRODUCT_ID=$(wp wc product create --user=admin --porcelain \
+  --name="Koszulka Basic" --type=variable --sku=TSHIRT-BASIC --status=publish \
+  --attributes='[{"name":"Rozmiar","options":["S","M","L"],"variation":true,"visible":true}]')
+
+for spec in "S:TSHIRT-BASIC-S:18" "M:TSHIRT-BASIC-M:3" "L:TSHIRT-BASIC-L:0"; do
+  size=${spec%%:*}; rest=${spec#*:}; sku=${rest%%:*}; qty=${rest#*:}
+  wp wc product_variation create "$PRODUCT_ID" --user=admin --porcelain \
+    --sku="$sku" --regular_price=79.00 --manage_stock=true --stock_quantity="$qty" \
+    --attributes="[{\"name\":\"Rozmiar\",\"option\":\"$size\"}]" >/dev/null
+done
+
+# Simple product for the non-variant path.
+wp wc product create --user=admin --porcelain \
+  --name="Kubek Logo" --type=simple --sku=MUG-LOGO --status=publish \
+  --regular_price=39.00 --manage_stock=true --stock_quantity=49 >/dev/null
+
+# Deterministic read-only REST API key for local integration work (B-12).
+wp eval '
+global $wpdb;
+$ck = "ck_local_operator_0000000000000000000000";
+$cs = "cs_local_operator_0000000000000000000000";
+$wpdb->insert($wpdb->prefix . "woocommerce_api_keys", array(
+  "user_id" => 1,
+  "description" => "Operator local (read)",
+  "permissions" => "read",
+  "consumer_key" => wc_api_hash($ck),
+  "consumer_secret" => $cs,
+  "truncated_key" => substr($ck, -7),
+));
+'
+
+wp option add operator_seed_version 1
+echo "Seed complete: product $PRODUCT_ID with 3 variants + 1 simple product."
