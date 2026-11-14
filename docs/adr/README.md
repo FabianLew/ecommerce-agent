@@ -12,6 +12,6 @@ Statusy: `Proponowany` → `Zaakceptowany` (po akceptacji właściciela w PR) �
 | [0003](0003-module-convention.md) | Konwencja modułów backendu | Zaakceptowany |
 | [0004](0004-tenancy-and-store-scope.md) | Model tenancy i zaufany zakres sklepu | Zaakceptowany z poprawkami |
 | [0005](0005-data-access.md) | Dostęp do danych przez JdbcClient i jawny SQL | Zaakceptowany |
-| [0006](0006-frontend-and-session.md) | Frontend Next.js z sesją po stronie serwera (BFF) i klientem z kontraktu OpenAPI | Proponowany |
+| [0006](0006-frontend-and-session.md) | Frontend Next.js z sesją po stronie serwera (BFF) i klientem z kontraktu OpenAPI | Zaakceptowany |
 
 Szablon: [0000-template.md](0000-template.md).

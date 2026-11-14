@@ -1,6 +1,6 @@
 # ADR-0006: Frontend Next.js z sesją po stronie serwera (BFF) i klientem z kontraktu OpenAPI
 
-- Status: Proponowany
+- Status: Zaakceptowany (akceptacja właściciela, 2026-11-14)
 - Data: 2026-11-14
 - Powiązania: plan (decyzja I5: Spring Security + OIDC, Keycloak), dokument 04 §2–3, §14–15, backlog B-09,
   B-10, ADR-0001 (zasada wersji), ADR-0004 (zakres sklepu)
