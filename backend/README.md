@@ -71,6 +71,14 @@ np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_A
 - Dostępny stan: `InventoryReading.availableToSell()` odejmuje rezerwacje tylko przy semantyce
   `SEPARATE_RESERVATIONS` (IG-02, bez podwójnego odejmowania).
 
+## Integracje (B-12)
+
+- Połączenie WooCommerce: `GET /api/v1/stores/{storeId}/integrations`, `POST .../integration-connections`,
+  `POST .../integration-connections/{id}/credentials`, `POST .../integrations/{id}/checks` (ADR-0007).
+- Sekrety są szyfrowane AES-256-GCM kluczem z `INTEGRATION_SECRETS_KEY` (base64, 32 bajty; bez niego aplikacja
+  nie startuje). Profil `local` ma klucz deweloperski i pozwala na `http://` oraz adresy prywatne (lokalny Woo).
+- Test z prawdziwym lokalnym WooCommerce: `WOO_LIVE_URL=http://localhost:8081 ./gradlew test --tests '*WooCommerceLiveTest'`.
+
 ## Zasady
 
 - Moduły to podpakiety `com.ecommerceagent`; dozwolone zależności są w `package-info.java` każdego modułu.

@@ -1,11 +1,17 @@
 package com.ecommerceagent.web;
 
+import java.util.List;
+
 import com.ecommerceagent.identity.StoreAccessDeniedException;
+import com.ecommerceagent.integration.IntegrationConflictException;
+import com.ecommerceagent.integration.IntegrationNotFoundException;
+import com.ecommerceagent.integration.InvalidIntegrationRequestException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -17,7 +23,8 @@ class ApiExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
-    @ExceptionHandler({ResourceNotFoundException.class, NoResourceFoundException.class})
+    @ExceptionHandler({ResourceNotFoundException.class, NoResourceFoundException.class,
+            IntegrationNotFoundException.class})
     ResponseEntity<ApiError> notFound(HttpServletRequest request) {
         return error(request, HttpStatus.NOT_FOUND, "NOT_FOUND", "The resource does not exist or is not available.",
                 false);
@@ -27,6 +34,25 @@ class ApiExceptionHandler {
     ResponseEntity<ApiError> forbidden(HttpServletRequest request) {
         return error(request, HttpStatus.FORBIDDEN, "FORBIDDEN",
                 "You do not have permission to perform this operation.", false);
+    }
+
+    @ExceptionHandler(InvalidIntegrationRequestException.class)
+    ResponseEntity<ApiError> invalid(HttpServletRequest request, InvalidIntegrationRequestException exception) {
+        ApiError error = new ApiError("VALIDATION_FAILED", "Correct the highlighted fields.",
+                List.of(new ApiError.FieldError(exception.field(), exception.code(), exception.getMessage())), false,
+                RequestCorrelationFilter.requestId(request), null);
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(error);
+    }
+
+    @ExceptionHandler(IntegrationConflictException.class)
+    ResponseEntity<ApiError> conflict(HttpServletRequest request) {
+        return error(request, HttpStatus.CONFLICT, "ALREADY_CONNECTED",
+                "This store already has a connection for the provider.", false);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ResponseEntity<ApiError> malformed(HttpServletRequest request) {
+        return error(request, HttpStatus.BAD_REQUEST, "MALFORMED_REQUEST", "The request body is not valid.", false);
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

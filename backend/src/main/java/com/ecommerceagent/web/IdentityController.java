@@ -1,6 +1,5 @@
 package com.ecommerceagent.web;
 
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -63,14 +62,6 @@ class IdentityController {
         static StoreResponse from(AccessibleStore store, Set<StorePermission> permissions) {
             return new StoreResponse(store.storeId(), store.organizationId(), store.organizationName(),
                     store.name(), store.currency(), store.timezone(), store.roles(), permissions);
-        }
-    }
-
-    /** List envelope from document 04 §3; stores are not paginated yet. */
-    record ListResponse<T>(@Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<T> items, String nextCursor, @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean hasMore) {
-
-        static <T> ListResponse<T> complete(List<T> items) {
-            return new ListResponse<>(items, null, false);
         }
     }
 }

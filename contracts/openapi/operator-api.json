@@ -27,6 +27,51 @@
         },
         "required" : [ "code", "message", "retryable" ]
       },
+      "CheckResponse" : {
+        "properties" : {
+          "checkedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "errorCode" : {
+            "enum" : [ "AUTH_FAILED", "PERMISSION_DENIED", "UNREACHABLE", "TLS_ERROR", "NOT_WOOCOMMERCE", "ADDRESS_NOT_ALLOWED", "UNEXPECTED_RESPONSE" ],
+            "type" : "string"
+          },
+          "integration" : {
+            "$ref" : "#/components/schemas/IntegrationResponse"
+          },
+          "sourceCurrency" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "PENDING_CREDENTIALS", "CHECK_REQUIRED", "CONNECTED", "ERROR" ],
+            "type" : "string"
+          },
+          "warnings" : {
+            "items" : {
+              "enum" : [ "CURRENCY_MISMATCH", "CURRENCY_UNKNOWN" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "checkedAt", "integration", "status", "warnings" ],
+        "type" : "object"
+      },
+      "CreateConnectionRequest" : {
+        "properties" : {
+          "provider" : {
+            "enum" : [ "WOOCOMMERCE" ],
+            "type" : "string"
+          },
+          "storeUrl" : {
+            "example" : "https://shop.example.com",
+            "type" : "string"
+          }
+        },
+        "required" : [ "provider", "storeUrl" ],
+        "type" : "object"
+      },
       "FieldError" : {
         "properties" : {
           "code" : {
@@ -40,6 +85,78 @@
           }
         },
         "required" : [ "code", "field", "message" ]
+      },
+      "IntegrationResponse" : {
+        "properties" : {
+          "allowedActions" : {
+            "items" : {
+              "enum" : [ "SAVE_CREDENTIALS", "RUN_CHECK" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "keyHint" : {
+            "description" : "Last 4 characters of the API key",
+            "type" : "string"
+          },
+          "lastCheckAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "lastErrorCode" : {
+            "enum" : [ "AUTH_FAILED", "PERMISSION_DENIED", "UNREACHABLE", "TLS_ERROR", "NOT_WOOCOMMERCE", "ADDRESS_NOT_ALLOWED", "UNEXPECTED_RESPONSE" ],
+            "type" : "string"
+          },
+          "lastSuccessAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "provider" : {
+            "enum" : [ "WOOCOMMERCE" ],
+            "type" : "string"
+          },
+          "sourceCurrency" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "PENDING_CREDENTIALS", "CHECK_REQUIRED", "CONNECTED", "ERROR" ],
+            "type" : "string"
+          },
+          "storeUrl" : {
+            "type" : "string"
+          },
+          "warnings" : {
+            "items" : {
+              "enum" : [ "CURRENCY_MISMATCH", "CURRENCY_UNKNOWN" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "allowedActions", "id", "provider", "status", "storeUrl", "warnings" ],
+        "type" : "object"
+      },
+      "ListResponseIntegrationResponse" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/IntegrationResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "hasMore", "items" ],
+        "type" : "object"
       },
       "ListResponseStoreResponse" : {
         "properties" : {
@@ -115,6 +232,20 @@
           }
         },
         "required" : [ "currency", "name", "organizationId", "organizationName", "permissions", "roles", "storeId", "timezone" ],
+        "type" : "object"
+      },
+      "WooCommerceCredentialsRequest" : {
+        "properties" : {
+          "consumerKey" : {
+            "type" : "string",
+            "writeOnly" : true
+          },
+          "consumerSecret" : {
+            "type" : "string",
+            "writeOnly" : true
+          }
+        },
+        "required" : [ "consumerKey", "consumerSecret" ],
         "type" : "object"
       }
     },
@@ -243,6 +374,332 @@
           }
         },
         "tags" : [ "identity-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/integration-connections" : {
+      "post" : {
+        "operationId" : "create",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateConnectionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/IntegrationResponse"
+                }
+              }
+            },
+            "description" : "Created"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "integration-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/integration-connections/{connectionId}/credentials" : {
+      "post" : {
+        "operationId" : "credentials",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "connectionId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WooCommerceCredentialsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/IntegrationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "integration-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/integrations" : {
+      "get" : {
+        "operationId" : "list",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseIntegrationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "integration-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/integrations/{integrationId}" : {
+      "get" : {
+        "operationId" : "get",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "integrationId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/IntegrationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "integration-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/integrations/{integrationId}/checks" : {
+      "post" : {
+        "operationId" : "check",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "integrationId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CheckResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "integration-controller" ]
       }
     }
   },

@@ -4,3 +4,13 @@
 spring:
   flyway:
     locations: classpath:db/migration,classpath:db/local
+
+operator:
+  integration:
+    # Local development key only. Never use it outside the local docker compose environment.
+    secrets-key: ${INTEGRATION_SECRETS_KEY:2C5y2DMN6l64uxs1CeLtgJgw5tDMik2fYYHzg5uwX/8=}
+    secrets-key-id: local-v1
+    woocommerce:
+      # The local test store runs on http://localhost:8081 (OAuth 1.0a signatures, ADR-0007).
+      allow-insecure-http: true
+      allow-private-network: true
