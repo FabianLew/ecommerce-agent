@@ -88,6 +88,17 @@ np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_A
 - Lokalnie: API (`api,local`) i worker (`worker,local --server.port=8090`), potem przycisk „Importuj dane z
   ostatnich 14 dni” w Integracjach.
 
+## Metrics Engine v1 (B-17)
+
+- `InventoryMetrics.coverage(scope, variantId, asOf)` liczy `UNITS_SOLD@v1`, `SALES_VELOCITY_7_FULL_LOCAL_DAYS@v1`
+  i `DAYS_OF_COVER@v1` deterministycznie, bez LLM (dokument 03 §2, §4).
+- Okno: 7 pełnych dni lokalnych sklepu przed dniem `asOf`, po `placed_at`; statusy kwalifikowane v1:
+  `processing`, `completed`, `on-hold`. Ułamki: skala 4, HALF_UP (IG-01: 18 / (49 / 7) = 2.5714).
+- Brak danych to `null` z przyczyną (`MetricReason`), nigdy zero: niepełne zamówienia w oknie, brak sprzedaży,
+  stan nieśledzony lub wspólny dla wariantów, brak odczytu stanu. Stockout w oknie oznacza prognozę jako
+  ograniczoną (IG-25).
+- Testy złote: `InventoryMetricsGoldenTest` (IG-01, IG-02, IG-03, IG-25).
+
 ## Zasady
 
 - Moduły to podpakiety `com.ecommerceagent`; dozwolone zależności są w `package-info.java` każdego modułu.

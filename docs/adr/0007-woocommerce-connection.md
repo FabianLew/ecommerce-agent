@@ -1,6 +1,6 @@
 # ADR-0007: Połączenie WooCommerce: sekrety, uwierzytelnianie i ochrona przed SSRF
 
-- Status: Proponowany
+- Status: Zaakceptowany (akceptacja właściciela, 2026-11-14)
 - Data: 2026-11-14
 - Powiązania: dokument 04 §10 (Integrations), ADR-0004 (zakres sklepu), ADR-0005 (dostęp do danych), backlog B-12
 

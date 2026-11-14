@@ -1,6 +1,6 @@
 # ADR-0008: Import WooCommerce (14 dni) i semantyka stanów magazynowych
 
-- Status: Proponowany
+- Status: Zaakceptowany (akceptacja właściciela, 2026-11-14)
 - Data: 2026-11-14
 - Powiązania: dokument 03 (Inventory Guardian, IG-02, IG-25), ADR-0004, ADR-0007, backlog B-13, B-13b
 
