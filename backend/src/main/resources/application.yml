@@ -50,6 +50,11 @@ operator:
       order-delay: 60s
     catalog:
       refresh-delay: 30s
+    sync:
+      # Temporal Schedules per connection (ADR-0010); the worker creates missing ones every minute.
+      schedules-enabled: true
+      poll-interval: 5m
+      reconcile-interval: 1h
 
 springdoc:
   api-docs:

@@ -101,6 +101,22 @@ public class OrderRepository {
         return true;
     }
 
+    /** Source modification time of a stored order, if we have it. */
+    public Optional<Instant> sourceUpdatedAt(TrustedStoreScope scope, CommerceSource source, String externalId) {
+        return jdbc.sql("""
+                        SELECT source_updated_at FROM customer_order
+                        WHERE source = :source AND external_id = :externalId
+                          AND organization_id = :organizationId AND store_id = :storeId
+                        """)
+                .param("source", source.name())
+                .param("externalId", externalId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .query((rs, n) -> Optional.ofNullable(rs.getTimestamp(1)).map(Timestamp::toInstant))
+                .optional()
+                .flatMap(value -> value);
+    }
+
     /** Units of a variant in orders placed in [from, toExclusive) with one of the given statuses. */
     public long unitsSold(TrustedStoreScope scope, UUID variantId, Instant from, Instant toExclusive,
             Collection<String> statuses) {

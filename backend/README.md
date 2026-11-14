@@ -111,6 +111,19 @@ np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_A
 - Opóźnienia: `operator.automation.inventory.verify-delay` (10 s), `order-delay` (60 s),
   `operator.automation.catalog.refresh-delay` (30 s). Test replay: `temporal/variant-inventory-v1.json`.
 
+## Polling, rekonsyliacja i Integration Health (B-16)
+
+- Worker co minutę tworzy brakujące Temporal Schedules dla połączeń z udanym importem (`SyncSchedules`):
+  `woo-poll-{connectionId}` (produkty i wariacje zmienione od watermarku, co 5 min) i
+  `woo-reconcile-{connectionId}` (zamówienia z porównaniem `X-WP-Total`, co godzinę). Oba uruchamiają
+  `IncrementalSyncWorkflow` jako aktor `woo-sync`.
+- Watermarki (`sync_watermark`) przesuwają się tylko po pełnym odczycie; pokrycie zamówień rośnie tylko przy
+  zgodnym liczniku. Każdy przebieg zapisuje `sync_check` z liczbą zmian i zgubionych webhooków.
+- `health` w odpowiedzi integracji liczony przy odczycie: `NOT_READY`, `STALE` (blokuje analizę),
+  `DEGRADED`, `HEALTHY`, z kodami powodów (`IntegrationHealthService`).
+- Ustawienia: `operator.automation.sync.poll-interval` (5 min), `reconcile-interval` (1 h),
+  `schedules-enabled` (w testach `false`: serwer testowy Temporal nie ma Schedules).
+
 ## Metrics Engine v1 (B-17)
 
 - `InventoryMetrics.coverage(scope, variantId, asOf)` liczy `UNITS_SOLD@v1`, `SALES_VELOCITY_7_FULL_LOCAL_DAYS@v1`

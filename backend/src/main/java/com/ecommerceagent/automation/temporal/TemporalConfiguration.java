@@ -3,6 +3,7 @@ package com.ecommerceagent.automation.temporal;
 import java.util.List;
 
 import io.temporal.client.WorkflowClientOptions;
+import io.temporal.client.schedules.ScheduleClientOptions;
 import io.temporal.spring.boot.TemporalOptionsCustomizer;
 import io.temporal.worker.WorkerFactoryOptions;
 import org.springframework.context.annotation.Bean;
@@ -14,6 +15,13 @@ class TemporalConfiguration {
 
     @Bean
     TemporalOptionsCustomizer<WorkflowClientOptions.Builder> storeContextPropagation(
+            StoreContextPropagator propagator) {
+        return builder -> builder.setContextPropagators(List.of(propagator));
+    }
+
+    /** Schedules store the store context in the header of each started workflow (ADR-0010). */
+    @Bean
+    TemporalOptionsCustomizer<ScheduleClientOptions.Builder> scheduleStoreContextPropagation(
             StoreContextPropagator propagator) {
         return builder -> builder.setContextPropagators(List.of(propagator));
     }

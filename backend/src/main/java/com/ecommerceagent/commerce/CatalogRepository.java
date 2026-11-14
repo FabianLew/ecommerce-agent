@@ -141,6 +141,22 @@ public class CatalogRepository {
                 .list();
     }
 
+    /** Source ids of this store's products of one type (e.g. variable products, whose variations are read separately). */
+    public List<String> productExternalIdsOfType(TrustedStoreScope scope, CommerceSource source, String productType) {
+        return jdbc.sql("""
+                        SELECT external_id FROM product
+                        WHERE source = :source AND product_type = :type
+                          AND organization_id = :organizationId AND store_id = :storeId
+                        ORDER BY external_id
+                        """)
+                .param("source", source.name())
+                .param("type", productType)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .query(String.class)
+                .list();
+    }
+
     /** Source id of one of this store's products. */
     public Optional<String> productExternalId(TrustedStoreScope scope, UUID productId) {
         return jdbc.sql("""

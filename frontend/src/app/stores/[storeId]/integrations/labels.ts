@@ -67,3 +67,28 @@ export const TOPIC_LABELS: Record<string, string> = {
   "product.created": "Produkt utworzony (Product created)",
   "product.updated": "Produkt zaktualizowany (Product updated)",
 };
+
+type Health = Integration["health"];
+
+export const HEALTH_LABELS: Record<Health["status"], string> = {
+  NOT_READY: "Niegotowa",
+  STALE: "Dane nieaktualne",
+  DEGRADED: "Działa z ostrzeżeniami",
+  HEALTHY: "Działa poprawnie",
+};
+
+/** One repair step per reason (ADR-0010). STALE blocks analysis that needs current data. */
+export const HEALTH_REASON_HELP: Record<Health["reasons"][number], string> = {
+  INITIAL_IMPORT_MISSING: "Uruchom import danych z ostatnich 14 dni.",
+  CONNECTION_NOT_CONNECTED: "Połączenie wymaga uwagi. Sprawdź połączenie albo zapisz nowy klucz API.",
+  POLL_STALE:
+    "Od ponad 15 minut nie udało się odczytać zmian ze sklepu. Sprawdź, czy sklep działa, i uruchom test połączenia.",
+  ORDERS_STALE:
+    "Kompletność zamówień potwierdziliśmy ponad 2 godziny temu. Analizy zależne od sprzedaży czekają na rekonsyliację.",
+  WEBHOOK_SECRET_MISSING:
+    "Webhooki nie są skonfigurowane. Zmiany dotrą z opóźnieniem do 5 minut. Skonfiguruj webhooki poniżej.",
+  MISSED_WEBHOOKS:
+    "Odczyt ze sklepu znalazł zmiany, których nie dostarczył webhook. Sprawdź w WooCommerce, czy webhooki są aktywne i mają ten sam sekret.",
+  WEBHOOK_FAILURES: "Część webhooków z ostatniej doby nie dała się przetworzyć. Zgłoś to zespołowi wsparcia.",
+  EVENT_BACKLOG: "Zdarzenia czekają na przetworzenie dłużej niż 5 minut. Zgłoś to zespołowi wsparcia.",
+};

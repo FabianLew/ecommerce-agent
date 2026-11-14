@@ -71,6 +71,11 @@ class WooPayloadNormalizer {
         return product(scope, inboxId.toString(), payload, false);
     }
 
+    /** An order just read from the source. */
+    Result applyOrder(TrustedStoreScope scope, JsonNode payload) {
+        return order(scope, payload);
+    }
+
     /** A product or variation just read from the source (authoritative at the moment of the read). */
     Result applyFresh(TrustedStoreScope scope, String readId, JsonNode payload) {
         return product(scope, readId, payload, true);

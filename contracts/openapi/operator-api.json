@@ -86,6 +86,44 @@
         },
         "required" : [ "code", "field", "message" ]
       },
+      "HealthResponse" : {
+        "properties" : {
+          "lastPollAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "lastReconcileAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "lastWebhookAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "missedWebhooks24h" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "ordersCompleteUntil" : {
+            "description" : "Orders are known to be complete up to this moment",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "reasons" : {
+            "items" : {
+              "enum" : [ "INITIAL_IMPORT_MISSING", "CONNECTION_NOT_CONNECTED", "POLL_STALE", "ORDERS_STALE", "WEBHOOK_SECRET_MISSING", "MISSED_WEBHOOKS", "WEBHOOK_FAILURES", "EVENT_BACKLOG" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "status" : {
+            "enum" : [ "NOT_READY", "STALE", "DEGRADED", "HEALTHY" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "missedWebhooks24h", "reasons", "status" ],
+        "type" : "object"
+      },
       "IntegrationResponse" : {
         "properties" : {
           "allowedActions" : {
@@ -94,6 +132,9 @@
               "type" : "string"
             },
             "type" : "array"
+          },
+          "health" : {
+            "$ref" : "#/components/schemas/HealthResponse"
           },
           "id" : {
             "format" : "uuid",
@@ -143,7 +184,7 @@
             "$ref" : "#/components/schemas/WebhookResponse"
           }
         },
-        "required" : [ "allowedActions", "id", "provider", "status", "storeUrl", "warnings", "webhook" ],
+        "required" : [ "allowedActions", "health", "id", "provider", "status", "storeUrl", "warnings", "webhook" ],
         "type" : "object"
       },
       "ListResponseIntegrationResponse" : {

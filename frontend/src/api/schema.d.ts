@@ -230,8 +230,27 @@ export interface components {
             field: string;
             message: string;
         };
+        HealthResponse: {
+            /** Format: date-time */
+            lastPollAt?: string;
+            /** Format: date-time */
+            lastReconcileAt?: string;
+            /** Format: date-time */
+            lastWebhookAt?: string;
+            /** Format: int32 */
+            missedWebhooks24h: number;
+            /**
+             * Format: date-time
+             * @description Orders are known to be complete up to this moment
+             */
+            ordersCompleteUntil?: string;
+            reasons: ("INITIAL_IMPORT_MISSING" | "CONNECTION_NOT_CONNECTED" | "POLL_STALE" | "ORDERS_STALE" | "WEBHOOK_SECRET_MISSING" | "MISSED_WEBHOOKS" | "WEBHOOK_FAILURES" | "EVENT_BACKLOG")[];
+            /** @enum {string} */
+            status: "NOT_READY" | "STALE" | "DEGRADED" | "HEALTHY";
+        };
         IntegrationResponse: {
             allowedActions: ("SAVE_CREDENTIALS" | "SAVE_WEBHOOK_SECRET" | "RUN_CHECK" | "START_SYNC")[];
+            health: components["schemas"]["HealthResponse"];
             /** Format: uuid */
             id: string;
             /** @description Last 4 characters of the API key */

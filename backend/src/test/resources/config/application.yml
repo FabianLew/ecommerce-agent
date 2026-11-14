@@ -20,3 +20,6 @@ operator:
       order-delay: 2s
     catalog:
       refresh-delay: 1s
+    sync:
+      # The Temporal test server has no schedules; tests start IncrementalSyncWorkflow directly.
+      schedules-enabled: false
