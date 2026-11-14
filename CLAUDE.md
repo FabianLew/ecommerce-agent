@@ -22,6 +22,10 @@
   Runtime woła `ChatModel` bezpośrednio (nie `ChatClient`), a konfiguracja zawsze ma
   `spring.ai.chat.client.tool-calling.enabled=false`.
 - Tenant/sklep pochodzi z zaufanego `TrustedStoreScope`, nigdy z argumentów modelu ani payloadu.
+  Zakres buduje tylko `StoreAccess` (użytkownik albo aktor systemowy); metody repozytoriów dla danych sklepu
+  przyjmują `TrustedStoreScope` i filtrują po `organization_id` i `store_id`; tabele sklepu mają złożony FK
+  do `store (id, organization_id)`; wrażliwa akcja woła `StoreAccess.reauthorize` tuż przed wykonaniem
+  (ADR-0004, ADR-0005).
 - Testy bezpieczeństwa runtime muszą przechodzić w 100% i blokują merge. Jakość rekomendacji LLM oceniamy
   osobno (scenariusze eksperckie, porównanie z deterministycznym baseline) jako raport, bez wymogu zgodności.
 - Pieniądze jako `BigDecimal` lub liczby całkowite w jednostkach najmniejszych z walutą; czas w UTC.

@@ -1,6 +1,6 @@
 # ADR-0002: Pętla narzędzi należy do runtime, nie do Spring AI
 
-- Status: Proponowany
+- Status: Zaakceptowany (merge PR, 2026-11-14)
 - Data: 2026-11-14
 - Powiązania: dokument 02 (sekcje 3–4: Agent Runtime, Tool Registry), dokument 03 (IG-11), backlog B-03,
   ADR-0001, `spikes/stack-compat`

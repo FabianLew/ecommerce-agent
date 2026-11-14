@@ -1,6 +1,6 @@
 # ADR-0003: Konwencja modułów backendu
 
-- Status: Proponowany
+- Status: Zaakceptowany (merge PR, 2026-11-14)
 - Data: 2026-11-14
 - Powiązania: plan architektury (B2 „Proponowana mapa modułów”, D1), dokument 02, ADR-0001, backlog B-04
 

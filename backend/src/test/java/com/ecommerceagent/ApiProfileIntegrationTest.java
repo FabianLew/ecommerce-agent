@@ -42,7 +42,7 @@ class ApiProfileIntegrationTest {
         List<String> applied = jdbc.queryForList(
                 "select version from flyway_schema_history where success order by installed_rank", String.class);
 
-        assertThat(applied).containsExactly("1");
+        assertThat(applied).startsWith("1", "2");
         assertThat(jdbc.queryForObject("select version()", String.class)).startsWith("PostgreSQL 17.");
     }
 }

@@ -1,0 +1,6 @@
+# Profile "local": development against infra/docker-compose. Adds demo tenants matching the
+# Keycloak users owner-a / owner-b (fixed IDs in infra/keycloak/operator-realm.json).
+# Use together with api or worker, e.g. --spring.profiles.active=api,local
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/local
