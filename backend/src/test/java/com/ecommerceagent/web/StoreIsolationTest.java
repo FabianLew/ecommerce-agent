@@ -3,12 +3,16 @@ package com.ecommerceagent.web;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Map;
 import java.util.UUID;
 
 import com.ecommerceagent.TestcontainersConfiguration;
+import com.ecommerceagent.identity.StorePermission;
+import com.ecommerceagent.identity.TrustedStoreScope;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +23,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Runtime safety (ADR-0004): a member of store A never sees store B, and cannot tell whether a
@@ -27,8 +33,18 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("api")
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, StoreIsolationTest.ManageProbeController.class})
 class StoreIsolationTest {
+
+    /** Stand-in for the first STORE_MANAGE endpoint until one exists in the product API. */
+    @RestController
+    static class ManageProbeController {
+
+        @PostMapping("/api/v1/stores/{storeId}/test-manage-probe")
+        Map<String, String> manage(@RequiresPermission(StorePermission.STORE_MANAGE) TrustedStoreScope scope) {
+            return Map.of("storeId", scope.storeId().toString());
+        }
+    }
 
     static final String ISSUER = "https://issuer.test/realms/operator";
 
@@ -153,6 +169,57 @@ class StoreIsolationTest {
                 .query(Long.class).single()).isEqualTo(1);
         mvc.perform(get("/api/v1/stores").with(user("new-subject")))
                 .andExpect(jsonPath("$.items.length()").value(0));
+    }
+
+    @Test
+    void storeDetailsExposeCurrentPermissions() throws Exception {
+        mvc.perform(get("/api/v1/stores/{id}", STORE_A).with(user("subject-a")))
+                .andExpect(jsonPath("$.permissions.length()").value(2))
+                .andExpect(jsonPath("$.permissions[1]").value("STORE_MANAGE"));
+        mvc.perform(get("/api/v1/stores/{id}", STORE_A).with(user("subject-b")))
+                .andExpect(jsonPath("$.permissions.length()").value(1))
+                .andExpect(jsonPath("$.permissions[0]").value("STORE_READ"));
+    }
+
+    @Test
+    void manageEndpointRequiresStoreManagePermission() throws Exception {
+        mvc.perform(post("/api/v1/stores/{id}/test-manage-probe", STORE_A).with(user("subject-a")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.storeId").value(STORE_A.toString()));
+        mvc.perform(post("/api/v1/stores/{id}/test-manage-probe", STORE_A).with(user("subject-b")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.requestId").isNotEmpty());
+    }
+
+    @Test
+    void missingPermissionIsAuditedAndNonMembersStillGet404() throws Exception {
+        long before = permissionDeniedEvents();
+
+        mvc.perform(post("/api/v1/stores/{id}/test-manage-probe", STORE_A).with(user("subject-b")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/stores/{id}/test-manage-probe", STORE_B).with(user("subject-a")))
+                .andExpect(status().isNotFound());
+
+        assertThat(permissionDeniedEvents()).isEqualTo(before + 1);
+    }
+
+    @Test
+    void revokedMembershipTakesEffectOnTheNextRequest() throws Exception {
+        mvc.perform(get("/api/v1/stores/{id}", STORE_A).with(user("subject-b"))).andExpect(status().isOk());
+
+        jdbc.sql("DELETE FROM store_membership WHERE user_id = ? AND store_id = ?").params(USER_B, STORE_A).update();
+
+        mvc.perform(get("/api/v1/stores/{id}", STORE_A).with(user("subject-b"))).andExpect(status().isNotFound());
+    }
+
+    private long permissionDeniedEvents() {
+        return jdbc.sql("""
+                        SELECT count(*) FROM audit_event
+                        WHERE action = 'STORE_PERMISSION_DENIED' AND actor_user_id = ? AND store_id = ?
+                          AND details->>'permission' = 'STORE_MANAGE'
+                        """)
+                .params(USER_B, STORE_A).query(Long.class).single();
     }
 
     /** 404 body without the per-request requestId, which differs on every call by design. */

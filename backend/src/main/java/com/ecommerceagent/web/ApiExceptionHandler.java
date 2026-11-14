@@ -1,5 +1,6 @@
 package com.ecommerceagent.web;
 
+import com.ecommerceagent.identity.StoreAccessDeniedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,12 @@ class ApiExceptionHandler {
                 false);
     }
 
+    @ExceptionHandler(StoreAccessDeniedException.class)
+    ResponseEntity<ApiError> forbidden(HttpServletRequest request) {
+        return error(request, HttpStatus.FORBIDDEN, "FORBIDDEN",
+                "You do not have permission to perform this operation.", false);
+    }
+
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     ResponseEntity<ApiError> methodNotAllowed(HttpServletRequest request) {
         return error(request, HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED",
@@ -41,4 +48,5 @@ class ApiExceptionHandler {
         return ResponseEntity.status(status)
                 .body(ApiError.of(code, message, retryable, RequestCorrelationFilter.requestId(request)));
     }
+
 }
