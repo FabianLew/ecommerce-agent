@@ -56,6 +56,12 @@ operator:
       schedules-enabled: true
       poll-interval: 5m
       reconcile-interval: 1h
+    history:
+      # Order history of 12 months, read backward in 30-day chunks after the initial import (ADR-0015).
+      enabled: true
+      interval: 10m
+      max-chunks-per-run: 6
+      pause: 2s
 
   inventory-guardian:
     risk:

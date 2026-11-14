@@ -50,6 +50,7 @@ class ActivityController {
             Map.entry("INTEGRATION_CHECK_COMPLETED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_SYNC_STARTED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_SYNC_FINISHED", ActivityType.INTEGRATION),
+            Map.entry("INTEGRATION_HISTORY_COMPLETED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_WEBHOOK_SECRET_UPDATED", ActivityType.INTEGRATION));
 
     private final AuditTrail audit;

@@ -200,4 +200,23 @@ public class OrderRepository {
                 .param("now", Timestamp.from(clock.instant()))
                 .update();
     }
+
+    /**
+     * Extends the start of the known coverage back to {@code from} when [from, until) touches it (ADR-0015). It never
+     * creates or replaces coverage and never moves its end; returns whether the coverage changed.
+     */
+    public boolean extendCoverageBack(TrustedStoreScope scope, CommerceSource source, Instant from, Instant until) {
+        return jdbc.sql("""
+                        UPDATE order_sync_coverage SET complete_from = :from, updated_at = :now
+                        WHERE organization_id = :organizationId AND store_id = :storeId AND source = :source
+                          AND complete_from > :from AND complete_from <= :until
+                        """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .param("source", source.name())
+                .param("from", Timestamp.from(from))
+                .param("until", Timestamp.from(until))
+                .param("now", Timestamp.from(clock.instant()))
+                .update() > 0;
+    }
 }
