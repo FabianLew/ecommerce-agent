@@ -144,6 +144,14 @@ np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_A
 - `ContextSnapshots` (moduł `decisions`) zapisuje snapshot raz, z listą dowodów tego samego sklepu; odczyt tylko
   przez `TrustedStoreScope`.
 
+## Reklamy i mapowania SKU–reklama (B-20)
+
+- `AdRepository` (moduł `commerce`): reklamy Meta (własny i efektywny status, fingerprint kreacji) i mapowania na
+  warianty z wersją rosnącą przy każdej zmianie. Weryfikacja dotyczy kreacji, dla której ją wykonano
+  (`AdMapping.currentFor`).
+- Do czasu adaptera Meta (F2) lokalny worker co minutę wczytuje `infra/fixtures/meta-ads.json`
+  (`operator.commerce.ad-fixture-file`): dedykowaną reklamę `ad-9001` dla `TSHIRT-BASIC-S` i katalogową `ad-9002`.
+
 ## Zasady
 
 - Moduły to podpakiety `com.ecommerceagent`; dozwolone zależności są w `package-info.java` każdego modułu.

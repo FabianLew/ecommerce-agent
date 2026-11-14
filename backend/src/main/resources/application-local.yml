@@ -6,6 +6,9 @@ spring:
     locations: classpath:db/migration,classpath:db/local
 
 operator:
+  commerce:
+    # Ads and SKU mappings stand in for the Meta adapter until F2 (B-20); path relative to backend/.
+    ad-fixture-file: ${AD_FIXTURE_FILE:../infra/fixtures/meta-ads.json}
   integration:
     # Local development key only. Never use it outside the local docker compose environment.
     secrets-key: ${INTEGRATION_SECRETS_KEY:2C5y2DMN6l64uxs1CeLtgJgw5tDMik2fYYHzg5uwX/8=}
