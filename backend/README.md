@@ -61,6 +61,16 @@ np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_A
   `src/test/resources/temporal/scope-check-v1.json`. Po zamierzonej (wersjonowanej) zmianie workflow:
   `./gradlew test -PrecordTemporalFixtures` i nowa wersja pliku.
 
+## Model handlu (B-11)
+
+- Moduł `commerce`, migracja `V3__commerce.sql`: `product`, `product_variant` (jednostka sprzedaży), append-only
+  `inventory_observation`, `customer_order` + `order_line` (bez danych osobowych klientów),
+  `order_sync_coverage` (okres, za który zamówienia są kompletne).
+- Tabele potomne wskazują rodzica przez `(id, store_id)`, więc wiersz nie może wskazywać danych innego sklepu.
+- Upserty są idempotentne i ignorują dane starsze niż zapisany `source_updated_at`.
+- Dostępny stan: `InventoryReading.availableToSell()` odejmuje rezerwacje tylko przy semantyce
+  `SEPARATE_RESERVATIONS` (IG-02, bez podwójnego odejmowania).
+
 ## Zasady
 
 - Moduły to podpakiety `com.ecommerceagent`; dozwolone zależności są w `package-info.java` każdego modułu.
