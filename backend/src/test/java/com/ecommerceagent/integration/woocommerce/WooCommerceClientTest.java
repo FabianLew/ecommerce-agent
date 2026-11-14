@@ -146,13 +146,14 @@ class WooCommerceClientTest {
             out.write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n"
                     .getBytes(StandardCharsets.US_ASCII));
             byte[] chunk = " ".repeat(256).getBytes(StandardCharsets.US_ASCII);
-            for (int i = 0; i < 100; i++) {
+            // Keep streaming until the client gives up; a write fails once it has closed the connection.
+            for (int i = 0; i < 10_000; i++) {
                 out.write(("100\r\n").getBytes(StandardCharsets.US_ASCII));
                 out.write(chunk);
                 out.write("\r\n".getBytes(StandardCharsets.US_ASCII));
                 out.flush();
+                sleep(1);
             }
-            sleep(10_000);
         });
 
         assertThatThrownBy(() -> client.get(store.url(), CREDENTIALS, "products", Map.of()))
