@@ -1,0 +1,49 @@
+{
+  "realm": "operator",
+  "displayName": "E-commerce Operator (local)",
+  "enabled": true,
+  "sslRequired": "none",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "accessTokenLifespan": 300,
+  "clients": [
+    {
+      "clientId": "operator-web",
+      "name": "Operator web app (Next.js, server-side session)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "local-operator-web-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*"],
+      "webOrigins": ["http://localhost:3000"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/*"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "owner-a",
+      "email": "owner-a@shop.local",
+      "emailVerified": true,
+      "firstName": "Owner",
+      "lastName": "Store A",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "owner-a", "temporary": false }]
+    },
+    {
+      "username": "owner-b",
+      "email": "owner-b@shop.local",
+      "emailVerified": true,
+      "firstName": "Owner",
+      "lastName": "Store B",
+      "enabled": true,
+      "credentials": [{ "type": "password", "value": "owner-b", "temporary": false }]
+    }
+  ]
+}
