@@ -8,6 +8,8 @@ public class WooClientException extends Exception {
     public enum Kind {
         ADDRESS_NOT_ALLOWED,
         UNREACHABLE,
+        /** The store did not send the complete response before the deadline (headers and body). */
+        TIMEOUT,
         TLS_ERROR,
         RESPONSE_TOO_LARGE
     }

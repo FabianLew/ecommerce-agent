@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -75,6 +76,40 @@ class SyncRunRepository {
                 .param("storeId", scope.storeId())
                 .query(SyncRunRepository::map)
                 .optional();
+    }
+
+    /** Confirms the workflow start; the first confirmation wins. */
+    void markWorkflowStarted(TrustedStoreScope scope, UUID runId) {
+        jdbc.sql("""
+                        UPDATE sync_run SET workflow_started_at = :now
+                        WHERE id = :id AND organization_id = :organizationId AND store_id = :storeId
+                          AND workflow_started_at IS NULL
+                        """)
+                .param("now", Timestamp.from(clock.instant()))
+                .param("id", runId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .update();
+    }
+
+    /**
+     * Running imports of all stores, oldest first, for the system reconciler only (FIX-02). Returns
+     * identifiers, never store data; every follow-up call uses a scope built for that run's store.
+     */
+    List<SyncRunDispatch> running(int limit) {
+        return jdbc.sql("""
+                        SELECT id, organization_id, store_id, started_at, workflow_started_at FROM sync_run
+                        WHERE status = 'RUNNING' ORDER BY started_at LIMIT :limit
+                        """)
+                .param("limit", limit)
+                .query((rs, rowNum) -> new SyncRunDispatch(
+                        rs.getObject("id", UUID.class),
+                        rs.getObject("organization_id", UUID.class),
+                        rs.getObject("store_id", UUID.class),
+                        rs.getTimestamp("started_at").toInstant(),
+                        rs.getTimestamp("workflow_started_at") == null ? null
+                                : rs.getTimestamp("workflow_started_at").toInstant()))
+                .list();
     }
 
     void recordCatalog(TrustedStoreScope scope, UUID runId, int products, int variants) {
