@@ -1,6 +1,6 @@
 # ADR-0009: Webhooki WooCommerce: rejestracja, podpis, inbox, normalizacja i outbox
 
-- Status: Proponowany (wariant rejestracji ręcznej wybrany przez właściciela, 2026-11-14)
+- Status: Zaakceptowany (wariant rejestracji ręcznej wybrany przez właściciela, 2026-11-14)
 - Data: 2026-11-14
 - Powiązania: dokument 01 §„Przepływ danych”, dokument 03 §3 i §11 (IG-04), dokument 04 §10, ADR-0004, ADR-0007,
   ADR-0008, backlog B-14 (B-15 i B-16 korzystają z outboxa)
