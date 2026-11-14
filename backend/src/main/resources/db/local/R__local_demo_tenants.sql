@@ -1,12 +1,14 @@
 -- Local-only demo data (profile "local"). Never on the default Flyway locations.
--- Organization "Demo" with two stores; owner-a may access only Store A, owner-b only Store B.
+-- Organization "Demo": owner-a owns Sklep A and is an analyst in Sklep C (store switching, read-only
+-- permissions); owner-b owns only Sklep B and must never see A or C.
 INSERT INTO organization (id, name) VALUES
     ('00000000-0000-4000-8000-000000000001', 'Demo')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO store (id, organization_id, name, currency, timezone) VALUES
     ('00000000-0000-4000-8000-00000000000a', '00000000-0000-4000-8000-000000000001', 'Sklep A', 'PLN', 'Europe/Warsaw'),
-    ('00000000-0000-4000-8000-00000000000b', '00000000-0000-4000-8000-000000000001', 'Sklep B', 'PLN', 'Europe/Warsaw')
+    ('00000000-0000-4000-8000-00000000000b', '00000000-0000-4000-8000-000000000001', 'Sklep B', 'PLN', 'Europe/Warsaw'),
+    ('00000000-0000-4000-8000-00000000000c', '00000000-0000-4000-8000-000000000001', 'Sklep C', 'EUR', 'Europe/Berlin')
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO app_user (id, issuer, subject, email, display_name) VALUES
@@ -20,5 +22,7 @@ INSERT INTO store_membership (organization_id, store_id, user_id, role) VALUES
     ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000000a',
      '00000000-0000-4000-8000-0000000000a1', 'OWNER'),
     ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000000b',
-     '00000000-0000-4000-8000-0000000000b1', 'OWNER')
+     '00000000-0000-4000-8000-0000000000b1', 'OWNER'),
+    ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-00000000000c',
+     '00000000-0000-4000-8000-0000000000a1', 'ANALYST')
 ON CONFLICT DO NOTHING;

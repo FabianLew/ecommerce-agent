@@ -10,6 +10,7 @@ import com.ecommerceagent.identity.StoreAccess;
 import com.ecommerceagent.identity.StorePermission;
 import com.ecommerceagent.identity.StoreRole;
 import com.ecommerceagent.identity.TrustedStoreScope;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,11 +43,18 @@ class IdentityController {
         return StoreResponse.from(storeAccess.store(scope), scope.permissions());
     }
 
-    record MeResponse(UUID userId, String email, String displayName) {
+    record MeResponse(@Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID userId, String email, String displayName) {
     }
 
-    record StoreResponse(UUID storeId, UUID organizationId, String organizationName, String name,
-            String currency, String timezone, Set<StoreRole> roles, Set<StorePermission> permissions) {
+    record StoreResponse(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID storeId,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID organizationId,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String organizationName,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String name,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String currency,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String timezone,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Set<StoreRole> roles,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Set<StorePermission> permissions) {
 
         static StoreResponse from(AccessibleStore store) {
             return from(store, StoreRole.permissionsOf(store.roles()));
@@ -59,7 +67,7 @@ class IdentityController {
     }
 
     /** List envelope from document 04 §3; stores are not paginated yet. */
-    record ListResponse<T>(List<T> items, String nextCursor, boolean hasMore) {
+    record ListResponse<T>(@Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<T> items, String nextCursor, @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean hasMore) {
 
         static <T> ListResponse<T> complete(List<T> items) {
             return new ListResponse<>(items, null, false);
