@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.ecommerce-agent.local/decision-proposal-v1.schema.json",
+  "title": "DecisionProposal v1",
+  "description": "Contract between a proposer (baseline or agent) and the backend (ADR-0012). The envelope is set by the backend; the recommendation comes from the proposer.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "proposalId", "revision", "subject", "proposer", "agentRunId", "contextSnapshotId",
+    "createdAt", "expiresAt", "recommendation"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "proposalId": { "$ref": "#/$defs/uuid" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "opportunityId"],
+      "properties": {
+        "type": { "const": "OPPORTUNITY" },
+        "opportunityId": { "$ref": "#/$defs/uuid" }
+      }
+    },
+    "proposer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "version"],
+      "properties": {
+        "kind": { "enum": ["BASELINE", "AGENT"] },
+        "name": { "$ref": "#/$defs/name" },
+        "version": { "$ref": "#/$defs/name" }
+      }
+    },
+    "agentRunId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/uuid" }] },
+    "contextSnapshotId": { "$ref": "#/$defs/uuid" },
+    "createdAt": { "$ref": "#/$defs/instant" },
+    "expiresAt": { "$ref": "#/$defs/instant" },
+    "recommendation": { "$ref": "#/$defs/recommendation" }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "instant": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z$"
+    },
+    "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+    "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,63}$" },
+    "text": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceId", "version"],
+      "properties": {
+        "evidenceId": { "$ref": "#/$defs/uuid" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "pauseAd": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "targetType", "targetId", "parameters"],
+      "properties": {
+        "type": { "const": "PAUSE_AD" },
+        "targetType": { "const": "META_AD" },
+        "targetId": { "$ref": "#/$defs/uuid" },
+        "parameters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["desiredStatus"],
+          "properties": {
+            "desiredStatus": { "const": "PAUSED" }
+          }
+        }
+      }
+    },
+    "monitorPlan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nextReviewAt", "conditions"],
+      "properties": {
+        "nextReviewAt": { "$ref": "#/$defs/instant" },
+        "conditions": { "type": "array", "minItems": 1, "maxItems": 10, "items": { "$ref": "#/$defs/code" } }
+      }
+    },
+    "recommendation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["disposition", "action", "monitorPlan", "evidence", "missingRequirements", "reasonCodes",
+        "summary", "uncertainties"],
+      "properties": {
+        "disposition": { "enum": ["RECOMMEND_ACTION", "NO_ACTION", "MONITOR", "INSUFFICIENT_DATA", "ESCALATE"] },
+        "action": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/pauseAd" }] },
+        "monitorPlan": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/monitorPlan" }] },
+        "evidence": { "type": "array", "minItems": 1, "maxItems": 50, "items": { "$ref": "#/$defs/evidenceRef" } },
+        "missingRequirements": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/code" } },
+        "reasonCodes": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "$ref": "#/$defs/code" } },
+        "summary": { "$ref": "#/$defs/text" },
+        "uncertainties": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/text" } }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "disposition": { "const": "RECOMMEND_ACTION" },
+            "action": { "$ref": "#/$defs/pauseAd" },
+            "monitorPlan": { "type": "null" }
+          }
+        },
+        {
+          "properties": {
+            "disposition": { "const": "MONITOR" },
+            "action": { "type": "null" },
+            "monitorPlan": { "$ref": "#/$defs/monitorPlan" }
+          }
+        },
+        {
+          "properties": {
+            "disposition": { "const": "INSUFFICIENT_DATA" },
+            "action": { "type": "null" },
+            "monitorPlan": { "type": "null" },
+            "missingRequirements": { "minItems": 1 }
+          }
+        },
+        {
+          "properties": {
+            "disposition": { "enum": ["NO_ACTION", "ESCALATE"] },
+            "action": { "type": "null" },
+            "monitorPlan": { "type": "null" }
+          }
+        }
+      ]
+    }
+  }
+}
