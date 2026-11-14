@@ -132,6 +132,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stores/{storeId}/integrations/{integrationId}/sync-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["startSync"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stores/{storeId}/integrations/{integrationId}/sync-jobs/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["syncJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -167,7 +199,7 @@ export interface components {
             message: string;
         };
         IntegrationResponse: {
-            allowedActions: ("SAVE_CREDENTIALS" | "RUN_CHECK")[];
+            allowedActions: ("SAVE_CREDENTIALS" | "RUN_CHECK" | "START_SYNC")[];
             /** Format: uuid */
             id: string;
             /** @description Last 4 characters of the API key */
@@ -178,6 +210,7 @@ export interface components {
             lastErrorCode?: "AUTH_FAILED" | "PERMISSION_DENIED" | "UNREACHABLE" | "TLS_ERROR" | "NOT_WOOCOMMERCE" | "ADDRESS_NOT_ALLOWED" | "UNEXPECTED_RESPONSE";
             /** Format: date-time */
             lastSuccessAt?: string;
+            lastSync?: components["schemas"]["SyncJobResponse"];
             /** @enum {string} */
             provider: "WOOCOMMERCE";
             sourceCurrency?: string;
@@ -213,6 +246,33 @@ export interface components {
             /** Format: uuid */
             storeId: string;
             timezone: string;
+        };
+        SyncJobRequest: {
+            /** @enum {string} */
+            scope: "INITIAL_14_DAYS";
+        };
+        SyncJobResponse: {
+            errorCode?: string;
+            /** Format: date-time */
+            finishedAt?: string;
+            /** Format: uuid */
+            id: string;
+            /** Format: int32 */
+            ordersExpected?: number;
+            /** Format: int32 */
+            ordersImported?: number;
+            /** Format: int32 */
+            productsImported?: number;
+            /** Format: date-time */
+            startedAt: string;
+            /** @enum {string} */
+            status: "RUNNING" | "SUCCEEDED" | "INCOMPLETE" | "FAILED";
+            /** Format: int32 */
+            variantsImported?: number;
+            /** Format: date-time */
+            windowFrom: string;
+            /** Format: date-time */
+            windowUntil: string;
         };
         WooCommerceCredentialsRequest: {
             consumerKey: string;
@@ -559,6 +619,111 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    startSync: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integrationId: string;
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SyncJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Accepted */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncJobResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    syncJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                integrationId: string;
+                jobId: string;
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncJobResponse"];
                 };
             };
             /** @description Missing or invalid access token */

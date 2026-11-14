@@ -6,6 +6,7 @@ import com.ecommerceagent.identity.StoreAccessDeniedException;
 import com.ecommerceagent.integration.IntegrationConflictException;
 import com.ecommerceagent.integration.IntegrationNotFoundException;
 import com.ecommerceagent.integration.InvalidIntegrationRequestException;
+import com.ecommerceagent.integration.SyncInProgressException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,6 +49,12 @@ class ApiExceptionHandler {
     ResponseEntity<ApiError> conflict(HttpServletRequest request) {
         return error(request, HttpStatus.CONFLICT, "ALREADY_CONNECTED",
                 "This store already has a connection for the provider.", false);
+    }
+
+    @ExceptionHandler(SyncInProgressException.class)
+    ResponseEntity<ApiError> syncInProgress(HttpServletRequest request) {
+        return error(request, HttpStatus.CONFLICT, "SYNC_IN_PROGRESS",
+                "An import for this integration is already running.", true);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

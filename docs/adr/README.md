@@ -14,5 +14,6 @@ Statusy: `Proponowany` → `Zaakceptowany` (po akceptacji właściciela w PR) �
 | [0005](0005-data-access.md) | Dostęp do danych przez JdbcClient i jawny SQL | Zaakceptowany |
 | [0006](0006-frontend-and-session.md) | Frontend Next.js z sesją po stronie serwera (BFF) i klientem z kontraktu OpenAPI | Zaakceptowany |
 | [0007](0007-woocommerce-connection.md) | Połączenie WooCommerce: sekrety, uwierzytelnianie i ochrona przed SSRF | Proponowany |
+| [0008](0008-woocommerce-import-and-stock-semantics.md) | Import WooCommerce (14 dni) i semantyka stanów magazynowych | Proponowany |
 
 Szablon: [0000-template.md](0000-template.md).

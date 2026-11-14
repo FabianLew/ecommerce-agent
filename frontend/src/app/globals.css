@@ -430,3 +430,31 @@ nav ul {
 .inline-form {
   margin-top: 16px;
 }
+
+/* Import status (B-13). */
+.sync-empty {
+  margin: 16px 0 0;
+}
+
+.sync .badge {
+  margin: 0 0 12px;
+}
+
+.badge-sync-succeeded {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.badge-sync-failed,
+.badge-sync-incomplete {
+  background: var(--error-soft);
+  color: var(--error);
+  border-color: var(--error);
+}
+
+.badge-sync-running {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border-color: var(--warning);
+}

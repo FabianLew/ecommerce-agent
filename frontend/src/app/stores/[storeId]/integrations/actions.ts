@@ -127,3 +127,15 @@ function failure(
     message: `Nie udało się zapisać połączenia. Spróbuj ponownie (identyfikator zgłoszenia ${error?.requestId ?? "-"}).`,
   };
 }
+
+/** Starts the initial import (14 days). It runs in the background; the page polls until it finishes. */
+export async function startSync(storeId: string, integrationId: string): Promise<void> {
+  const path = storePath(storeId, "integrations");
+  const api = await backend(path);
+  const started = await api.POST("/api/v1/stores/{storeId}/integrations/{integrationId}/sync-jobs", {
+    params: { path: { storeId, integrationId } },
+    body: { scope: "INITIAL_14_DAYS" },
+  });
+  redirectIfUnauthenticated(started.response.status, path);
+  revalidatePath(path);
+}

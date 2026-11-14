@@ -38,3 +38,24 @@ export function formatInstant(value: string | undefined, timezone: string): stri
   );
 }
 
+
+type SyncJob = NonNullable<Integration["lastSync"]>;
+
+export const SYNC_STATUS_LABELS: Record<SyncJob["status"], string> = {
+  RUNNING: "Import w toku",
+  SUCCEEDED: "Synchronizacja ukończona",
+  INCOMPLETE: "Import niepełny",
+  FAILED: "Import nieudany",
+};
+
+/** What the user can do about a finished import (ADR-0008). */
+export function syncHelp(job: SyncJob): string | null {
+  if (job.status === "INCOMPLETE") {
+    return "WooCommerce zgłosił inną liczbę zamówień niż pobrana. Dane zapisano, ale metryki nie użyją tego okresu. Uruchom import ponownie.";
+  }
+  if (job.status === "FAILED") {
+    const code = job.errorCode as keyof typeof ERROR_HELP | undefined;
+    return code && code in ERROR_HELP ? ERROR_HELP[code] : "Import przerwał się z nieoczekiwanego powodu. Spróbuj ponownie.";
+  }
+  return null;
+}

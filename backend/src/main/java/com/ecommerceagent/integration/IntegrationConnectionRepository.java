@@ -103,6 +103,15 @@ class IntegrationConnectionRepository {
                 .single();
     }
 
+    /** Store timezone (IANA id) from the store settings; import windows start at local midnight. */
+    String storeTimezone(TrustedStoreScope scope) {
+        return jdbc.sql("SELECT timezone FROM store WHERE id = :storeId AND organization_id = :organizationId")
+                .param("storeId", scope.storeId())
+                .param("organizationId", scope.organizationId())
+                .query(String.class)
+                .single();
+    }
+
     void saveCredential(TrustedStoreScope scope, UUID connectionId, String name, SecretCipher.Sealed sealed) {
         int written = jdbc.sql("""
                         INSERT INTO integration_credential (connection_id, organization_id, store_id, name, ciphertext,

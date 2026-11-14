@@ -67,7 +67,7 @@ export default async function SectionPage({ params }: { params: Promise<{ storeI
       <StatePanel
         tone="info"
         title="Monitorowanie sklepu nie jest jeszcze uruchomione"
-        description="Pierwsze dane pojawią się po połączeniu WooCommerce (kolejna iteracja)."
+        description="Monitorowanie zacznie się po połączeniu WooCommerce i imporcie danych w sekcji Integracje."
       />
     </>
   );
