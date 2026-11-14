@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { StatePanel } from "@/components/StatePanel";
+import { getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { storePath } from "@/lib/store-path";
 
@@ -18,15 +19,12 @@ export default async function Home() {
   if (first) {
     redirect(storePath(first.storeId));
   }
+  const t = await getMessages();
   return (
     <main className="centered">
-      <StatePanel
-        tone="info"
-        title="Nie masz jeszcze dostępu do żadnego sklepu"
-        description="Poproś właściciela sklepu o dodanie Cię do zespołu. Po nadaniu dostępu odśwież stronę."
-      >
+      <StatePanel tone="info" title={t.home.noStoresTitle} description={t.home.noStoresDescription}>
         <form action="/auth/logout" method="post">
-          <button type="submit" className="button secondary">Wyloguj się</button>
+          <button type="submit" className="button secondary">{t.common.signOut}</button>
         </form>
       </StatePanel>
     </main>

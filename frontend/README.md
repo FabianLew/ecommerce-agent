@@ -28,6 +28,14 @@ only "Sklep B".
   session.
 - Server Components fetch API data through `backend()` from `src/lib/api.ts` (no cache).
 
+## Languages
+
+The interface is in English by default and in Polish as the second language (ADR-0013). Texts live in
+`src/i18n/en.ts` and `src/i18n/pl.ts`; the English catalog defines the type, so a text missing in Polish fails
+`pnpm typecheck`. Server components call `getMessages()`, client components `useMessages()`. The choice is kept in
+the `op_locale` cookie and changed with the language button in the header or on the sign-out page. Store data
+(names, products) is shown as entered and is not translated.
+
 ## API client
 
 The types in `src/api/schema.d.ts` are generated from `../contracts/openapi/operator-api.json`. Do not edit them by

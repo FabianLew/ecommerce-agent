@@ -87,8 +87,8 @@ e.g. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_
 - The `WooImportWorkflow` workflow (`worker` profile) imports the catalog with stock levels, then the orders since
   midnight store time 14 days ago. The period goes into `order_sync_coverage` only when it matches `X-WP-Total`
   (ADR-0008).
-- Locally: the API (`api,local`) and the worker (`worker,local --server.port=8090`), then the "Importuj dane z
-  ostatnich 14 dni" (import data from the last 14 days) button in Integrations.
+- Locally: the API (`api,local`) and the worker (`worker,local --server.port=8090`), then the "Import data from the
+  last 14 days" button in Integrations.
 
 ## WooCommerce webhooks (B-14)
 

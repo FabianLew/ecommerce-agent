@@ -2,8 +2,10 @@
 
 import { useActionState, useState } from "react";
 
+import { useMessages } from "@/i18n/LocaleProvider";
+
 import { saveWebhookSecret, type WebhookSecretState } from "./actions";
-import { TOPIC_LABELS, type Integration } from "./labels";
+import type { Integration } from "./labels";
 
 const INITIAL: WebhookSecretState = { status: "idle" };
 
@@ -28,24 +30,22 @@ export function WebhookSetup({
 }) {
   const [state, action, pending] = useActionState(saveWebhookSecret.bind(null, storeId, integrationId), INITIAL);
   const [secret, setSecret] = useState("");
+  const { integrations } = useMessages();
+  const t = integrations.webhookSetup;
 
   return (
     <div className="webhook-setup">
-      <p className="muted">
-        Webhooki przyspieszają aktualizację stanów i zamówień. Utwórz je ręcznie w WooCommerce → Ustawienia →
-        Zaawansowane → Webhooki: po jednym dla każdego tematu, status „Aktywny”, wersja API „WP REST API
-        Integration v3”, ten sam adres i ten sam sekret. Bez webhooków dane i tak odświeży okresowa synchronizacja.
-      </p>
+      <p className="muted">{t.intro}</p>
       <dl className="details">
-        <dt>Adres dostawy</dt>
+        <dt>{t.deliveryUrl}</dt>
         <dd data-testid="webhook-url">
-          {webhook.deliveryUrl ? <code>{webhook.deliveryUrl}</code> : "Adres publiczny API nie jest skonfigurowany."}
+          {webhook.deliveryUrl ? <code>{webhook.deliveryUrl}</code> : t.deliveryUrlMissing}
         </dd>
-        <dt>Tematy</dt>
+        <dt>{t.topics}</dt>
         <dd>
           <ul className="plain-list">
             {webhook.topics.map((topic) => (
-              <li key={topic}>{TOPIC_LABELS[topic] ?? topic}</li>
+              <li key={topic}>{integrations.topics[topic] ?? topic}</li>
             ))}
           </ul>
         </dd>
@@ -53,10 +53,9 @@ export function WebhookSetup({
       {canManage ? (
         <form action={action} className="form" noValidate>
           <div className="field">
-            <label htmlFor="webhookSecret">Sekret webhooków</label>
+            <label htmlFor="webhookSecret">{t.secret}</label>
             <p id="webhookSecret-hint" className="field-hint">
-              Wygeneruj sekret, wklej go w polu „Sekret” każdego webhooka w WooCommerce i zapisz tutaj. Nie pokażemy
-              go ponownie.
+              {t.secretHint}
             </p>
             <div className="inline-form">
               <input
@@ -70,7 +69,7 @@ export function WebhookSetup({
                 onChange={(event) => setSecret(event.target.value)}
               />
               <button type="button" className="button secondary" onClick={() => setSecret(generateSecret())}>
-                Wygeneruj sekret
+                {t.generate}
               </button>
             </div>
           </div>
@@ -81,7 +80,7 @@ export function WebhookSetup({
           ) : null}
           <div className="form-actions">
             <button type="submit" className="button primary" disabled={pending || !secret}>
-              {webhook.secretConfigured ? "Zapisz nowy sekret" : "Zapisz sekret"}
+              {webhook.secretConfigured ? t.saveNew : t.save}
             </button>
           </div>
         </form>

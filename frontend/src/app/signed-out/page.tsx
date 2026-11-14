@@ -1,25 +1,23 @@
 import Link from "next/link";
 
 import { StatePanel } from "@/components/StatePanel";
+import { LanguageSwitcher } from "@/i18n/LanguageSwitcher";
+import { getMessages } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
-const ERRORS: Record<string, string> = {
-  expired: "Logowanie trwało zbyt długo albo zostało rozpoczęte w innej karcie. Spróbuj ponownie.",
-  rejected: "Nie udało się potwierdzić logowania. Spróbuj ponownie.",
-};
-
 export default async function SignedOut({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams;
-  const message = error ? ERRORS[error] : undefined;
+  const [{ error }, t] = await Promise.all([searchParams, getMessages()]);
+  const message = error && Object.hasOwn(t.signedOut.errors, error) ? t.signedOut.errors[error] : undefined;
   return (
     <main className="centered">
       <StatePanel
         tone={message ? "error" : "info"}
-        title={message ? "Logowanie nie powiodło się" : "Wylogowano"}
-        description={message ?? "Sesja została zakończona na tym urządzeniu."}
+        title={message ? t.signedOut.failedTitle : t.signedOut.signedOutTitle}
+        description={message ?? t.signedOut.signedOutDescription}
       >
-        <Link href="/auth/login" className="button primary" prefetch={false}>Zaloguj się</Link>
+        <Link href="/auth/login" className="button primary" prefetch={false}>{t.common.signIn}</Link>
+        <LanguageSwitcher />
       </StatePanel>
     </main>
   );

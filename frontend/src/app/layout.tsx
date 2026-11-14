@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { LocaleProvider } from "@/i18n/LocaleProvider";
+import { getLocale } from "@/i18n/server";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,10 +12,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const locale = await getLocale();
   return (
-    <html lang="pl">
-      <body>{children}</body>
+    <html lang={locale}>
+      <body>
+        <LocaleProvider locale={locale}>{children}</LocaleProvider>
+      </body>
     </html>
   );
 }

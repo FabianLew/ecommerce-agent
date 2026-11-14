@@ -1,19 +1,19 @@
-/** Sidebar sections from document 04 §2, in display order. */
+/** Sidebar sections from document 04 §2, in display order. Their labels live in the message catalogs. */
 export const SECTIONS = [
-  { slug: "dashboard", label: "Przegląd" },
-  { slug: "decisions", label: "Decyzje" },
-  { slug: "support", label: "Obsługa klientów" },
-  { slug: "analytics", label: "Analityka" },
-  { slug: "automations", label: "Automatyzacje" },
-  { slug: "activity", label: "Aktywność" },
-  { slug: "integrations", label: "Integracje" },
-  { slug: "settings", label: "Ustawienia" },
+  "dashboard",
+  "decisions",
+  "support",
+  "analytics",
+  "automations",
+  "activity",
+  "integrations",
+  "settings",
 ] as const;
 
-export type SectionSlug = (typeof SECTIONS)[number]["slug"];
+export type SectionSlug = (typeof SECTIONS)[number];
 
 export function isSection(value: string): value is SectionSlug {
-  return SECTIONS.some((section) => section.slug === value);
+  return (SECTIONS as readonly string[]).includes(value);
 }
 
 export function storePath(storeId: string, section: SectionSlug = "dashboard"): string {

@@ -2,21 +2,14 @@ import { notFound } from "next/navigation";
 
 import { PageHeading } from "@/components/PageHeading";
 import { StatePanel } from "@/components/StatePanel";
+import type { Locale } from "@/i18n/locale";
+import type { Messages } from "@/i18n/messages";
+import { getLocale, getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { storePath } from "@/lib/store-path";
 
 import { checkConnection, startSync } from "./actions";
-import {
-  ERROR_HELP,
-  formatInstant,
-  HEALTH_LABELS,
-  HEALTH_REASON_HELP,
-  type Integration,
-  STATUS_LABELS,
-  SYNC_STATUS_LABELS,
-  syncHelp,
-  WARNING_HELP,
-} from "./labels";
+import { formatInstant, type Integration, syncHelp } from "./labels";
 import { RefreshWhileRunning } from "./RefreshWhileRunning";
 import { WebhookSetup } from "./WebhookSetup";
 import { WooCommerceForm } from "./WooCommerceForm";
@@ -28,10 +21,13 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ s
   const { storeId } = await params;
   const path = storePath(storeId, "integrations");
   const api = await backend(path);
-  const [store, integrations] = await Promise.all([
+  const [store, integrations, locale, messages] = await Promise.all([
     api.GET("/api/v1/stores/{storeId}", { params: { path: { storeId } } }),
     api.GET("/api/v1/stores/{storeId}/integrations", { params: { path: { storeId } } }),
+    getLocale(),
+    getMessages(),
   ]);
+  const t = messages.integrations;
   redirectIfUnauthenticated(integrations.response.status, path);
   if (!store.data || !integrations.data) {
     notFound();
@@ -41,28 +37,28 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ s
 
   return (
     <>
-      <PageHeading>Integracje</PageHeading>
+      <PageHeading>{messages.sections.integrations}</PageHeading>
       <section className="card" aria-labelledby="woocommerce-title" data-testid="woocommerce-card">
         <div className="card-header">
           <h2 id="woocommerce-title">WooCommerce</h2>
           {woo ? (
             <span className={`badge badge-${woo.status.toLowerCase()}`} data-testid="woocommerce-status">
-              {STATUS_LABELS[woo.status]}
+              {t.status[woo.status]}
             </span>
           ) : null}
         </div>
-        {woo ? <ConnectionDetails integration={woo} timezone={store.data.timezone} /> : (
-          <p className="muted">Sklep nie ma jeszcze połączenia. Podłącz WooCommerce kluczem REST API tylko do odczytu.</p>
+        {woo ? <ConnectionDetails integration={woo} timezone={store.data.timezone} locale={locale} t={t} /> : (
+          <p className="muted">{t.noConnection}</p>
         )}
         {woo ? (
           <section className="sync" aria-labelledby="webhooks-title" data-testid="woocommerce-webhooks">
-            <h3 id="webhooks-title" className="subheading">Webhooki</h3>
+            <h3 id="webhooks-title" className="subheading">{t.webhooks}</h3>
             <p className="badge" role="status" data-testid="webhook-status">
               {woo.webhook.secretConfigured
                 ? woo.webhook.lastReceivedAt
-                  ? `Ostatni webhook: ${formatInstant(woo.webhook.lastReceivedAt, store.data.timezone)}`
-                  : "Sekret zapisany, czekamy na pierwszy webhook"
-                : "Nie skonfigurowano"}
+                  ? t.lastWebhook(formatInstant(woo.webhook.lastReceivedAt, store.data.timezone, locale))
+                  : t.waitingForWebhook
+                : t.webhooksNotConfigured}
             </p>
             <WebhookSetup
               storeId={storeId}
@@ -77,23 +73,23 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ s
             <div className="form-actions inline-form">
               {woo?.allowedActions.includes("START_SYNC") ? (
                 <form action={startSync.bind(null, storeId, woo.id)}>
-                  <button type="submit" className="button primary">Importuj dane z ostatnich 14 dni</button>
+                  <button type="submit" className="button primary">{t.importLast14Days}</button>
                 </form>
               ) : null}
               {woo?.allowedActions.includes("RUN_CHECK") ? (
                 <form action={checkConnection.bind(null, storeId, woo.id)}>
-                  <button type="submit" className="button secondary">Sprawdź połączenie</button>
+                  <button type="submit" className="button secondary">{t.checkConnection}</button>
                 </form>
               ) : null}
             </div>
-            <h3 className="subheading">{woo ? "Zmień klucz API" : "Połącz sklep"}</h3>
+            <h3 className="subheading">{woo ? t.changeKey : t.connectStore}</h3>
             <WooCommerceForm storeId={storeId} integrationId={woo?.id} />
           </>
         ) : (
           <StatePanel
             tone="info"
-            title="Tylko podgląd"
-            description="Połączenia może zmieniać właściciel sklepu."
+            title={t.readOnlyTitle}
+            description={t.readOnlyDescription}
           />
         )}
       </section>
@@ -101,44 +97,46 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ s
   );
 }
 
-function ConnectionDetails({ integration, timezone }: { integration: Integration; timezone: string }) {
+type DetailsProps = { integration: Integration; timezone: string; locale: Locale; t: Messages["integrations"] };
+
+function ConnectionDetails({ integration, timezone, locale, t }: DetailsProps) {
   return (
     <>
       {integration.lastErrorCode && integration.status === "ERROR" ? (
         <p className="form-message error" role="alert" data-testid="woocommerce-error">
-          {ERROR_HELP[integration.lastErrorCode]}
+          {t.errorHelp[integration.lastErrorCode]}
         </p>
       ) : null}
       {integration.warnings.map((warning) => (
         <p key={warning} className="form-message warning">
-          {WARNING_HELP[warning]}
+          {t.warningHelp[warning]}
         </p>
       ))}
       <dl className="details">
-        <dt>Adres sklepu</dt>
+        <dt>{t.storeUrl}</dt>
         <dd>{integration.storeUrl}</dd>
-        <dt>Klucz API</dt>
-        <dd>{integration.keyHint ? `…${integration.keyHint}` : "nie zapisano"}</dd>
-        <dt>Ostatni test</dt>
-        <dd>{formatInstant(integration.lastCheckAt, timezone)}</dd>
-        <dt>Ostatnie udane połączenie</dt>
-        <dd>{formatInstant(integration.lastSuccessAt, timezone)}</dd>
-        <dt>Waluta w WooCommerce</dt>
+        <dt>{t.apiKey}</dt>
+        <dd>{integration.keyHint ? `…${integration.keyHint}` : t.keyNotSaved}</dd>
+        <dt>{t.lastCheck}</dt>
+        <dd>{formatInstant(integration.lastCheckAt, timezone, locale)}</dd>
+        <dt>{t.lastSuccess}</dt>
+        <dd>{formatInstant(integration.lastSuccessAt, timezone, locale)}</dd>
+        <dt>{t.sourceCurrency}</dt>
         <dd>{integration.sourceCurrency ?? "—"}</dd>
       </dl>
-      <HealthDetails integration={integration} timezone={timezone} />
-      <SyncDetails integration={integration} timezone={timezone} />
+      <HealthDetails integration={integration} timezone={timezone} locale={locale} t={t} />
+      <SyncDetails integration={integration} timezone={timezone} locale={locale} t={t} />
     </>
   );
 }
 
-function HealthDetails({ integration, timezone }: { integration: Integration; timezone: string }) {
+function HealthDetails({ integration, timezone, locale, t }: DetailsProps) {
   const health = integration.health;
   return (
     <section className="sync" aria-labelledby="health-title" data-testid="woocommerce-health">
-      <h3 id="health-title" className="subheading">Stan integracji</h3>
+      <h3 id="health-title" className="subheading">{t.health}</h3>
       <p className={`badge badge-health-${health.status.toLowerCase()}`} role="status" data-testid="health-status">
-        {HEALTH_LABELS[health.status]}
+        {t.healthStatus[health.status]}
       </p>
       {health.reasons.map((reason) => (
         <p
@@ -146,16 +144,16 @@ function HealthDetails({ integration, timezone }: { integration: Integration; ti
           className={`form-message ${health.status === "STALE" ? "error" : "warning"}`}
           data-testid={`health-reason-${reason}`}
         >
-          {HEALTH_REASON_HELP[reason]}
+          {t.healthReasonHelp[reason]}
         </p>
       ))}
       {health.status === "NOT_READY" ? null : (
         <dl className="details">
-          <dt>Ostatni odczyt zmian</dt>
-          <dd>{formatInstant(health.lastPollAt, timezone)}</dd>
-          <dt>Zamówienia kompletne do</dt>
-          <dd>{formatInstant(health.ordersCompleteUntil, timezone)}</dd>
-          <dt>Zgubione webhooki (24 h)</dt>
+          <dt>{t.lastPoll}</dt>
+          <dd>{formatInstant(health.lastPollAt, timezone, locale)}</dd>
+          <dt>{t.ordersCompleteUntil}</dt>
+          <dd>{formatInstant(health.ordersCompleteUntil, timezone, locale)}</dd>
+          <dt>{t.missedWebhooks24h}</dt>
           <dd>{health.missedWebhooks24h}</dd>
         </dl>
       )}
@@ -163,40 +161,40 @@ function HealthDetails({ integration, timezone }: { integration: Integration; ti
   );
 }
 
-function SyncDetails({ integration, timezone }: { integration: Integration; timezone: string }) {
+function SyncDetails({ integration, timezone, locale, t }: DetailsProps) {
   const job = integration.lastSync;
   if (!job) {
     return integration.status === "CONNECTED" ? (
-      <p className="muted sync-empty">Dane nie zostały jeszcze zaimportowane.</p>
+      <p className="muted sync-empty">{t.notImported}</p>
     ) : null;
   }
-  const help = syncHelp(job);
+  const help = syncHelp(job, t);
   return (
     <section className="sync" aria-labelledby="sync-title" data-testid="woocommerce-sync">
       <RefreshWhileRunning running={job.status === "RUNNING"} />
-      <h3 id="sync-title" className="subheading">Synchronizacja</h3>
+      <h3 id="sync-title" className="subheading">{t.sync}</h3>
       <p className={`badge badge-sync-${job.status.toLowerCase()}`} role="status" data-testid="sync-status">
-        {SYNC_STATUS_LABELS[job.status]}
+        {t.syncStatus[job.status]}
       </p>
       {help ? <p className="form-message error">{help}</p> : null}
       <dl className="details">
-        <dt>Zakres zamówień</dt>
+        <dt>{t.orderWindow}</dt>
         <dd>
-          {formatInstant(job.windowFrom, timezone)} – {formatInstant(job.windowUntil, timezone)}
+          {formatInstant(job.windowFrom, timezone, locale)} – {formatInstant(job.windowUntil, timezone, locale)}
         </dd>
-        <dt>Produkty / warianty</dt>
+        <dt>{t.productsVariants}</dt>
         <dd>
           {job.productsImported ?? "—"} / {job.variantsImported ?? "—"}
         </dd>
-        <dt>Zamówienia</dt>
+        <dt>{t.orders}</dt>
         <dd data-testid="sync-orders">
           {job.ordersImported ?? "—"}
           {job.ordersExpected != null && job.ordersExpected !== job.ordersImported
-            ? ` (WooCommerce podaje ${job.ordersExpected})`
+            ? t.wooReportsOrders(job.ordersExpected)
             : ""}
         </dd>
-        <dt>Zakończono</dt>
-        <dd>{formatInstant(job.finishedAt, timezone)}</dd>
+        <dt>{t.finished}</dt>
+        <dd>{formatInstant(job.finishedAt, timezone, locale)}</dd>
       </dl>
     </section>
   );
