@@ -1,0 +1,72 @@
+[
+  {
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "storeId": "00000000-0000-4000-8000-00000000000a",
+    "ads": [
+      {
+        "externalId": "ad-9001",
+        "accountExternalId": "act-local-01",
+        "name": "Koszulka Basic S – reklama dedykowana",
+        "ownStatus": "ACTIVE",
+        "effectiveStatus": "ACTIVE",
+        "creativeFingerprint": "fp-creative-44",
+        "scope": "SINGLE_VARIANT",
+        "skus": [
+          "TSHIRT-BASIC-S"
+        ],
+        "verified": true
+      },
+      {
+        "externalId": "ad-9002",
+        "accountExternalId": "act-local-01",
+        "name": "Katalog – wszystkie produkty",
+        "ownStatus": "ACTIVE",
+        "effectiveStatus": "ACTIVE",
+        "creativeFingerprint": "fp-catalog-07",
+        "scope": "MULTI_PRODUCT",
+        "skus": [
+          "TSHIRT-BASIC-S",
+          "TSHIRT-BASIC-M",
+          "TSHIRT-BASIC-L",
+          "MUG-LOGO"
+        ],
+        "verified": false
+      }
+    ]
+  },
+  {
+    "organizationId": "00000000-0000-4000-8000-000000000001",
+    "storeId": "00000000-0000-4000-8000-00000000000b",
+    "ads": [
+      {
+        "externalId": "ad-9001",
+        "accountExternalId": "act-local-01",
+        "name": "Koszulka Basic S – reklama dedykowana",
+        "ownStatus": "ACTIVE",
+        "effectiveStatus": "ACTIVE",
+        "creativeFingerprint": "fp-creative-44",
+        "scope": "SINGLE_VARIANT",
+        "skus": [
+          "TSHIRT-BASIC-S"
+        ],
+        "verified": true
+      },
+      {
+        "externalId": "ad-9002",
+        "accountExternalId": "act-local-01",
+        "name": "Katalog – wszystkie produkty",
+        "ownStatus": "ACTIVE",
+        "effectiveStatus": "ACTIVE",
+        "creativeFingerprint": "fp-catalog-07",
+        "scope": "MULTI_PRODUCT",
+        "skus": [
+          "TSHIRT-BASIC-S",
+          "TSHIRT-BASIC-M",
+          "TSHIRT-BASIC-L",
+          "MUG-LOGO"
+        ],
+        "verified": false
+      }
+    ]
+  }
+]
