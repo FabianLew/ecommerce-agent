@@ -35,6 +35,11 @@ operator:
       allow-private-network: false
       connect-timeout: 5s
       read-timeout: 10s
+    webhooks:
+      # Public address of this API that shops deliver webhooks to (ADR-0009), e.g. https://api.example.com
+      base-url: ${WEBHOOK_BASE_URL:}
+      processor-enabled: true
+      processor-interval: 2s
 
 springdoc:
   api-docs:

@@ -125,6 +125,27 @@ public class CatalogRepository {
                 .optional();
     }
 
+    /** Variants of one product, e.g. those sharing the parent's stock. */
+    public List<Variant> variantsOfProduct(TrustedStoreScope scope, UUID productId) {
+        return jdbc.sql("SELECT " + VARIANT_COLUMNS + """
+                        FROM product_variant v
+                        JOIN product p ON p.id = v.product_id AND p.store_id = v.store_id
+                        WHERE v.product_id = :productId AND v.organization_id = :organizationId
+                          AND v.store_id = :storeId
+                        ORDER BY v.external_id
+                        """)
+                .param("productId", productId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .query(CatalogRepository::mapVariant)
+                .list();
+    }
+
+    /** Our id of a source product, if it was imported. */
+    public Optional<UUID> productIdByExternalId(TrustedStoreScope scope, CommerceSource source, String externalId) {
+        return productId(scope, source, externalId);
+    }
+
     public Optional<Variant> variantByExternalId(TrustedStoreScope scope, CommerceSource source, String externalId) {
         return jdbc.sql("SELECT " + VARIANT_COLUMNS + """
                         FROM product_variant v

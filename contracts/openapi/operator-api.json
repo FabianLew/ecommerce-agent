@@ -90,7 +90,7 @@
         "properties" : {
           "allowedActions" : {
             "items" : {
-              "enum" : [ "SAVE_CREDENTIALS", "RUN_CHECK", "START_SYNC" ],
+              "enum" : [ "SAVE_CREDENTIALS", "SAVE_WEBHOOK_SECRET", "RUN_CHECK", "START_SYNC" ],
               "type" : "string"
             },
             "type" : "array"
@@ -138,9 +138,12 @@
               "type" : "string"
             },
             "type" : "array"
+          },
+          "webhook" : {
+            "$ref" : "#/components/schemas/WebhookResponse"
           }
         },
-        "required" : [ "allowedActions", "id", "provider", "status", "storeUrl", "warnings" ],
+        "required" : [ "allowedActions", "id", "provider", "status", "storeUrl", "warnings", "webhook" ],
         "type" : "object"
       },
       "ListResponseIntegrationResponse" : {
@@ -294,6 +297,56 @@
           }
         },
         "required" : [ "id", "startedAt", "status", "windowFrom", "windowUntil" ],
+        "type" : "object"
+      },
+      "WebhookReceiptResponse" : {
+        "properties" : {
+          "receipt" : {
+            "enum" : [ "ACCEPTED", "DUPLICATE", "PING", "IGNORED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "receipt" ],
+        "type" : "object"
+      },
+      "WebhookResponse" : {
+        "properties" : {
+          "apiVersion" : {
+            "type" : "string"
+          },
+          "deliveryUrl" : {
+            "description" : "Delivery URL to enter in WooCommerce; null until the public API address is configured",
+            "type" : "string"
+          },
+          "lastReceivedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "secretConfigured" : {
+            "type" : "boolean"
+          },
+          "secretUpdatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "topics" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "apiVersion", "secretConfigured", "topics" ],
+        "type" : "object"
+      },
+      "WebhookSecretRequest" : {
+        "properties" : {
+          "secret" : {
+            "type" : "string",
+            "writeOnly" : true
+          }
+        },
+        "required" : [ "secret" ],
         "type" : "object"
       },
       "WooCommerceCredentialsRequest" : {
@@ -529,6 +582,80 @@
             "application/json" : {
               "schema" : {
                 "$ref" : "#/components/schemas/WooCommerceCredentialsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/IntegrationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "integration-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/integration-connections/{connectionId}/webhook-secret" : {
+      "post" : {
+        "operationId" : "webhookSecret",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "connectionId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WebhookSecretRequest"
               }
             }
           },
@@ -907,6 +1034,42 @@
           }
         },
         "tags" : [ "integration-controller" ]
+      }
+    },
+    "/api/v1/webhooks/woocommerce/{endpointKey}" : {
+      "post" : {
+        "operationId" : "receive",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "endpointKey",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WebhookReceiptResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "woo-webhook-controller" ]
       }
     }
   },

@@ -156,7 +156,7 @@ class IntegrationApiTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING_CREDENTIALS"))
                 .andExpect(jsonPath("$.storeUrl").value(wooUrl))
-                .andExpect(jsonPath("$.allowedActions.length()").value(1));
+                .andExpect(jsonPath("$.allowedActions.length()").value(2));
         String id = JsonPath.read(mvc.perform(get("/api/v1/stores/{s}/integrations", STORE_A).with(user("owner")))
                 .andReturn().getResponse().getContentAsString(), "$.items[0].id");
 

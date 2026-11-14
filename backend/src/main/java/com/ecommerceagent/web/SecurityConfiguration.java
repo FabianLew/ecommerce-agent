@@ -3,6 +3,7 @@ package com.ecommerceagent.web;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -30,6 +31,8 @@ class SecurityConfiguration {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                        // Shops call webhooks without a user token; the signature authenticates them (ADR-0009).
+                        .requestMatchers(HttpMethod.POST, "/api/v1/webhooks/woocommerce/*").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth
                         .jwt(Customizer.withDefaults())

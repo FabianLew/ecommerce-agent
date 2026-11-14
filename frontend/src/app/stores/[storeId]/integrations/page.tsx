@@ -16,6 +16,7 @@ import {
   WARNING_HELP,
 } from "./labels";
 import { RefreshWhileRunning } from "./RefreshWhileRunning";
+import { WebhookSetup } from "./WebhookSetup";
 import { WooCommerceForm } from "./WooCommerceForm";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +52,24 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ s
         {woo ? <ConnectionDetails integration={woo} timezone={store.data.timezone} /> : (
           <p className="muted">Sklep nie ma jeszcze połączenia. Podłącz WooCommerce kluczem REST API tylko do odczytu.</p>
         )}
+        {woo ? (
+          <section className="sync" aria-labelledby="webhooks-title" data-testid="woocommerce-webhooks">
+            <h3 id="webhooks-title" className="subheading">Webhooki</h3>
+            <p className="badge" role="status" data-testid="webhook-status">
+              {woo.webhook.secretConfigured
+                ? woo.webhook.lastReceivedAt
+                  ? `Ostatni webhook: ${formatInstant(woo.webhook.lastReceivedAt, store.data.timezone)}`
+                  : "Sekret zapisany, czekamy na pierwszy webhook"
+                : "Nie skonfigurowano"}
+            </p>
+            <WebhookSetup
+              storeId={storeId}
+              integrationId={woo.id}
+              webhook={woo.webhook}
+              canManage={canManage && woo.allowedActions.includes("SAVE_WEBHOOK_SECRET")}
+            />
+          </section>
+        ) : null}
         {canManage ? (
           <>
             <div className="form-actions inline-form">

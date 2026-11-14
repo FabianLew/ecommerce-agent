@@ -20,6 +20,7 @@ import com.ecommerceagent.integration.InvalidIntegrationRequestException;
 import com.ecommerceagent.integration.SyncRun;
 import com.ecommerceagent.integration.SyncRunStatus;
 import com.ecommerceagent.integration.WooCommerceImport;
+import com.ecommerceagent.integration.WooWebhooks;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,11 +39,14 @@ class IntegrationController {
     private final IntegrationConnections connections;
     private final WooCommerceImport imports;
     private final StoreSync sync;
+    private final WooWebhooks webhooks;
 
-    IntegrationController(IntegrationConnections connections, WooCommerceImport imports, StoreSync sync) {
+    IntegrationController(IntegrationConnections connections, WooCommerceImport imports, StoreSync sync,
+            WooWebhooks webhooks) {
         this.connections = connections;
         this.imports = imports;
         this.sync = sync;
+        this.webhooks = webhooks;
     }
 
     @GetMapping("/integrations")
@@ -69,6 +73,13 @@ class IntegrationController {
             @PathVariable String connectionId, @RequestBody WooCommerceCredentialsRequest request) {
         return response(connections.saveWooCommerceCredentials(scope, id(connectionId),
                 request.consumerKey(), request.consumerSecret()), scope);
+    }
+
+    /** Shared webhook secret, generated in the browser and also entered in WooCommerce (ADR-0009). */
+    @PostMapping("/integration-connections/{connectionId}/webhook-secret")
+    IntegrationResponse webhookSecret(@RequiresPermission(StorePermission.STORE_MANAGE) TrustedStoreScope scope,
+            @PathVariable String connectionId, @RequestBody WebhookSecretRequest request) {
+        return response(webhooks.saveSecret(scope, id(connectionId), request.secret()), scope);
     }
 
     @PostMapping("/integrations/{integrationId}/checks")
@@ -101,7 +112,8 @@ class IntegrationController {
     }
 
     private IntegrationResponse response(IntegrationConnection connection, TrustedStoreScope scope) {
-        return IntegrationResponse.from(connection, imports.latestRun(scope, connection.id()).orElse(null), scope);
+        return IntegrationResponse.from(connection, imports.latestRun(scope, connection.id()).orElse(null),
+                WebhookResponse.from(connection, webhooks.deliveryUrl(connection).orElse(null)), scope);
     }
 
     /** A malformed id is reported like a missing one, as for store ids. */
@@ -129,8 +141,36 @@ class IntegrationController {
         }
     }
 
+    /** Write-only, like the API key. */
+    record WebhookSecretRequest(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, accessMode = Schema.AccessMode.WRITE_ONLY) String secret) {
+
+        @Override
+        public String toString() {
+            return "WebhookSecretRequest[<redacted>]";
+        }
+    }
+
+    /** What the user enters in WooCommerce, and whether deliveries arrive. Never contains the secret. */
+    record WebhookResponse(
+            @Schema(description = "Delivery URL to enter in WooCommerce; null until the public API address is configured")
+            String deliveryUrl,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<String> topics,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String apiVersion,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean secretConfigured,
+            Instant secretUpdatedAt,
+            Instant lastReceivedAt) {
+
+        static WebhookResponse from(IntegrationConnection connection, String deliveryUrl) {
+            return new WebhookResponse(deliveryUrl, WooWebhooks.TOPICS, "wp_api_v3",
+                    connection.webhookSecretSetAt() != null, connection.webhookSecretSetAt(),
+                    connection.lastWebhookAt());
+        }
+    }
+
     enum IntegrationAction {
         SAVE_CREDENTIALS,
+        SAVE_WEBHOOK_SECRET,
         RUN_CHECK,
         START_SYNC
     }
@@ -175,12 +215,15 @@ class IntegrationController {
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ConnectionWarning> warnings,
             String sourceCurrency,
             SyncJobResponse lastSync,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) WebhookResponse webhook,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<IntegrationAction> allowedActions) {
 
-        static IntegrationResponse from(IntegrationConnection connection, SyncRun lastSync, TrustedStoreScope scope) {
+        static IntegrationResponse from(IntegrationConnection connection, SyncRun lastSync, WebhookResponse webhook,
+                TrustedStoreScope scope) {
             List<IntegrationAction> actions = new ArrayList<>();
             if (scope.has(StorePermission.STORE_MANAGE)) {
                 actions.add(IntegrationAction.SAVE_CREDENTIALS);
+                actions.add(IntegrationAction.SAVE_WEBHOOK_SECRET);
                 if (connection.status() != ConnectionStatus.PENDING_CREDENTIALS) {
                     actions.add(IntegrationAction.RUN_CHECK);
                 }
@@ -192,7 +235,7 @@ class IntegrationController {
             return new IntegrationResponse(connection.id(), connection.provider(), connection.storeUrl().toString(),
                     connection.status(), connection.keyHint(), connection.lastCheckAt(), connection.lastSuccessAt(),
                     connection.lastErrorCode(), connection.lastCheckWarnings(), connection.sourceCurrency(),
-                    lastSync == null ? null : SyncJobResponse.from(lastSync), List.copyOf(actions));
+                    lastSync == null ? null : SyncJobResponse.from(lastSync), webhook, List.copyOf(actions));
         }
     }
 
