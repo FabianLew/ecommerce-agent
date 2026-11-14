@@ -151,3 +151,26 @@ test("the interface is in English by default and the user can switch to Polish a
   await expect(page.getByRole("link", { name: "Activity" })).toHaveAttribute("aria-current", "page");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 });
+
+test("decision inbox shows its groups and a positive empty state; activity lists integration events", async ({ page }) => {
+  await signIn(page, "owner-a", `/stores/${STORE_A}/decisions`);
+  await expect(page).toHaveURL(`/stores/${STORE_A}/decisions`);
+  await expect(page.getByRole("heading", { name: "Decisions", exact: true })).toBeVisible();
+  await expect(page.getByTestId("decision-group-TO_APPROVE")).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { name: "No decisions to approve" })).toBeVisible();
+  await page.getByTestId("decision-group-COMPLETED").click();
+  await expect(page).toHaveURL(`/stores/${STORE_A}/decisions?group=COMPLETED`);
+  await expect(page.getByRole("heading", { name: "No completed decisions yet" })).toBeVisible();
+
+  // An unknown proposal is a safe not-found state, not an error page.
+  await page.goto(`/stores/${STORE_A}/decisions/00000000-0000-4000-8000-000000000999`);
+  await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
+
+  // The WooCommerce test above saved a key and ran a check in store A.
+  await page.goto(`/stores/${STORE_A}/activity`);
+  const list = page.getByTestId("activity-list");
+  await expect(list.getByText("The API key was saved").first()).toBeVisible();
+  await page.getByRole("link", { name: "Policy", exact: true }).click();
+  await expect(page).toHaveURL(`/stores/${STORE_A}/activity?type=POLICY`);
+  await expect(page.getByRole("heading", { name: "No activity yet" })).toBeVisible();
+});

@@ -498,3 +498,114 @@ nav ul {
   flex: 1 1 16rem;
   min-width: 0;
 }
+
+/* Decision Inbox, Decision Detail and Activity (04 §5, §9). */
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  padding: 8px 14px;
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  color: var(--text);
+  text-decoration: none;
+  background: var(--surface);
+}
+
+.tab[aria-current="page"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.tab-count {
+  font-variant-numeric: tabular-nums;
+  margin-left: 4px;
+}
+
+.decision-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.decision-row h2 a {
+  color: var(--text);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.lead {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.decision-actions {
+  margin-top: 16px;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.quote {
+  margin: 0;
+  padding: 8px 16px;
+  border-left: 3px solid var(--border);
+  color: var(--text-muted);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table th .badge {
+  margin-left: 8px;
+}
+
+.json {
+  max-width: 100%;
+  overflow-x: auto;
+  font-size: 0.8125rem;
+  background: var(--bg);
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .table,
+  .table tbody,
+  .table tr,
+  .table th,
+  .table td {
+    display: block;
+  }
+}
