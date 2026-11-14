@@ -141,6 +141,19 @@ public class CatalogRepository {
                 .list();
     }
 
+    /** Source id of one of this store's products. */
+    public Optional<String> productExternalId(TrustedStoreScope scope, UUID productId) {
+        return jdbc.sql("""
+                        SELECT external_id FROM product
+                        WHERE id = :productId AND organization_id = :organizationId AND store_id = :storeId
+                        """)
+                .param("productId", productId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .query(String.class)
+                .optional();
+    }
+
     /** Our id of a source product, if it was imported. */
     public Optional<UUID> productIdByExternalId(TrustedStoreScope scope, CommerceSource source, String externalId) {
         return productId(scope, source, externalId);

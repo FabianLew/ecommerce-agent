@@ -64,7 +64,7 @@ public class WooWebhooks {
     private final IntegrationConnectionRepository connections;
     private final IntegrationConnections integrationConnections;
     private final WebhookInboxRepository inbox;
-    private final WooWebhookNormalizer normalizer;
+    private final WooPayloadNormalizer normalizer;
     private final SecretCipher cipher;
     private final StoreAccess storeAccess;
     private final AuditTrail audit;
@@ -73,7 +73,7 @@ public class WooWebhooks {
     private final String baseUrl;
 
     WooWebhooks(IntegrationConnectionRepository connections, IntegrationConnections integrationConnections,
-            WebhookInboxRepository inbox, WooWebhookNormalizer normalizer, SecretCipher cipher,
+            WebhookInboxRepository inbox, WooPayloadNormalizer normalizer, SecretCipher cipher,
             StoreAccess storeAccess, AuditTrail audit, TransactionTemplate transactions, Clock clock,
             IntegrationProperties properties) {
         this.connections = connections;
@@ -190,7 +190,7 @@ public class WooWebhooks {
                     TrustedStoreScope scope = storeAccess
                             .systemScope(WEBHOOK_SERVICE, item.organizationId(), item.storeId())
                             .orElseThrow(() -> new IllegalStateException("Store of inbox item no longer exists"));
-                    WooWebhookNormalizer.Result result = normalizer.apply(scope, item.id(), item.topic(),
+                    WooPayloadNormalizer.Result result = normalizer.apply(scope, item.id(), item.topic(),
                             item.payload());
                     inbox.finish(scope, item.id(), result.status(), result.outcome());
                     return true;

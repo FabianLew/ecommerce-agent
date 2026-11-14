@@ -101,6 +101,16 @@ np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_A
   obserwacją (`STALE`, `DUPLICATE`, `AMBIGUOUS` → prośba o weryfikację, `RECORDED`).
 - Testy: `WooWebhookApiTest`, `WebhookNormalizationTest`.
 
+## Dispatcher outbox → Temporal (B-15)
+
+- `EventDispatch` (worker, co 1 s) przekazuje `outbox_event` przez `signalWithStart` do workflow o stałych
+  ID (ADR-0010): `inventory-{storeId}-{variantId}` (`VariantInventoryWorkflow`) i `store-sync-{connectionId}`
+  (`StoreSyncWorkflow`). Workflow odrzuca znane `eventId`, więc powtórka nie tworzy drugiego workflow.
+- Prośba o weryfikację, a także zmiana zamówienia bez nowszego stanu w ciągu `order-delay`, daje jeden świeży
+  odczyt wariantu z Woo (`WooSourceRefresh`, obserwacja `POLL`). Nieznany produkt jest doczytywany do katalogu.
+- Opóźnienia: `operator.automation.inventory.verify-delay` (10 s), `order-delay` (60 s),
+  `operator.automation.catalog.refresh-delay` (30 s). Test replay: `temporal/variant-inventory-v1.json`.
+
 ## Metrics Engine v1 (B-17)
 
 - `InventoryMetrics.coverage(scope, variantId, asOf)` liczy `UNITS_SOLD@v1`, `SALES_VELOCITY_7_FULL_LOCAL_DAYS@v1`

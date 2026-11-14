@@ -111,6 +111,21 @@ public class InventoryRepository {
         return StockChange.RECORDED;
     }
 
+    /**
+     * Records a fresh read from the source (poll or verification). It is the truth at the moment of the read,
+     * so it also settles a same-second conflict; only a reading identical to the latest one is skipped.
+     * A read older in source time than the latest reading is still rejected (it raced with a newer event).
+     */
+    @Transactional
+    public StockChange recordAuthoritative(TrustedStoreScope scope, UUID variantId, InventoryReading reading) {
+        StockChange change = recordIfNewer(scope, variantId, reading);
+        if (change == StockChange.AMBIGUOUS) {
+            record(scope, variantId, reading);
+            return StockChange.RECORDED;
+        }
+        return change;
+    }
+
     /** The most recently observed reading. */
     public Optional<InventoryObservation> latest(TrustedStoreScope scope, UUID variantId) {
         return jdbc.sql("SELECT " + COLUMNS + """
