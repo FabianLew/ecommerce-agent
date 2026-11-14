@@ -1,136 +1,138 @@
-# ADR-0011: Dowody, ContextSnapshot, detektor ryzyka i epizod Opportunity
+# ADR-0011: Evidence, ContextSnapshot, risk detector and the Opportunity episode
 
-- Status: Proponowany
-- Data: 2026-11-14
-- Powiązania: dokument 03 §3–4 i §12 (IG-04, IG-05), dokument 05 §C4 i §D2, dokument 02 §9, plan (wiersze 3 i 10
-  tabeli przeglądu, mapa modułów B2), ADR-0004, ADR-0008, ADR-0010, backlog B-18, B-19, B-20
+- Status: Accepted (owner acceptance, 2026-11-14)
+- Date: 2026-11-14
+- Related: document 03 §3–4 and §12 (IG-04, IG-05), document 05 §C4 and §D2, document 02 §9, plan (rows 3 and 10
+  of the review table, module map B2), ADR-0004, ADR-0008, ADR-0010, backlog B-18, B-19, B-20
 
-## Kontekst
+## Context
 
-I7 otwiera pierwszy epizod Inventory Guardian. Trudne do odwrócenia są tu cztery rzeczy:
+I7 opens the first Inventory Guardian episode. Four things are hard to reverse here:
 
-- postać dowodu i jego hash, do których będą się odwoływać propozycje, zgody i audyt;
-- niezmienność snapshotu kontekstu;
-- reguła „dwóch aktualnych obserwacji ryzyka”, od której zależy, kiedy powstaje epizod;
-- unikalność aktywnego epizodu, od której zależy deduplikacja workflow.
+- the shape of the evidence and its hash, which proposals, approvals and the audit will refer to;
+- the immutability of the context snapshot;
+- the "two current risk observations" rule, which decides when an episode is created;
+- the uniqueness of the active episode, which workflow deduplication depends on.
 
-Plan (wiersz 10) zastrzega, że dowody utrwalamy tylko w kontekście decyzji, a nie przy każdym zapytaniu
-analitycznym.
+The plan (row 10) requires that evidence is persisted only in a decision context, not for every analytical
+query.
 
-## Decyzja
+## Decision
 
-1. **Evidence (moduł `metrics`).** Każdy dowód jest trwałym, niezmiennym rekordem w tabeli `evidence` z polami:
-   - sklep;
+1. **Evidence (module `metrics`).** Every piece of evidence is a durable, immutable record in the `evidence` table
+   with the fields:
+   - store;
    - `kind` (`OBSERVATION`, `DERIVED_METRIC`);
    - `evidence_type` (`STOCK_READING`, `UNITS_SOLD`, `SALES_VELOCITY`, `DAYS_OF_COVER`, `REPLENISHMENT`,
      `AD_STATE`, `AD_MAPPING`);
    - `resource_ref` (`PRODUCT_VARIANT:{id}`, `AD:{id}`, `AD_MAPPING:{id}`);
-   - wersja definicji metryki;
-   - kanoniczna treść (`content`);
+   - the metric definition version;
+   - canonical content (`content`);
    - `content_hash`;
-   - `version` (zawsze 1, nowe fakty to nowy dowód);
-   - czasy `observed_at`, `available_at`, `computed_at`;
-   - lista dowodów wejściowych.
+   - `version` (always 1; new facts are new evidence);
+   - the times `observed_at`, `available_at`, `computed_at`;
+   - the list of input evidence.
 
-   Dowody powstają tylko w Context Builderze, nigdy przy zapytaniach analitycznych. Trigger bazy odrzuca `UPDATE` i
-   `DELETE`. Identyczna treść w tym samym sklepie daje ten sam dowód (`UNIQUE (store_id, content_hash)`).
-2. **Kanoniczny rekord i hash.** Kanoniczny rekord to JSON z kluczami w kolejności leksykograficznej, bez zbędnych
-   białych znaków.
-   - Liczby dziesiętne są tekstem w notacji zwykłej ze stałą skalą definicji. Liczby całkowite są liczbami. Nie
-     używamy liczb zmiennoprzecinkowych.
-   - Czas zapisujemy w UTC w formacie ISO-8601 z dokładnością do sekundy.
-   - `content_hash = "sha256:" + hex(SHA-256(UTF-8))` liczymy z rekordu bez identyfikatora, czasu obliczenia i czasu zapisu, ale ze
-     sklepem i typem.
+   Evidence is created only in the Context Builder, never for analytical queries. A database trigger rejects
+   `UPDATE` and `DELETE`. Identical content in the same store gives the same evidence (`UNIQUE (store_id, content_hash)`).
+2. **Canonical record and hash.** The canonical record is JSON with keys in lexicographic order, without extra
+   whitespace.
+   - Decimal numbers are text in plain notation with the definition's fixed scale. Integers are numbers. We do not
+     use floating-point numbers.
+   - Time is stored in UTC in ISO-8601 format with second precision.
+   - `content_hash = "sha256:" + hex(SHA-256(UTF-8))` is computed from the record without the identifier, the
+     computation time and the write time, but with the store and the type.
 
-   Tę samą kanonizację stosujemy do snapshotu i propozycji (ADR-0012).
-3. **ContextSnapshot (moduł `decisions`).** `context_snapshot` zawiera:
-   - sklep;
-   - epizod;
+   The same canonicalization applies to the snapshot and the proposal (ADR-0012).
+3. **ContextSnapshot (module `decisions`).** `context_snapshot` contains:
+   - the store;
+   - the episode;
    - `as_of`;
-   - schemat treści (`inventory-context/1`);
-   - kanoniczną treść;
-   - hash.
+   - the content schema (`inventory-context/1`);
+   - the canonical content;
+   - the hash.
 
-   `context_snapshot_evidence` wiąże snapshot z dowodami. Zapis odbywa się raz, a trigger odrzuca zmiany. Odczyt
-   jest możliwy tylko przez `TrustedStoreScope`, więc obcy sklep dostaje „brak”. Snapshot jest też manifestem
-   kontekstu pilota. Referencje do wiedzy i profilu sklepu (05 §D2) dojdą jako pola dodatkowe w nowej wersji
-   schematu treści.
-4. **Detektor ryzyka (moduł `decisions`, wywoływany z `VariantInventoryWorkflow`).** Każda ocena zapisuje
-   obserwację w `inventory_risk_observation` z polami:
-   - wariant;
-   - czas;
-   - potwierdzenie stanu;
+   `context_snapshot_evidence` links the snapshot to the evidence. It is written once, and a trigger rejects changes.
+   It can be read only through a `TrustedStoreScope`, so another store gets "not found". The snapshot is also the
+   pilot's context manifest. References to knowledge and the store profile (05 §D2) will be added as extra fields in a
+   new version of the content schema.
+4. **Risk detector (module `decisions`, called from `VariantInventoryWorkflow`).** Every assessment writes an
+   observation to `inventory_risk_observation` with the fields:
+   - variant;
+   - time;
+   - stock confirmation;
    - `available`;
    - `days_of_cover`;
-   - wynik `AT_RISK`, `NOT_AT_RISK` albo `UNKNOWN` z przyczyną;
-   - próg i wersja detektora (`inventory-risk/1`).
+   - the outcome `AT_RISK`, `NOT_AT_RISK` or `UNKNOWN` with a reason;
+   - the threshold and the detector version (`inventory-risk/1`).
 
-   Reguła działania:
-   - Obserwacja jest aktualna, gdy stan potwierdził odczyt nie starszy niż `max-stock-age` (120 s). Potwierdzeniem
-     jest odczyt źródła albo świeży zapis z webhooka lub pollingu.
-   - `AT_RISK` oznacza `daysOfCover < threshold-days` (3).
-   - `UNKNOWN` (brak forecastu, nieaktualny stan, wariant bez śledzenia albo ze wspólnym stanem) przerywa serię.
-   - Epizod otwierają co najmniej dwie kolejne aktualne obserwacje `AT_RISK` odległe o co najmniej `min-gap`
-     (5 min).
+   Rules:
+   - An observation is current when the stock was confirmed by a read no older than `max-stock-age` (120 s). A
+     confirmation is a source read or a fresh write from a webhook or polling.
+   - `AT_RISK` means `daysOfCover < threshold-days` (3).
+   - `UNKNOWN` (no forecast, stale stock, a variant without tracking or with shared stock) breaks the series.
+   - An episode is opened by at least two consecutive current `AT_RISK` observations at least `min-gap`
+     (5 min) apart.
 
-   Workflow wariantu ocenia ryzyko po każdej zmianie stanu. Po obserwacji `AT_RISK` bez epizodu ustawia timer na
-   `min-gap` i wtedy ocenia ponownie po świeżym odczycie wariantu z Woo. Dzięki temu druga obserwacja nie zależy od
-   tego, czy sklep coś wyśle. Parametry pochodzą z konfiguracji (`operator.inventory-guardian.risk.*`) i są
-   zapisane w każdej obserwacji. Ustawienia per sklep dojdą z profilem sklepu. Osobny, szybszy próg dla
-   potwierdzonego zera zostaje na później.
-5. **Opportunity (moduł `decisions`).** `opportunity` zawiera sklep, kategorię `INVENTORY_RISK`, podmiot
-   (`PRODUCT_VARIANT`, id), status, wersję, czasy i przyczynę zamknięcia.
-   - Częściowy indeks unikalny `(store_id, category, subject_type, subject_id) WHERE status NOT IN ('RESOLVED',
-     'CLOSED')` gwarantuje jeden aktywny epizod (IG-05).
-   - Otwarcie to `INSERT … ON CONFLICT DO NOTHING`, a przy konflikcie odczyt istniejącego. Drugi detektor dostaje
-     ten sam epizod.
-   - Statusy to `OPEN`, `ANALYZING`, `AWAITING_DECISION`, `MONITORING`, `WAITING_DATA`, `ACTING`, `RESOLVED`,
-     `CLOSED`. Tabela dozwolonych przejść jest w kodzie (`OpportunityStatus.canMoveTo`), a zmiana działa jako
-     compare-and-set na wersji.
-   - Propozycje i wykonania mają własne maszyny stanów (ADR-0012), więc status Opportunity opisuje tylko cykl
-     problemu.
-6. **Start epizodu.** Po otwarciu epizodu workflow wariantu woła aktywność, która startuje
-   `InventoryGuardianWorkflow` z ID `inventory-guardian-{storeId}-{variantId}-{opportunityId}` i polityką
-   `REJECT_DUPLICATE`. Przy aktywnym workflow wysyła mu sygnał aktualizacji ryzyka. Powtórka aktywności po awarii
-   znajduje ten sam epizod, a start z tym samym ID nie tworzy drugiego procesu. Nie używamy outboxa, bo inicjator
-   (workflow wariantu) jest już trwały. Zdarzenia biznesowe `inventory.risk.*.v1` dojdą, gdy pojawi się ich
-   konsument (powiadomienia, read model).
-7. **Reklamy i mapowania (moduł `commerce`, B-20).**
-   - `ad` zawiera platformę `META`, zewnętrzne ID, nazwę, własny i efektywny status, fingerprint kreacji, czas
-     odczytu i źródło (`FIXTURE`, później `META_API`).
-   - `ad_mapping` zawiera reklamę, zakres (`SINGLE_VARIANT`, `MULTI_PRODUCT`), `version` zwiększaną przy każdej
-     zmianie, status weryfikacji (`VERIFIED`, `UNVERIFIED`, `REVOKED`), czas weryfikacji i fingerprint kreacji z
-     chwili weryfikacji.
-   - `ad_mapping_variant` wiąże mapowanie z wariantami.
-   - Do czasu adaptera Meta (F2) reklamy i mapowania wczytujemy z pliku fixture w profilu `local` i w testach.
+   The variant workflow assesses risk after every stock change. After an `AT_RISK` observation without an episode it
+   sets a timer for `min-gap` and then assesses again after a fresh read of the variant from Woo. This way the second
+   observation does not depend on whether the store sends anything. The parameters come from the configuration
+   (`operator.inventory-guardian.risk.*`) and are stored in every observation. Per-store settings will come with the
+   store profile. A separate, faster threshold for a confirmed zero is left for later.
+5. **Opportunity (module `decisions`).** `opportunity` contains the store, the `INVENTORY_RISK` category, the subject
+   (`PRODUCT_VARIANT`, id), the status, the version, the times and the close reason.
+   - A partial unique index `(store_id, category, subject_type, subject_id) WHERE status NOT IN ('RESOLVED',
+     'CLOSED')` guarantees one active episode (IG-05).
+   - Opening is `INSERT … ON CONFLICT DO NOTHING`, and on a conflict the existing one is read. A second detector gets
+     the same episode.
+   - The statuses are `OPEN`, `ANALYZING`, `AWAITING_DECISION`, `MONITORING`, `WAITING_DATA`, `ACTING`, `RESOLVED`,
+     `CLOSED`. The table of allowed transitions is in code (`OpportunityStatus.canMoveTo`), and a change works as a
+     compare-and-set on the version.
+   - Proposals and executions have their own state machines (ADR-0012), so the Opportunity status describes only the
+     lifecycle of the problem.
+6. **Episode start.** After the episode is opened, the variant workflow calls an activity that starts
+   `InventoryGuardianWorkflow` with the ID `inventory-guardian-{storeId}-{variantId}-{opportunityId}` and the
+   `REJECT_DUPLICATE` policy. With an active workflow it sends it a risk update signal. A retried activity after a
+   crash finds the same episode, and a start with the same ID does not create a second process. We do not use the
+   outbox, because the initiator (the variant workflow) is already durable. The business events `inventory.risk.*.v1`
+   will be added when a consumer appears (notifications, read model).
+7. **Ads and mappings (module `commerce`, B-20).**
+   - `ad` contains the `META` platform, the external ID, the name, the own and effective status, the creative
+     fingerprint, the read time and the source (`FIXTURE`, later `META_API`).
+   - `ad_mapping` contains the ad, the scope (`SINGLE_VARIANT`, `MULTI_PRODUCT`), a `version` incremented on every
+     change, the verification status (`VERIFIED`, `UNVERIFIED`, `REVOKED`), the verification time and the creative
+     fingerprint at the time of verification.
+   - `ad_mapping_variant` links the mapping to the variants.
+   - Until the Meta adapter exists (F2), ads and mappings are loaded from a fixture file in the `local` profile and in
+     tests.
 
-## Rozważane alternatywy
+## Alternatives considered
 
-- **Dowody liczone przy każdym zapytaniu analityki.** Odrzucone w planie (wiersz 10): wolumen bez potrzeby.
-- **Hash z JSON zapisanego przez Jackson bez kanonizacji.** Kolejność pól i format liczb zależą od wersji
-  biblioteki, a hash zgody musi być stabilny. Odrzucone.
-- **Druga obserwacja tylko z kolejnego zdarzenia.** Gdy stan się nie zmienia, nie ma kolejnego zdarzenia, a
-  polling nie zapisuje identycznego stanu. Ryzyko nie otworzyłoby epizodu. Odrzucone na rzecz timera i świeżego
-  odczytu.
-- **Start workflow epizodu przez outbox.** Byłby to drugi mechanizm obok trwałego workflow wariantu, bez zysku
-  niezawodności. Odrzucone na pilota.
-- **Jeden status Opportunity z 16 wartościami.** Odrzucone w planie (wiersz 3).
+- **Evidence computed for every analytics query.** Rejected in the plan (row 10): volume without need.
+- **A hash of JSON written by Jackson without canonicalization.** Field order and number format depend on the
+  library version, and the approval hash must be stable. Rejected.
+- **The second observation only from the next event.** When stock does not change, there is no next event, and
+  polling does not store identical stock. The risk would never open an episode. Rejected in favor of a timer and a
+  fresh read.
+- **Starting the episode workflow through the outbox.** It would be a second mechanism next to the durable variant
+  workflow, with no reliability gain. Rejected for the pilot.
+- **One Opportunity status with 16 values.** Rejected in the plan (row 3).
 
-## Konsekwencje
+## Consequences
 
-- Wariant w ryzyku daje dodatkowy odczyt Woo co 5 minut do chwili otwarcia epizodu. Po otwarciu ocena działa tylko
-  na zmiany stanu.
-- Dowody i snapshoty rosną z liczbą analiz. Retencja przyjdzie z retencją audytu (F4) i nie może usuwać dowodów
-  użytych w decyzji.
-- Zmiana reguły detektora wymaga nowej wersji (`inventory-risk/2`) i wersjonowania workflow wariantu
+- A variant at risk causes an extra Woo read every 5 minutes until the episode opens. After it opens, assessment runs
+  only on stock changes.
+- Evidence and snapshots grow with the number of analyses. Retention comes with audit retention (F4) and must not
+  delete evidence used in a decision.
+- Changing the detector rule requires a new version (`inventory-risk/2`) and versioning of the variant workflow
   (`Workflow.getVersion`).
 
-## Weryfikacja
+## Verification
 
-- `EvidenceTest`: kanoniczny hash jest stabilny niezależnie od kolejności pól, trigger odrzuca zmianę, identyczna
-  treść daje ten sam dowód, obcy sklep nie widzi dowodu ani snapshotu.
-- `InventoryRiskDetectorTest`: jedna obserwacja nie otwiera epizodu; dwie w odstępie krótszym niż `min-gap` też
-  nie; `UNKNOWN` przerywa serię; nieaktualny stan daje `UNKNOWN`.
-- `OpportunityConcurrencyTest` (IG-05): dwa równoczesne otwarcia dają jeden epizod; niedozwolone przejście statusu
-  jest odrzucane.
-- Test workflow wariantu: timer drugiej obserwacji, jeden start `InventoryGuardianWorkflow` mimo powtórek.
+- `EvidenceTest`: the canonical hash is stable regardless of field order, the trigger rejects a change, identical
+  content gives the same evidence, another store sees neither the evidence nor the snapshot.
+- `InventoryRiskDetectorTest`: one observation does not open an episode; neither do two closer than `min-gap`;
+  `UNKNOWN` breaks the series; stale stock gives `UNKNOWN`.
+- `OpportunityConcurrencyTest` (IG-05): two concurrent openings give one episode; a disallowed status transition
+  is rejected.
+- Variant workflow test: the second observation timer, one `InventoryGuardianWorkflow` start despite retries.

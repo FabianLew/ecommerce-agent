@@ -1,73 +1,72 @@
-# ADR-0002: Pętla narzędzi należy do runtime, nie do Spring AI
+# ADR-0002: The tool loop belongs to the runtime, not to Spring AI
 
-- Status: Zaakceptowany (merge PR, 2026-11-14)
-- Data: 2026-11-14
-- Powiązania: dokument 02 (sekcje 3–4: Agent Runtime, Tool Registry), dokument 03 (IG-11), backlog B-03,
+- Status: Accepted (PR merge, 2026-11-14)
+- Date: 2026-11-14
+- Related: document 02 (sections 3–4: Agent Runtime, Tool Registry), document 03 (IG-11), backlog B-03,
   ADR-0001, `spikes/stack-compat`
 
-## Kontekst
+## Context
 
-Model LLM tylko proponuje. Każde wywołanie narzędzia musi przejść przez nasz runtime: allowlistę narzędzi
-READ, walidację argumentów, `TrustedStoreScope`, limity kroków i tokenów, audyt (dokument 02). Jeśli
-biblioteka sama wykona narzędzie i ponownie zapyta model, te kontrole zostają ominięte, a my tracimy
-zapis przebiegu.
+The LLM only proposes. Every tool call must go through our runtime: the READ tool allowlist, argument
+validation, `TrustedStoreScope`, step and token limits, audit (document 02). If a library executes a tool on its
+own and calls the model again, those controls are bypassed and we lose the record of the run.
 
-W planie zakładaliśmy, że wystarczy `internalToolExecutionEnabled(false)` w opcjach czatu. Spike B-03
-pokazał, że w Spring AI 2.0.2 tej opcji już nie ma, a model wykonywania narzędzi wygląda inaczej:
+The plan assumed that `internalToolExecutionEnabled(false)` in the chat options would be enough. Spike B-03
+showed that this option no longer exists in Spring AI 2.0.2 and that the tool execution model is different:
 
-- `ChatModel.call()` (np. `AnthropicChatModel`) **nie wykonuje narzędzi**. Zwraca odpowiedź z
-  `toolCalls`; `ToolCallingManager` służy tam tylko do zbudowania definicji narzędzi.
-- Pętlę wykonuje `ToolCallingAdvisor` w `ChatClient`. Autokonfiguracja rejestruje go automatycznie,
-  gdy w wywołaniu są narzędzia (`spring.ai.chat.client.tool-calling.enabled`, domyślnie `true`).
-  Można go też włączyć per wywołanie (`AdvisorParams.toolCallingAdvisorAutoRegister(true)`).
+- `ChatModel.call()` (e.g. `AnthropicChatModel`) **does not execute tools**. It returns a response with
+  `toolCalls`; there, `ToolCallingManager` is used only to build the tool definitions.
+- The loop is run by `ToolCallingAdvisor` in `ChatClient`. Auto-configuration registers it automatically
+  when the call has tools (`spring.ai.chat.client.tool-calling.enabled`, default `true`).
+  It can also be enabled per call (`AdvisorParams.toolCallingAdvisorAutoRegister(true)`).
 
-## Decyzja
+## Decision
 
-1. Agent Runtime rozmawia z modelem przez **`ChatModel` bezpośrednio** (za naszym `ModelGateway`),
-   nie przez `ChatClient`. Pętla narzędzi (wywołanie modelu → dispatch narzędzia przez nasz
-   `ToolDispatcher` → `ToolResponseMessage` → kolejne wywołanie) jest kodem runtime.
-2. Obrona w głąb: w konfiguracji aplikacji zawsze `spring.ai.chat.client.tool-calling.enabled=false`,
-   żeby `ChatClient` wzięty z kontekstu też nie wykonywał narzędzi.
-3. Do modelu przekazujemy tylko definicje narzędzi READ z allowlisty. Wywołanie narzędzia spoza
-   allowlisty kończy się ustrukturyzowanym błędem `TOOL_NOT_ALLOWED` odesłanym do modelu, bez wykonania.
-4. `ToolCallback` w opcjach służy wyłącznie do opisu narzędzia (nazwa, opis, schemat wejścia). Logika
-   narzędzi żyje w runtime, nie w callbackach.
-5. Adres bazowy API ustawiamy zawsze jawnie (`spring.ai.anthropic.base-url`), bo SDK czyta
-   `ANTHROPIC_BASE_URL` ze środowiska (ADR-0001).
-6. Każdy upgrade Spring AI wymaga przejścia testów granicy narzędzi (poniżej) — należą one do testów
-   bezpieczeństwa runtime, które blokują merge.
+1. The Agent Runtime talks to the model through **`ChatModel` directly** (behind our `ModelGateway`),
+   not through `ChatClient`. The tool loop (model call → tool dispatch through our `ToolDispatcher` →
+   `ToolResponseMessage` → next call) is runtime code.
+2. Defense in depth: the application configuration always has `spring.ai.chat.client.tool-calling.enabled=false`,
+   so that a `ChatClient` taken from the context does not execute tools either.
+3. Only definitions of allowlisted READ tools are passed to the model. A call to a tool outside the allowlist
+   ends with a structured `TOOL_NOT_ALLOWED` error sent back to the model, without execution.
+4. A `ToolCallback` in the options is used only to describe the tool (name, description, input schema). Tool
+   logic lives in the runtime, not in callbacks.
+5. The API base URL is always set explicitly (`spring.ai.anthropic.base-url`), because the SDK reads
+   `ANTHROPIC_BASE_URL` from the environment (ADR-0001).
+6. Every Spring AI upgrade must pass the tool boundary tests (below); they belong to the runtime safety tests,
+   which block the merge.
 
-## Rozważane alternatywy
+## Alternatives considered
 
-- **`ChatClient` + `ToolCallingAdvisor` z własnym `ToolCallingManager`** (wstrzyknięcie naszych kontroli
-  w pętlę Spring AI) — odrzucone: pętla, limity i stan przebiegu byłyby rozproszone między nasz kod a
-  advisor chain; trudniej to audytować i trudniej zagwarantować kolejność kontroli. Wraca do rozważenia
-  tylko, jeśli pojawi się konkretna potrzeba (np. streaming z narzędziami).
-- **Bezpośrednio oficjalny SDK Anthropic, bez Spring AI** — odrzucone na teraz: decyzja I2 to Spring AI;
-  przy `ChatModel` bez `ChatClient` Spring AI daje nam mapowanie wiadomości, obserwowalność i
-  konfigurację, a nie przejmuje kontroli nad narzędziami. Granica `ModelGateway` pozwala zmienić to później.
-- **Poleganie na domyślnym zachowaniu bez testów** — odrzucone: API zmieniło się już między 1.x a 2.0.
+- **`ChatClient` + `ToolCallingAdvisor` with our own `ToolCallingManager`** (injecting our controls into the
+  Spring AI loop) — rejected: the loop, the limits and the run state would be spread between our code and the
+  advisor chain; that is harder to audit and makes the order of controls harder to guarantee. We reconsider it
+  only if a concrete need appears (e.g. streaming with tools).
+- **The official Anthropic SDK directly, without Spring AI** — rejected for now: decision I2 is Spring AI;
+  with `ChatModel` and without `ChatClient`, Spring AI gives us message mapping, observability and
+  configuration without taking control of tools. The `ModelGateway` boundary lets us change this later.
+- **Relying on the default behavior without tests** — rejected: the API already changed between 1.x and 2.0.
 
-## Konsekwencje
+## Consequences
 
-- Pozytywne: jedna, jawna pętla narzędzi w runtime; każda kontrola i każdy krok jest w naszym kodzie
-  i w ledgerze/audycie.
-- Negatywne: piszemy własną pętlę (kilkadziesiąt linii plus limity), zamiast użyć gotowej.
-- Ryzyko: kolejne wersje Spring AI mogą znów przenieść wykonywanie narzędzi. Mitygacja: testy niżej
-  w zestawie bezpieczeństwa runtime (przeniesione z spike'a do backendu w I2/I3).
-- `CLAUDE.md` odsyła do tego ADR w sprawie sposobu wymuszenia reguły.
+- Positive: one explicit tool loop in the runtime; every control and every step is in our code and in the
+  ledger/audit.
+- Negative: we write our own loop (a few dozen lines plus limits) instead of using a ready-made one.
+- Risk: future Spring AI versions may move tool execution again. Mitigation: the tests below in the runtime
+  safety suite (moved from the spike to the backend in I2/I3).
+- `CLAUDE.md` refers to this ADR for how the rule is enforced.
 
-## Weryfikacja
+## Verification
 
-Spike `spikes/stack-compat`, `ToolCallingBoundaryTest`, 5/5. Testy używają autokonfigurowanego
-`AnthropicChatModel` i lokalnego stuba Messages API (bez klucza i sieci):
+Spike `spikes/stack-compat`, `ToolCallingBoundaryTest`, 5/5. The tests use the auto-configured
+`AnthropicChatModel` and a local Messages API stub (no key and no network):
 
-- `toolCallIsReturnedToCallerAndNotExecutedBySpringAi` — `ChatModel.call()` zwraca `tool_use`,
-  callback nie jest wykonany, do API poszedł 1 request z definicją narzędzia.
-- `runtimeDrivesTheLoopAndSendsToolResultBack` — nasz dispatcher wykonuje narzędzie, `tool_result`
-  z `tool_use_id` i dowodami trafia w drugim requeście; Spring AI wykonał 0 narzędzi.
-- `toolOutsideAllowlistIsNeverExecuted` — model prosi o `pause_ad` (IG-11): `TOOL_NOT_ALLOWED`, 0 wykonań.
-- `autoConfiguredChatClientDoesNotExecuteTools` — przy `tool-calling.enabled=false` `ChatClient` z
-  kontekstu zwraca `tool_use` bez wykonania. Sprawdzone mutacyjnie: po zmianie na `true` test nie przechodzi.
-- `chatClientWithToolCallingAdvisorWouldRunToolsInsideSpringAi` — test kontrastowy dokumentujący
-  zagrożenie: z `ToolCallingAdvisor` jedno wywołanie wykonuje narzędzie i samo robi drugi request.
+- `toolCallIsReturnedToCallerAndNotExecutedBySpringAi` — `ChatModel.call()` returns `tool_use`,
+  the callback is not executed, 1 request with the tool definition went to the API.
+- `runtimeDrivesTheLoopAndSendsToolResultBack` — our dispatcher executes the tool, and a `tool_result`
+  with the `tool_use_id` and evidence is sent in the second request; Spring AI executed 0 tools.
+- `toolOutsideAllowlistIsNeverExecuted` — the model asks for `pause_ad` (IG-11): `TOOL_NOT_ALLOWED`, 0 executions.
+- `autoConfiguredChatClientDoesNotExecuteTools` — with `tool-calling.enabled=false`, a `ChatClient` from the
+  context returns `tool_use` without execution. Checked by mutation: after changing it to `true`, the test fails.
+- `chatClientWithToolCallingAdvisorWouldRunToolsInsideSpringAi` — a contrast test documenting the
+  threat: with `ToolCallingAdvisor`, one call executes the tool and makes the second request on its own.

@@ -1,25 +1,25 @@
-# ADR-XXXX: Tytuł decyzji
+# ADR-XXXX: Decision title
 
-- Status: Proponowany
-- Data: RRRR-MM-DD
-- Powiązania: dokumenty architektury, inne ADR, zadania backlogu
+- Status: Proposed
+- Date: YYYY-MM-DD
+- Related: architecture documents, other ADRs, backlog items
 
-## Kontekst
+## Context
 
-Jaki problem rozwiązujemy i jakie są ograniczenia.
+What problem we are solving and what the constraints are.
 
-## Decyzja
+## Decision
 
-Co wybieramy, sformułowane jednoznacznie.
+What we choose, stated unambiguously.
 
-## Rozważane alternatywy
+## Alternatives considered
 
-Opcje i powód ich odrzucenia.
+The options and why they were rejected.
 
-## Konsekwencje
+## Consequences
 
-Skutki pozytywne i negatywne, koszty, ryzyka, co trzeba zrobić dalej.
+Positive and negative effects, costs, risks, and what needs to be done next.
 
-## Weryfikacja
+## Verification
 
-Jak sprawdziliśmy decyzję (test, spike, pomiar) i gdzie jest dowód.
+How we checked the decision (test, spike, measurement) and where the evidence is.

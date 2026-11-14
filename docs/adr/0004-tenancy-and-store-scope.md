@@ -1,114 +1,115 @@
-# ADR-0004: Model tenancy i zaufany zakres sklepu
+# ADR-0004: Tenancy model and trusted store scope
 
-- Status: Zaakceptowany z poprawkami (review właściciela, 2026-11-14; poprawki w punktach 2, 3, 5, 6, 8 i 9)
-- Data: 2026-11-14
-- Powiązania: plan (decyzja I6, B2 „ryzyka tenancy”), dokument 02 §3 (`RunContext`), dokument 04 §3, backlog B-06, B-08
+- Status: Accepted with corrections (owner review, 2026-11-14; corrections in items 2, 3, 5, 6, 8 and 9)
+- Date: 2026-11-14
+- Related: plan (decision I6, B2 "tenancy risks"), document 02 §3 (`RunContext`), document 04 §3, backlog B-06, B-08
 
-## Kontekst
+## Context
 
-Jedna organizacja (tenant) ma wiele sklepów, a użytkownik może mieć dostęp do wielu sklepów z różnymi
-rolami (I6). Zakres sklepu musi być taki sam w HTTP, w aktywnościach Temporal i w Agent Runtime, a model LLM
-ani payload nie mogą go ustawić. Wyciek danych między sklepami jest najpoważniejszym ryzykiem produktu.
+One organization (tenant) has many stores, and a user may have access to many stores with different
+roles (I6). The store scope must be the same in HTTP, in Temporal activities and in the Agent Runtime, and
+neither the LLM nor a payload may set it. A data leak between stores is the most serious risk of the product.
 
-## Decyzja
+## Decision
 
-1. **Model:** `organization` → `store`; `app_user` identyfikowany przez parę (`issuer`, `subject`) z tokenu
-   OIDC; `store_membership` (organizacja, sklep, użytkownik, rola) — jeden wiersz na rolę.
-2. **Każda tabela biznesowa zależna od sklepu ma `organization_id` i `store_id` oraz złożony klucz obcy
-   (`store_id`, `organization_id`) → `store (id, organization_id)`.** Dotyczy to wszystkich takich tabel,
-   nie tylko `store_membership`: baza nie przyjmie wiersza, który łączy sklep z inną organizacją. Regułę
-   sprawdza test schematu (`IdentitySchemaTest`), który obejmuje automatycznie każdą nową tabelę z kolumną
-   `store_id`. Jedyny udokumentowany wyjątek to `audit_event` (zdarzenia bez ustalonego zakresu, np. odmowa
-   dostępu do nieistniejącego sklepu).
-3. **`TrustedStoreScope` (organizacja, sklep, aktor, role, uprawnienia)** to jedyny typ zakresu przekazywany
-   do modułów. Aktor to typ zamknięty:
+1. **Model:** `organization` → `store`; `app_user` identified by the (`issuer`, `subject`) pair from the OIDC
+   token; `store_membership` (organization, store, user, role) — one row per role.
+2. **Every store-dependent business table has `organization_id` and `store_id` and a composite foreign key
+   (`store_id`, `organization_id`) → `store (id, organization_id)`.** This applies to all such tables,
+   not only `store_membership`: the database will not accept a row that links a store to another organization. The
+   rule is checked by a schema test (`IdentitySchemaTest`) that automatically covers every new table with a
+   `store_id` column. The only documented exception is `audit_event` (events without an established scope, e.g.
+   a denied access to a non-existent store).
+3. **`TrustedStoreScope` (organization, store, actor, roles, permissions)** is the only scope type passed
+   to modules. The actor is a sealed type:
    ```java
    sealed interface Actor {
        record UserActor(UUID userId) implements Actor {}
        record SystemActor(String service) implements Actor {}
    }
    ```
-   `UserActor` to operacja w imieniu zalogowanego użytkownika, `SystemActor` to operacja usługi backendu
-   bez użytkownika (np. agent monitorujący sklep w nocy). **Sam typ nie jest zabezpieczeniem.** Konstruktor
-   `TrustedStoreScope` nie jest publiczny; zakres buduje wyłącznie zaufana fabryka `StoreAccess`, która
-   sprawdza dane w bazie:
-   - `scopeFor(userId, storeId)`: aktualne członkostwo użytkownika w sklepie;
-   - `systemScope(service, organizationId, storeId)`: istnienie sklepu w tej organizacji, gdy proces
-     systemowy zaczyna się od zapisanego rekordu (np. harmonogram monitorowania sklepu);
-   - HTTP: użytkownik z tokenu i `{storeId}` ze ścieżki;
-   - Temporal (B-08): `StoreContextPropagator` przenosi w nagłówkach workflow identyfikatory
-     (`organizationId`, `storeId`, aktora: `userId` **albo** `service`) i `correlationId`. Nagłówek to tylko
-     **deklaracja**: `StoreScopeActivityInterceptor` przed każdą aktywnością buduje zakres na nowo w
-     `StoreAccess` (`scopeFor` dla użytkownika, `systemScope` dla usługi) i dopiero wtedy udostępnia
-     `ActivityStoreScope.current()`. Brak, niejednoznaczność (oba aktory) lub niezgodność deklaracji kończy
-     aktywność nieretryowalnym błędem `STORE_SCOPE_MISSING` / `STORE_SCOPE_REJECTED` (z wpisem w audycie).
-     Workflow użytkownika, któremu odebrano dostęp, nie wykona więc kolejnej aktywności;
-   - Agent Runtime: aktor i sklep z zaufanego kontekstu przebiegu, nigdy z argumentów modelu ani payloadu.
-   Zapytania repozytoriów biorą `organizationId` i `storeId` z tego obiektu (ADR-0005).
-4. **Brak dostępu i brak zasobu dają tę samą odpowiedź `404 NOT_FOUND`** (dokument 04 §3), żeby nie
-   ujawniać istnienia cudzych sklepów. Próba dostępu do cudzego lub nieistniejącego sklepu trafia do audytu
-   (`STORE_ACCESS_DENIED`). Członek sklepu bez wymaganego uprawnienia dostaje `403 FORBIDDEN`
-   (istnienie sklepu nie jest dla niego tajemnicą) i zdarzenie `STORE_PERMISSION_DENIED`.
-5. **Role i minimalne uprawnienia od B-06.** Robocze role z dokumentu 04 §11 [P]: `OWNER`,
-   `DECISION_OPERATOR`, `SUPPORT_OPERATOR`, `ANALYST`. Kod sprawdza uprawnienia, nie nazwy ról.
-   Od razu egzekwujemy dwa uprawnienia:
+   `UserActor` is an operation on behalf of a signed-in user; `SystemActor` is an operation of a backend
+   service without a user (e.g. an agent monitoring the store at night). **The type alone is not a safeguard.**
+   The `TrustedStoreScope` constructor is not public; the scope is built only by the trusted `StoreAccess`
+   factory, which checks the data in the database:
+   - `scopeFor(userId, storeId)`: the user's current membership in the store;
+   - `systemScope(service, organizationId, storeId)`: that the store exists in this organization, when a
+     system process starts from a stored record (e.g. a store monitoring schedule);
+   - HTTP: the user from the token and `{storeId}` from the path;
+   - Temporal (B-08): `StoreContextPropagator` carries identifiers in the workflow headers
+     (`organizationId`, `storeId`, the actor: `userId` **or** `service`) and the `correlationId`. The header is only
+     a **declaration**: before every activity, `StoreScopeActivityInterceptor` rebuilds the scope in
+     `StoreAccess` (`scopeFor` for a user, `systemScope` for a service) and only then exposes
+     `ActivityStoreScope.current()`. A missing, ambiguous (both actors) or mismatched declaration ends the
+     activity with a non-retryable `STORE_SCOPE_MISSING` / `STORE_SCOPE_REJECTED` error (with an audit entry).
+     So a workflow of a user whose access was revoked will not execute the next activity;
+   - Agent Runtime: the actor and the store come from the trusted run context, never from model arguments or a
+     payload.
+   Repository queries take `organizationId` and `storeId` from this object (ADR-0005).
+4. **No access and no resource give the same `404 NOT_FOUND` response** (document 04 §3), so that the
+   existence of other stores is not revealed. An attempt to access another or a non-existent store is audited
+   (`STORE_ACCESS_DENIED`). A store member without the required permission gets `403 FORBIDDEN`
+   (the existence of the store is not a secret to them) and a `STORE_PERMISSION_DENIED` event.
+5. **Roles and minimal permissions from B-06.** Working roles from document 04 §11 [P]: `OWNER`,
+   `DECISION_OPERATOR`, `SUPPORT_OPERATOR`, `ANALYST`. Code checks permissions, not role names.
+   Two permissions are enforced right away:
 
-   | Uprawnienie | Znaczenie | Role |
+   | Permission | Meaning | Roles |
    | --- | --- | --- |
-   | `STORE_READ` | odczyt danych sklepu, decyzji i raportów | wszystkie role |
-   | `STORE_MANAGE` | ustawienia sklepu, integracje, członkostwa | `OWNER` |
+   | `STORE_READ` | reading store data, decisions and reports | all roles |
+   | `STORE_MANAGE` | store settings, integrations, memberships | `OWNER` |
 
-   Endpoint sklepu wymaga domyślnie `STORE_READ`; endpoint zmieniający sklep deklaruje `STORE_MANAGE`.
-   Zakres systemowy ma tylko `STORE_READ`: działania systemu idą ścieżką polityki i executora
-   (`AuthorizedAction`), a nie szerszym zakresem. Pełną macierz (np. zatwierdzanie decyzji, obsługa
-   klienta) ustalamy w O-13 i rozszerzamy tę tabelę. Role żyją w naszej bazie, nie w Keycloak
-   (Keycloak tylko uwierzytelnia).
-6. **Zmiana uprawnień działa od razu, także dla wcześniejszych zatwierdzeń.** Zakres dowodzi tylko, że
-   sprawdzenie przeszło w chwili jego zbudowania. Bezpośrednio przed wrażliwą akcją (wykonanie
-   `AuthorizedAction`, zmiana ustawień, wysyłka) wykonawca woła `StoreAccess.reauthorize(scope, uprawnienie)`,
-   które ponownie czyta członkostwo i role z bazy. Zatwierdzenie sprzed kilku godzin nie pozwala działać
-   użytkownikowi, któremu odebrano dostęp lub rolę; akcja kończy się odmową i wpisem w audycie. Obowiązuje
-   to niezależnie od 24-godzinnej ważności zatwierdzenia i rewalidacji stanu sklepu (I1).
-7. **Audyt:** tabela `audit_event` tylko do dopisywania (trigger blokuje `UPDATE` i `DELETE`), w module
-   `identity`, żeby każdy moduł mógł z niej korzystać zgodnie z kierunkiem zależności. Aktor zdarzenia to
-   `actor_user_id` albo `actor_service` (nigdy oba).
-8. **Retencja i minimalizacja danych osobowych w audycie (wymaganie).**
-   - Audyt przechowuje identyfikatory (użytkownik, sklep, zasób), a nie dane osobowe: bez e-maili, treści
-     wiadomości klientów i danych zamówień w `details`.
-   - Przed pilotem (F4) wprowadzamy politykę retencji z okresem przechowywania (osobny ADR) i jej
-     wykonanie przez zadanie systemowe, które jako jedyne może usuwać przeterminowane wpisy.
-   - Trigger chroni przed błędem aplikacji, **nie przed uprzywilejowanym administratorem bazy** (może
-     wyłączyć trigger lub zmienić dane). Docelowo aplikacja łączy się rolą bez praw `UPDATE`/`DELETE` do
-     `audit_event`, a właścicielem tabeli jest osobna rola migracji; ewentualna niezmienność wobec
-     administratora (eksport do zewnętrznego magazynu) to decyzja F4.
-9. **Druga linia obrony (RLS PostgreSQL)** zostaje włączona przed pilotem (F4, E-45), zgodnie z planem.
+   A store endpoint requires `STORE_READ` by default; an endpoint that changes the store declares `STORE_MANAGE`.
+   The system scope has only `STORE_READ`: system actions go through the policy and executor path
+   (`AuthorizedAction`), not through a broader scope. The full matrix (e.g. approving decisions, customer
+   support) is settled in O-13, and this table is extended then. Roles live in our database, not in Keycloak
+   (Keycloak only authenticates).
+6. **A permission change takes effect immediately, including for earlier approvals.** A scope proves only that
+   the check passed at the moment it was built. Right before a sensitive action (executing an
+   `AuthorizedAction`, changing settings, sending), the executor calls `StoreAccess.reauthorize(scope, permission)`,
+   which reads the membership and roles from the database again. An approval from a few hours ago does not let a
+   user whose access or role was revoked act; the action ends with a denial and an audit entry. This applies
+   independently of the 24-hour approval validity and the store state revalidation (I1).
+7. **Audit:** the `audit_event` table is append-only (a trigger blocks `UPDATE` and `DELETE`), in the
+   `identity` module, so that every module can use it in line with the dependency direction. The event actor is
+   `actor_user_id` or `actor_service` (never both).
+8. **Retention and minimization of personal data in the audit (requirement).**
+   - The audit stores identifiers (user, store, resource), not personal data: no e-mails, no customer message
+     content and no order data in `details`.
+   - Before the pilot (F4) we introduce a retention policy with a retention period (a separate ADR) and its
+     execution by a system job, which is the only thing allowed to delete expired entries.
+   - The trigger protects against an application bug, **not against a privileged database administrator** (who
+     can disable the trigger or change the data). The target is that the application connects with a role
+     without `UPDATE`/`DELETE` rights on `audit_event`, and a separate migration role owns the table; any
+     immutability against the administrator (export to external storage) is an F4 decision.
+9. **A second line of defense (PostgreSQL RLS)** is enabled before the pilot (F4, E-45), as planned.
 
-## Rozważane alternatywy
+## Alternatives considered
 
-- **Role i sklepy w claims tokenu Keycloak** — odrzucone: zmiana uprawnień wymagałaby nowego tokenu,
-  a model danych sklepu i tak jest w naszej bazie; Keycloak zostaje wymienialnym dostawcą tożsamości.
-- **`403` dla cudzego sklepu** — odrzucone: ujawnia istnienie zasobu (04 §3).
-- **RLS od razu** — odłożone: wymaga `SET LOCAL` w każdej transakcji i komplikuje migracje i zapytania
-  serwisowe; plan zakłada scope w repozytoriach + testy izolacji teraz, RLS w F4.
+- **Roles and stores in Keycloak token claims** — rejected: a permission change would need a new token,
+  and the store data model is in our database anyway; Keycloak stays a replaceable identity provider.
+- **`403` for another store** — rejected: it reveals that the resource exists (04 §3).
+- **RLS right away** — postponed: it needs `SET LOCAL` in every transaction and complicates migrations and service
+  queries; the plan is scope in repositories + isolation tests now, RLS in F4.
 
-## Konsekwencje
+## Consequences
 
-- Każdy nowy endpoint sklepu przyjmuje `TrustedStoreScope` jako parametr; brak scope = brak dostępu.
-  Endpoint zmieniający sklep oznacza parametr `@RequiresPermission(STORE_MANAGE)`.
-- Każda nowa tabela sklepu dostaje złożony klucz obcy w tej samej migracji; inaczej test schematu nie przejdzie.
-- Wykonawcy wrażliwych akcji (B-18+) muszą wołać `reauthorize` tuż przed wykonaniem; testy wykonawcy
-  sprawdzają odmowę po odebraniu członkostwa.
-- Pierwsze żądanie użytkownika rejestruje go w `app_user` (`USER_REGISTERED` w audycie). Zaproszenia i
-  zarządzanie członkostwem to osobne zadanie (Settings → Zespół).
-- Testy izolacji (`StoreIsolationTest`) są częścią testów bezpieczeństwa i blokują merge.
+- Every new store endpoint takes a `TrustedStoreScope` as a parameter; no scope = no access.
+  An endpoint that changes the store marks the parameter `@RequiresPermission(STORE_MANAGE)`.
+- Every new store table gets the composite foreign key in the same migration; otherwise the schema test fails.
+- Executors of sensitive actions (B-18+) must call `reauthorize` right before execution; executor tests
+  check the denial after a membership is revoked.
+- A user's first request registers them in `app_user` (`USER_REGISTERED` in the audit). Invitations and
+  membership management are a separate task (Settings → Team).
+- Isolation tests (`StoreIsolationTest`) are part of the safety tests and block the merge.
 
-## Weryfikacja
+## Verification
 
 `backend/`, `./gradlew check` (Testcontainers PostgreSQL), PR B-06:
 
-- `StoreIsolationTest` (tokeny JWT w MockMvc): izolacja sklepów, nieodróżnialne 404, `403` dla członka bez
-  `STORE_MANAGE`, audyt obu odmów, odebranie członkostwa działa od następnego żądania.
-- `StoreAccessTest`: aktor i uprawnienia w zakresie, zakres systemowy tylko dla sklepu w danej organizacji,
-  `reauthorize` odmawia po odebraniu członkostwa i po zmianie roli.
-- `IdentitySchemaTest`: append-only audytu, aktor albo użytkownik, albo usługa, strażnik złożonych kluczy
-  obcych (z testem, że wykrywa tabelę bez klucza).
+- `StoreIsolationTest` (JWT tokens in MockMvc): store isolation, indistinguishable 404s, `403` for a member without
+  `STORE_MANAGE`, audit of both denials, a revoked membership takes effect from the next request.
+- `StoreAccessTest`: actor and permissions in the scope, a system scope only for a store in the given organization,
+  `reauthorize` denies after a membership is revoked and after a role change.
+- `IdentitySchemaTest`: append-only audit, the actor is either a user or a service, a guard for composite foreign
+  keys (with a test that it detects a table without the key).

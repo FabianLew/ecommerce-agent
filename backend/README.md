@@ -1,34 +1,34 @@
 # backend
 
-Modularny monolit Spring Boot (wersje: [ADR-0001](../docs/adr/0001-stack-versions.md),
-moduły: [ADR-0003](../docs/adr/0003-module-convention.md)). Jeden artefakt, dwa profile:
+Spring Boot modular monolith (versions: [ADR-0001](../docs/adr/0001-stack-versions.md),
+modules: [ADR-0003](../docs/adr/0003-module-convention.md)). One artifact, two profiles:
 
-| Profil | Rola |
+| Profile | Role |
 | --- | --- |
-| `api` | REST API dla frontendu (port `PORT`, domyślnie 8080), `/actuator/health` |
-| `worker` | Przetwarzanie w tle (workery Temporal od B-08), bez serwera HTTP |
+| `api` | REST API for the frontend (port `PORT`, default 8080), `/actuator/health` |
+| `worker` | Background processing (Temporal workers since B-08), no HTTP server |
 
-## Wymagania
+## Requirements
 
-- JDK 21 (Gradle toolchain), Docker (Testcontainers w testach).
+- JDK 21 (Gradle toolchain), Docker (Testcontainers in tests).
 
-## Polecenia
+## Commands
 
 ```bash
-./gradlew check                                   # testy jednostkowe, integracyjne (Testcontainers) i granice modułów
+./gradlew check                                   # unit tests, integration tests (Testcontainers) and module boundaries
 ./gradlew bootRun --args='--spring.profiles.active=api'
 ```
 
-Połączenie z bazą: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (domyślnie lokalny PostgreSQL z `infra/`).
-OIDC: `OIDC_ISSUER_URI` (domyślnie realm `operator` z lokalnego Keycloak) i `OIDC_AUDIENCE` (`operator-api`).
+Database connection: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` (default: the local PostgreSQL from `infra/`).
+OIDC: `OIDC_ISSUER_URI` (default: the `operator` realm of the local Keycloak) and `OIDC_AUDIENCE` (`operator-api`).
 
-Obserwowalność (B-07): logi JSON (ECS) na stdout z `requestId`, `correlationId`, `traceId`, `spanId`.
-Każda odpowiedź ma nagłówki `X-Request-Id` i `X-Correlation-Id` (przyjmowane od klienta tylko w bezpiecznym
-formacie). Eksport śladów OTLP: `OTEL_EXPORT_ENABLED=true`, adres `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`
-(domyślnie lokalny Jaeger z `infra/`), próbkowanie `TRACING_SAMPLING_PROBABILITY` (domyślnie 1.0).
+Observability (B-07): JSON logs (ECS) on stdout with `requestId`, `correlationId`, `traceId`, `spanId`.
+Every response has the `X-Request-Id` and `X-Correlation-Id` headers (accepted from the client only in a safe
+format). OTLP trace export: `OTEL_EXPORT_ENABLED=true`, address `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`
+(default: the local Jaeger from `infra/`), sampling `TRACING_SAMPLING_PROBABILITY` (default 1.0).
 
-Profil `local` (łączony z `api` lub `worker`) dokłada demo-tenantów zgodnych z użytkownikami Keycloak:
-organizacja „Demo”: `owner-a` jest właścicielem „Sklep A” i analitykiem w „Sklep C”, `owner-b` widzi tylko „Sklep B”.
+The `local` profile (combined with `api` or `worker`) adds demo tenants that match the Keycloak users:
+organization "Demo": `owner-a` owns "Sklep A" and is an analyst in "Sklep C", `owner-b` sees only "Sklep B".
 
 ```bash
 ./gradlew bootRun --args='--spring.profiles.active=api,local'
@@ -37,157 +37,165 @@ TOKEN=$(curl -s -d grant_type=password -d client_id=operator-dev-cli -d username
 curl -H "Authorization: Bearer $TOKEN" localhost:8080/api/v1/stores
 ```
 
-## API (stan na B-07)
+## API (as of B-07)
 
-| Endpoint | Opis |
+| Endpoint | Description |
 | --- | --- |
-| `GET /api/v1/me` | Bieżący użytkownik (rejestrowany przy pierwszym żądaniu) |
-| `GET /api/v1/stores` | Sklepy, do których użytkownik ma członkostwo, z rolami |
-| `GET /api/v1/stores/{storeId}` | Szczegóły sklepu; brak dostępu i brak sklepu dają ten sam `404 NOT_FOUND` |
+| `GET /api/v1/me` | Current user (registered on the first request) |
+| `GET /api/v1/stores` | Stores the user is a member of, with roles |
+| `GET /api/v1/stores/{storeId}` | Store details; no access and no store give the same `404 NOT_FOUND` |
 
-Błędy mają format z dokumentu 04 §3: `{code, message, fieldErrors?, retryable, requestId, currentVersion?}`,
-np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_ALLOWED` (405),
-`INTERNAL_ERROR` (500, bez szczegółów wyjątku; szczegóły są w logu z tym samym `requestId`).
+Errors use the format from document 04 §3: `{code, message, fieldErrors?, retryable, requestId, currentVersion?}`,
+e.g. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_ALLOWED` (405),
+`INTERNAL_ERROR` (500, without exception details; the details are in the log with the same `requestId`).
 
 ## Temporal (B-08)
 
-- Profil `worker` uruchamia workery (kolejka `operator-main`), profil `api` używa tylko klienta.
-  Adres: `TEMPORAL_ADDRESS` (domyślnie `localhost:7233`), namespace `TEMPORAL_NAMESPACE`.
-- Workflow startujemy przez `StoreContextPropagator.callWith(context, ...)`; aktywności czytają zakres
-  wyłącznie z `ActivityStoreScope.current()` (zweryfikowany w bazie przez interceptor, ADR-0004).
-- Diagnostyka (tylko profil `local`): `POST /api/v1/stores/{storeId}/diagnostics/workflow-scope-check`
-  uruchamia workflow na workerze i zwraca zakres widziany przez aktywność.
-- Testy workflow działają na in-process `TestWorkflowEnvironment`; test replay używa zapisanej historii
-  `src/test/resources/temporal/scope-check-v1.json`. Po zamierzonej (wersjonowanej) zmianie workflow:
-  `./gradlew test -PrecordTemporalFixtures` i nowa wersja pliku.
+- The `worker` profile runs the workers (queue `operator-main`); the `api` profile uses only the client.
+  Address: `TEMPORAL_ADDRESS` (default `localhost:7233`), namespace `TEMPORAL_NAMESPACE`.
+- Workflows are started through `StoreContextPropagator.callWith(context, ...)`; activities read the scope
+  only from `ActivityStoreScope.current()` (verified against the database by an interceptor, ADR-0004).
+- Diagnostics (`local` profile only): `POST /api/v1/stores/{storeId}/diagnostics/workflow-scope-check`
+  runs a workflow on the worker and returns the scope seen by the activity.
+- Workflow tests run on the in-process `TestWorkflowEnvironment`; the replay test uses the recorded history
+  `src/test/resources/temporal/scope-check-v1.json`. After an intended (versioned) workflow change:
+  `./gradlew test -PrecordTemporalFixtures` and a new version of the file.
 
-## Model handlu (B-11)
+## Commerce model (B-11)
 
-- Moduł `commerce`, migracja `V3__commerce.sql`: `product`, `product_variant` (jednostka sprzedaży), append-only
-  `inventory_observation`, `customer_order` + `order_line` (bez danych osobowych klientów),
-  `order_sync_coverage` (okres, za który zamówienia są kompletne).
-- Tabele potomne wskazują rodzica przez `(id, store_id)`, więc wiersz nie może wskazywać danych innego sklepu.
-- Upserty są idempotentne i ignorują dane starsze niż zapisany `source_updated_at`.
-- Dostępny stan: `InventoryReading.availableToSell()` odejmuje rezerwacje tylko przy semantyce
-  `SEPARATE_RESERVATIONS` (IG-02, bez podwójnego odejmowania).
+- Module `commerce`, migration `V3__commerce.sql`: `product`, `product_variant` (the selling unit), append-only
+  `inventory_observation`, `customer_order` + `order_line` (no customer personal data),
+  `order_sync_coverage` (the period for which orders are complete).
+- Child tables reference their parent by `(id, store_id)`, so a row cannot point at another store's data.
+- Upserts are idempotent and ignore data older than the stored `source_updated_at`.
+- Available stock: `InventoryReading.availableToSell()` subtracts reservations only with the
+  `SEPARATE_RESERVATIONS` semantics (IG-02, no double subtraction).
 
-## Integracje (B-12)
+## Integrations (B-12)
 
-- Połączenie WooCommerce: `GET /api/v1/stores/{storeId}/integrations`, `POST .../integration-connections`,
+- WooCommerce connection: `GET /api/v1/stores/{storeId}/integrations`, `POST .../integration-connections`,
   `POST .../integration-connections/{id}/credentials`, `POST .../integrations/{id}/checks` (ADR-0007).
-- Sekrety są szyfrowane AES-256-GCM kluczem z `INTEGRATION_SECRETS_KEY` (base64, 32 bajty; bez niego aplikacja
-  nie startuje). Profil `local` ma klucz deweloperski i pozwala na `http://` oraz adresy prywatne (lokalny Woo).
-- Test z prawdziwym lokalnym WooCommerce: `WOO_LIVE_URL=http://localhost:8081 ./gradlew test --tests '*WooCommerceLiveTest'`.
+- Secrets are encrypted with AES-256-GCM using the key from `INTEGRATION_SECRETS_KEY` (base64, 32 bytes; the
+  application does not start without it). The `local` profile has a development key and allows `http://` and
+  private addresses (local Woo).
+- Test against a real local WooCommerce: `WOO_LIVE_URL=http://localhost:8081 ./gradlew test --tests '*WooCommerceLiveTest'`.
 
-## Import WooCommerce (B-13)
+## WooCommerce import (B-13)
 
-- `POST /api/v1/stores/{storeId}/integrations/{id}/sync-jobs` `{"scope":"INITIAL_14_DAYS"}` → 202 i przebieg
-  `sync_run`; status: `GET .../sync-jobs/{jobId}` albo `lastSync` w `GET .../integrations`.
-- Workflow `WooImportWorkflow` (profil `worker`) importuje katalog ze stanami, potem zamówienia od północy
-  czasu sklepu 14 dni temu. Okres trafia do `order_sync_coverage` tylko przy zgodności z `X-WP-Total` (ADR-0008).
-- Lokalnie: API (`api,local`) i worker (`worker,local --server.port=8090`), potem przycisk „Importuj dane z
-  ostatnich 14 dni” w Integracjach.
+- `POST /api/v1/stores/{storeId}/integrations/{id}/sync-jobs` `{"scope":"INITIAL_14_DAYS"}` → 202 and a
+  `sync_run`; status: `GET .../sync-jobs/{jobId}` or `lastSync` in `GET .../integrations`.
+- The `WooImportWorkflow` workflow (`worker` profile) imports the catalog with stock levels, then the orders since
+  midnight store time 14 days ago. The period goes into `order_sync_coverage` only when it matches `X-WP-Total`
+  (ADR-0008).
+- Locally: the API (`api,local`) and the worker (`worker,local --server.port=8090`), then the "Importuj dane z
+  ostatnich 14 dni" (import data from the last 14 days) button in Integrations.
 
-## Webhooki WooCommerce (B-14)
+## WooCommerce webhooks (B-14)
 
-- Publiczny `POST /api/v1/webhooks/woocommerce/{endpointKey}` (bez OIDC, ADR-0009): losowy klucz w adresie
-  wskazuje połączenie, podpis `X-WC-Webhook-Signature` (HMAC-SHA256 surowego body) uwierzytelnia sklep.
-  Ping Woo (`webhook_id=N`) dostaje 200 bez zapisu, zły podpis 401, nieznany klucz 404, body > 1 MiB 413.
-- Sekret: `POST /api/v1/stores/{storeId}/integration-connections/{id}/webhook-secret` `{secret}` (generuje go
-  przeglądarka, backend go nie zwraca). Adres dostawy w `webhook.deliveryUrl` z `WEBHOOK_BASE_URL`.
-- `webhook_inbox` przechowuje zminimalizowany payload (bez danych klientów), deduplikacja po SHA-256 body.
-  Worker co 2 s normalizuje wpisy (`WebhookInboxProcessor`), w tej samej transakcji zapisuje `outbox_event`.
-- Stan nie cofa się (IG-04): `InventoryRepository.recordIfNewer` porównuje `date_modified_gmt` z ostatnią
-  obserwacją (`STALE`, `DUPLICATE`, `AMBIGUOUS` → prośba o weryfikację, `RECORDED`).
-- Testy: `WooWebhookApiTest`, `WebhookNormalizationTest`.
+- Public `POST /api/v1/webhooks/woocommerce/{endpointKey}` (no OIDC, ADR-0009): a random key in the URL
+  identifies the connection, and the `X-WC-Webhook-Signature` signature (HMAC-SHA256 of the raw body)
+  authenticates the store. A Woo ping (`webhook_id=N`) gets 200 without being stored, a bad signature 401, an
+  unknown key 404, a body > 1 MiB 413.
+- Secret: `POST /api/v1/stores/{storeId}/integration-connections/{id}/webhook-secret` `{secret}` (the browser
+  generates it, and the backend never returns it). The delivery URL is in `webhook.deliveryUrl`, built from
+  `WEBHOOK_BASE_URL`.
+- `webhook_inbox` stores a minimized payload (no customer data), deduplicated by the SHA-256 of the body.
+  Every 2 s the worker normalizes entries (`WebhookInboxProcessor`) and writes an `outbox_event` in the same
+  transaction.
+- Stock never goes back in time (IG-04): `InventoryRepository.recordIfNewer` compares `date_modified_gmt` with the
+  latest observation (`STALE`, `DUPLICATE`, `AMBIGUOUS` → verification request, `RECORDED`).
+- Tests: `WooWebhookApiTest`, `WebhookNormalizationTest`.
 
-## Dispatcher outbox → Temporal (B-15)
+## Outbox → Temporal dispatcher (B-15)
 
-- `EventDispatch` (worker, co 1 s) przekazuje `outbox_event` przez `signalWithStart` do workflow o stałych
-  ID (ADR-0010): `inventory-{storeId}-{variantId}` (`VariantInventoryWorkflow`) i `store-sync-{connectionId}`
-  (`StoreSyncWorkflow`). Workflow odrzuca znane `eventId`, więc powtórka nie tworzy drugiego workflow.
-- Prośba o weryfikację, a także zmiana zamówienia bez nowszego stanu w ciągu `order-delay`, daje jeden świeży
-  odczyt wariantu z Woo (`WooSourceRefresh`, obserwacja `POLL`). Nieznany produkt jest doczytywany do katalogu.
-- Opóźnienia: `operator.automation.inventory.verify-delay` (10 s), `order-delay` (60 s),
-  `operator.automation.catalog.refresh-delay` (30 s). Test replay: `temporal/variant-inventory-v1.json`.
+- `EventDispatch` (worker, every 1 s) forwards `outbox_event` via `signalWithStart` to workflows with fixed
+  IDs (ADR-0010): `inventory-{storeId}-{variantId}` (`VariantInventoryWorkflow`) and `store-sync-{connectionId}`
+  (`StoreSyncWorkflow`). A workflow rejects a known `eventId`, so a redelivery does not create a second workflow.
+- A verification request, and an order change without newer stock within `order-delay`, trigger one fresh
+  read of the variant from Woo (`WooSourceRefresh`, observation `POLL`). An unknown product is loaded into the
+  catalog.
+- Delays: `operator.automation.inventory.verify-delay` (10 s), `order-delay` (60 s),
+  `operator.automation.catalog.refresh-delay` (30 s). Replay test: `temporal/variant-inventory-v1.json`.
 
-## Polling, rekonsyliacja i Integration Health (B-16)
+## Polling, reconciliation and Integration Health (B-16)
 
-- Worker co minutę tworzy brakujące Temporal Schedules dla połączeń z udanym importem (`SyncSchedules`):
-  `woo-poll-{connectionId}` (produkty i wariacje zmienione od watermarku, co 5 min) i
-  `woo-reconcile-{connectionId}` (zamówienia z porównaniem `X-WP-Total`, co godzinę). Oba uruchamiają
-  `IncrementalSyncWorkflow` jako aktor `woo-sync`.
-- Watermarki (`sync_watermark`) przesuwają się tylko po pełnym odczycie; pokrycie zamówień rośnie tylko przy
-  zgodnym liczniku. Każdy przebieg zapisuje `sync_check` z liczbą zmian i zgubionych webhooków.
-- `health` w odpowiedzi integracji liczony przy odczycie: `NOT_READY`, `STALE` (blokuje analizę),
-  `DEGRADED`, `HEALTHY`, z kodami powodów (`IntegrationHealthService`).
-- Ustawienia: `operator.automation.sync.poll-interval` (5 min), `reconcile-interval` (1 h),
-  `schedules-enabled` (w testach `false`: serwer testowy Temporal nie ma Schedules).
+- Every minute the worker creates missing Temporal Schedules for connections with a successful import
+  (`SyncSchedules`): `woo-poll-{connectionId}` (products and variations changed since the watermark, every 5 min)
+  and `woo-reconcile-{connectionId}` (orders with an `X-WP-Total` comparison, every hour). Both run
+  `IncrementalSyncWorkflow` as the `woo-sync` actor.
+- Watermarks (`sync_watermark`) move only after a complete read; order coverage grows only when the count
+  matches. Every run writes a `sync_check` with the number of changes and missed webhooks.
+- `health` in the integration response is computed on read: `NOT_READY`, `STALE` (blocks analysis),
+  `DEGRADED`, `HEALTHY`, with reason codes (`IntegrationHealthService`).
+- Settings: `operator.automation.sync.poll-interval` (5 min), `reconcile-interval` (1 h),
+  `schedules-enabled` (`false` in tests: the Temporal test server has no Schedules).
 
 ## Metrics Engine v1 (B-17)
 
-- `InventoryMetrics.coverage(scope, variantId, asOf)` liczy `UNITS_SOLD@v1`, `SALES_VELOCITY_7_FULL_LOCAL_DAYS@v1`
-  i `DAYS_OF_COVER@v1` deterministycznie, bez LLM (dokument 03 §2, §4).
-- Okno: 7 pełnych dni lokalnych sklepu przed dniem `asOf`, po `placed_at`; statusy kwalifikowane v1:
-  `processing`, `completed`, `on-hold`. Ułamki: skala 4, HALF_UP (IG-01: 18 / (49 / 7) = 2.5714).
-- Brak danych to `null` z przyczyną (`MetricReason`), nigdy zero: niepełne zamówienia w oknie, brak sprzedaży,
-  stan nieśledzony lub wspólny dla wariantów, brak odczytu stanu. Stockout w oknie oznacza prognozę jako
-  ograniczoną (IG-25).
-- Testy złote: `InventoryMetricsGoldenTest` (IG-01, IG-02, IG-03, IG-25).
+- `InventoryMetrics.coverage(scope, variantId, asOf)` computes `UNITS_SOLD@v1`, `SALES_VELOCITY_7_FULL_LOCAL_DAYS@v1`
+  and `DAYS_OF_COVER@v1` deterministically, without an LLM (document 03 §2, §4).
+- Window: 7 full local store days before the `asOf` day, by `placed_at`; v1 qualifying statuses:
+  `processing`, `completed`, `on-hold`. Fractions: scale 4, HALF_UP (IG-01: 18 / (49 / 7) = 2.5714).
+- Missing data is `null` with a reason (`MetricReason`), never zero: incomplete orders in the window, no sales,
+  untracked stock or stock shared between variants, no stock reading. A stockout in the window marks the forecast
+  as constrained (IG-25).
+- Golden tests: `InventoryMetricsGoldenTest` (IG-01, IG-02, IG-03, IG-25).
 
-## Dowody i ContextSnapshot (B-18)
+## Evidence and ContextSnapshot (B-18)
 
-- `EvidenceStore` (moduł `metrics`) zapisuje niezmienne dowody z hashem kanonicznego rekordu (`CanonicalJson`,
-  ADR-0011). Identyczna treść w sklepie to ten sam dowód; trigger bazy odrzuca zmianę i usunięcie.
-- `InventoryEvidence` utrwala dowody forecastu (stan, sprzedaż, tempo, pokrycie) z lineage. Dowody powstają tylko
-  przy budowie kontekstu decyzji, nie przy zapytaniach analityki.
-- `ContextSnapshots` (moduł `decisions`) zapisuje snapshot raz, z listą dowodów tego samego sklepu; odczyt tylko
-  przez `TrustedStoreScope`.
+- `EvidenceStore` (module `metrics`) stores immutable evidence with a hash of the canonical record (`CanonicalJson`,
+  ADR-0011). Identical content in a store is the same evidence; a database trigger rejects updates and deletes.
+- `InventoryEvidence` persists forecast evidence (stock, sales, velocity, coverage) with lineage. Evidence is
+  created only when a decision context is built, not for analytics queries.
+- `ContextSnapshots` (module `decisions`) stores a snapshot once, with a list of evidence from the same store; it is
+  read only through a `TrustedStoreScope`.
 
-## Reklamy i mapowania SKU–reklama (B-20)
+## Ads and SKU–ad mappings (B-20)
 
-- `AdRepository` (moduł `commerce`): reklamy Meta (własny i efektywny status, fingerprint kreacji) i mapowania na
-  warianty z wersją rosnącą przy każdej zmianie. Weryfikacja dotyczy kreacji, dla której ją wykonano
-  (`AdMapping.currentFor`).
-- Do czasu adaptera Meta (F2) lokalny worker co minutę wczytuje `infra/fixtures/meta-ads.json`
-  (`operator.commerce.ad-fixture-file`): dedykowaną reklamę `ad-9001` dla `TSHIRT-BASIC-S` i katalogową `ad-9002`.
+- `AdRepository` (module `commerce`): Meta ads (own and effective status, creative fingerprint) and mappings to
+  variants, with a version that increases on every change. A verification applies to the creative it was
+  performed for (`AdMapping.currentFor`).
+- Until the Meta adapter exists (F2), the local worker loads `infra/fixtures/meta-ads.json` every minute
+  (`operator.commerce.ad-fixture-file`): the dedicated ad `ad-9001` for `TSHIRT-BASIC-S` and the catalog ad
+  `ad-9002`.
 
-## Detektor ryzyka i Opportunity (B-19)
+## Risk detector and Opportunity (B-19)
 
-- `InventoryRiskDetector` (`inventory-risk/1`, moduł `decisions`) zapisuje obserwację przy każdej ocenie: ryzyko to
-  pokrycie poniżej `threshold-days`; stan starszy niż `max-stock-age` albo niedostępna metryka daje `UNKNOWN`, które
-  przerywa serię. Epizod otwiera się po `min-observations` aktualnych obserwacjach ryzyka odległych o `min-gap`
-  (`operator.inventory-guardian.risk.*`).
-- `Opportunities`: co najwyżej jeden aktywny epizod na wariant (indeks unikalny, IG-05), przejścia statusów przez
-  maszynę stanów z kontrolą wersji.
-- `VariantInventoryWorkflow` (wersja `risk-detection`) ocenia ryzyko po zmianie stanu i po świeżym odczycie, a gdy
-  seria się buduje, po `min-gap` potwierdza stan kolejnym odczytem ze sklepu.
+- `InventoryRiskDetector` (`inventory-risk/1`, module `decisions`) records an observation on every assessment: risk
+  means cover below `threshold-days`; stock older than `max-stock-age` or an unavailable metric gives `UNKNOWN`,
+  which breaks the series. An episode opens after `min-observations` current risk observations at least `min-gap`
+  apart (`operator.inventory-guardian.risk.*`).
+- `Opportunities`: at most one active episode per variant (unique index, IG-05); status transitions go through a
+  state machine with a version check.
+- `VariantInventoryWorkflow` (version `risk-detection`) assesses risk after a stock change and after a fresh read,
+  and while a series is building it confirms the stock with another read from the store after `min-gap`.
 
-## Kontrakt DecisionProposal v1 (B-21)
+## DecisionProposal v1 contract (B-21)
 
-- Schemat `knowledge/schemas/decision-proposal-v1.schema.json` (JSON Schema 2020-12) trafia do classpath jako
-  `schemas/…` i jest jedynym źródłem kształtu kontraktu (ADR-0012); przykłady są w `knowledge/schemas/examples`.
-- `DecisionProposals.submit` opakowuje rekomendację proposera w kopertę v1 i sprawdza ją `ProposalValidator`
-  (schemat, reguły procesu z `ProposalRules`, dowody i cel w snapshocie). Ważna propozycja to kolejna rewizja
-  epizodu (poprzednia przechodzi w `SUPERSEDED`); nieważna to tylko wpis w `proposal_rejection` z kodami (IG-10).
-- `AdEvidence` (moduł `metrics`) zapisuje dowody stanu reklamy i mapowania, na których opiera się walidacja celu.
+- The schema `knowledge/schemas/decision-proposal-v1.schema.json` (JSON Schema 2020-12) is put on the classpath as
+  `schemas/…` and is the only source of the contract's shape (ADR-0012); examples are in `knowledge/schemas/examples`.
+- `DecisionProposals.submit` wraps the proposer's recommendation in the v1 envelope and checks it with
+  `ProposalValidator` (schema, process rules from `ProposalRules`, evidence and target in the snapshot). A valid
+  proposal becomes the next revision of the episode (the previous one moves to `SUPERSEDED`); an invalid one is only
+  an entry in `proposal_rejection` with codes (IG-10).
+- `AdEvidence` (module `metrics`) stores the ad-state and mapping evidence that target validation relies on.
 
-## Inventory Guardian w trybie shadow (B-22)
+## Inventory Guardian in shadow mode (B-22)
 
-- Otwarty epizod uruchamia `InventoryGuardianWorkflow` (ID `inventory-guardian-{storeId}-{variantId}-{opportunityId}`,
-  `REJECT_DUPLICATE`). Kroki to aktywności: `buildContext` (snapshot `inventory-context/1` z dowodami stanu, popytu,
-  dostaw i reklam), `propose` (`BaselineProposer`), `validateAndPersist`, `evaluatePolicy`.
-- `PauseAdPolicy` (`inventory-protection@1.0.0`, `operator.policies.inventory-protection.*`) sprawdza po kolei
-  izolację, zdrowie integracji, świeżość, ryzyko i jakość popytu, mapowanie i kreację, stan reklamy i autonomię.
-  Wynik z listą kontroli i parametrami trafia do `policy_evaluation` w trybie `EVALUATION_ONLY`; nic nie jest
-  wykonywane.
-- Status epizodu wynika z dyspozycji i wyniku polityki (ADR-0012 pkt 6). Limity epizodu są w
-  `operator.inventory-guardian.workflow.*`. Workflow wariantu przekazuje kolejne obserwacje sygnałami `riskUpdated`
-  i `riskResolved`.
+- An open episode starts `InventoryGuardianWorkflow` (ID `inventory-guardian-{storeId}-{variantId}-{opportunityId}`,
+  `REJECT_DUPLICATE`). Its steps are activities: `buildContext` (snapshot `inventory-context/1` with stock, demand,
+  supply and ad evidence), `propose` (`BaselineProposer`), `validateAndPersist`, `evaluatePolicy`.
+- `PauseAdPolicy` (`inventory-protection@1.0.0`, `operator.policies.inventory-protection.*`) checks, in order,
+  isolation, integration health, freshness, risk and demand quality, mapping and creative, ad state and autonomy.
+  The result, with the list of checks and parameters, goes into `policy_evaluation` in `EVALUATION_ONLY` mode;
+  nothing is executed.
+- The episode status follows from the disposition and the policy result (ADR-0012 item 6). Episode limits are in
+  `operator.inventory-guardian.workflow.*`. The variant workflow passes further observations through the
+  `riskUpdated` and `riskResolved` signals.
 
-## Zasady
+## Rules
 
-- Moduły to podpakiety `com.ecommerceagent`; dozwolone zależności są w `package-info.java` każdego modułu.
-- Endpointy sklepu przyjmują `TrustedStoreScope` jako parametr kontrolera; zapytania filtrują po
-  `organization_id`/`store_id` z tego obiektu (ADR-0004). Dostęp do danych: `JdbcClient` + SQL (ADR-0005).
-- Migracje Flyway w `src/main/resources/db/migration`, czas zapisywany w UTC.
+- Modules are subpackages of `com.ecommerceagent`; the allowed dependencies are in each module's `package-info.java`.
+- Store endpoints take a `TrustedStoreScope` as a controller parameter; queries filter by
+  `organization_id`/`store_id` from that object (ADR-0004). Data access: `JdbcClient` + SQL (ADR-0005).
+- Flyway migrations are in `src/main/resources/db/migration`; time is stored in UTC.
