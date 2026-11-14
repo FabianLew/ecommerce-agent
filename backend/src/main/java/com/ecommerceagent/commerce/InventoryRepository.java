@@ -6,12 +6,14 @@ import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
 import com.ecommerceagent.identity.TrustedStoreScope;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 /** Append-only stock readings of a store's variants (document 03 §3). */
 @Repository
@@ -63,6 +65,50 @@ public class InventoryRepository {
             throw new IllegalArgumentException("Variant " + variantId + " is not part of store " + scope.storeId());
         }
         return id;
+    }
+
+    /**
+     * Records a pushed reading (e.g. a webhook) only if it is newer in source time than the latest reading
+     * of the variant, so an old or repeated event never regresses stock (IG-04, ADR-0009). The variant row is
+     * locked, so two concurrent events for the same variant are compared one after the other.
+     */
+    @Transactional
+    public StockChange recordIfNewer(TrustedStoreScope scope, UUID variantId, InventoryReading reading) {
+        boolean locked = jdbc.sql("""
+                        SELECT id FROM product_variant
+                        WHERE id = :variantId AND organization_id = :organizationId AND store_id = :storeId
+                        FOR UPDATE
+                        """)
+                .param("variantId", variantId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .query(UUID.class)
+                .optional()
+                .isPresent();
+        if (!locked) {
+            throw new IllegalArgumentException("Variant " + variantId + " is not part of store " + scope.storeId());
+        }
+        Optional<InventoryObservation> latest = latest(scope, variantId);
+        if (latest.isPresent() && reading.sourceUpdatedAt() != null) {
+            InventoryReading known = latest.get().reading();
+            Instant knownAt = known.sourceUpdatedAt();
+            if (knownAt != null) {
+                int order = reading.sourceUpdatedAt().compareTo(knownAt);
+                if (order < 0) {
+                    return StockChange.STALE;
+                }
+                if (order == 0) {
+                    boolean same = Objects.equals(known.stockQuantity(), reading.stockQuantity())
+                            && known.stockStatus() == reading.stockStatus();
+                    return same ? StockChange.DUPLICATE : StockChange.AMBIGUOUS;
+                }
+            }
+        } else if (latest.isPresent()) {
+            // Without a source time the reading cannot be ordered against what we know.
+            return StockChange.AMBIGUOUS;
+        }
+        record(scope, variantId, reading);
+        return StockChange.RECORDED;
     }
 
     /** The most recently observed reading. */

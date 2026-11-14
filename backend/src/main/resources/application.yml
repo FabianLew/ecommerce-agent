@@ -36,6 +36,11 @@ operator:
       connect-timeout: 5s
       # Deadline for the whole response, headers and body (FIX-01).
       response-timeout: 30s
+    webhooks:
+      # Public address of this API that shops deliver webhooks to (ADR-0009), e.g. https://api.example.com
+      base-url: ${WEBHOOK_BASE_URL:}
+      processor-enabled: true
+      processor-interval: 2s
 
 springdoc:
   api-docs:

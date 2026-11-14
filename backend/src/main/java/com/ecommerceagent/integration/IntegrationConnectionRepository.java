@@ -1,12 +1,14 @@
 package com.ecommerceagent.integration;
 
 import java.net.URI;
+import java.security.SecureRandom;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,10 +26,12 @@ import tools.jackson.databind.json.JsonMapper;
 class IntegrationConnectionRepository {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private static final String COLUMNS = """
             id, provider, store_url, status, key_hint, last_check_at, last_success_at, last_error_code,
-            last_check_warnings::text AS warnings, source_currency
+            last_check_warnings::text AS warnings, source_currency, webhook_endpoint_key, webhook_secret_set_at,
+            last_webhook_at
             """;
 
     private final JdbcClient jdbc;
@@ -44,8 +48,9 @@ class IntegrationConnectionRepository {
         Timestamp now = Timestamp.from(clock.instant());
         int inserted = jdbc.sql("""
                         INSERT INTO integration_connection (id, organization_id, store_id, provider, store_url, status,
-                                                            created_at, updated_at)
-                        VALUES (:id, :organizationId, :storeId, :provider, :storeUrl, 'PENDING_CREDENTIALS', :now, :now)
+                                                            webhook_endpoint_key, created_at, updated_at)
+                        VALUES (:id, :organizationId, :storeId, :provider, :storeUrl, 'PENDING_CREDENTIALS',
+                                :webhookKey, :now, :now)
                         ON CONFLICT (store_id, provider) DO NOTHING
                         """)
                 .param("id", id)
@@ -53,6 +58,7 @@ class IntegrationConnectionRepository {
                 .param("storeId", scope.storeId())
                 .param("provider", provider.name())
                 .param("storeUrl", storeUrl.toString())
+                .param("webhookKey", newEndpointKey())
                 .param("now", now)
                 .update();
         return inserted == 1 ? find(scope, id) : Optional.empty();
@@ -190,6 +196,58 @@ class IntegrationConnectionRepository {
                 .update();
     }
 
+    /**
+     * Finds the connection behind a public webhook URL (ADR-0009). This is the only lookup without a trusted
+     * scope: the caller is the shop, and the result is used only to build a system scope for that store.
+     */
+    Optional<WebhookEndpoint> webhookEndpoint(String endpointKey) {
+        return jdbc.sql("""
+                        SELECT id, organization_id, store_id, provider FROM integration_connection
+                        WHERE webhook_endpoint_key = :key
+                        """)
+                .param("key", endpointKey)
+                .query((rs, n) -> new WebhookEndpoint(rs.getObject("id", UUID.class),
+                        rs.getObject("organization_id", UUID.class), rs.getObject("store_id", UUID.class),
+                        IntegrationProvider.valueOf(rs.getString("provider"))))
+                .optional();
+    }
+
+    void markWebhookSecretSet(TrustedStoreScope scope, UUID connectionId) {
+        Timestamp now = Timestamp.from(clock.instant());
+        jdbc.sql("""
+                        UPDATE integration_connection SET webhook_secret_set_at = :now, updated_at = :now
+                        WHERE id = :id AND organization_id = :organizationId AND store_id = :storeId
+                        """)
+                .param("now", now)
+                .param("id", connectionId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .update();
+    }
+
+    void markWebhookReceived(TrustedStoreScope scope, UUID connectionId, Instant receivedAt) {
+        jdbc.sql("""
+                        UPDATE integration_connection
+                        SET last_webhook_at = GREATEST(COALESCE(last_webhook_at, :at), :at)
+                        WHERE id = :id AND organization_id = :organizationId AND store_id = :storeId
+                        """)
+                .param("at", Timestamp.from(receivedAt))
+                .param("id", connectionId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .update();
+    }
+
+    /** 128 random bits as 32 hex characters. */
+    static String newEndpointKey() {
+        byte[] bytes = new byte[16];
+        RANDOM.nextBytes(bytes);
+        return HexFormat.of().formatHex(bytes);
+    }
+
+    record WebhookEndpoint(UUID connectionId, UUID organizationId, UUID storeId, IntegrationProvider provider) {
+    }
+
     private static IntegrationConnection map(ResultSet rs, int rowNum) throws SQLException {
         String error = rs.getString("last_error_code");
         String[] warnings = JSON.readValue(rs.getString("warnings"), String[].class);
@@ -203,7 +261,10 @@ class IntegrationConnectionRepository {
                 instant(rs.getTimestamp("last_success_at")),
                 error == null ? null : ConnectionCheckError.valueOf(error),
                 Arrays.stream(warnings).map(ConnectionWarning::valueOf).toList(),
-                rs.getString("source_currency"));
+                rs.getString("source_currency"),
+                rs.getString("webhook_endpoint_key"),
+                instant(rs.getTimestamp("webhook_secret_set_at")),
+                instant(rs.getTimestamp("last_webhook_at")));
     }
 
     private static Instant instant(Timestamp timestamp) {

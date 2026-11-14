@@ -8,3 +8,7 @@ operator:
       allow-insecure-http: true
       allow-private-network: true
       response-timeout: 2s
+    webhooks:
+      base-url: https://api.example.test
+      # Tests drain the inbox explicitly.
+      processor-enabled: false

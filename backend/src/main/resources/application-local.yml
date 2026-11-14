@@ -14,3 +14,6 @@ operator:
       # The local test store runs on http://localhost:8081 (OAuth 1.0a signatures, ADR-0007).
       allow-insecure-http: true
       allow-private-network: true
+    webhooks:
+      # The Woo container reaches the API on the host through host.docker.internal (infra/docker-compose.yml).
+      base-url: ${WEBHOOK_BASE_URL:http://host.docker.internal:8080}
