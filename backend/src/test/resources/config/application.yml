@@ -23,6 +23,10 @@ operator:
       order-delay: 2s
     catalog:
       refresh-delay: 1s
+  inventory-guardian:
+    risk:
+      # Short gap so workflow tests see the confirming read open an episode.
+      min-gap: 2s
     sync:
       # The Temporal test server has no schedules; tests start IncrementalSyncWorkflow directly.
       schedules-enabled: false
