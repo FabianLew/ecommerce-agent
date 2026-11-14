@@ -12,3 +12,11 @@ operator:
       base-url: https://api.example.test
       # Tests drain the inbox explicitly.
       processor-enabled: false
+  automation:
+    # Tests dispatch the outbox explicitly; short delays keep workflow tests fast.
+    dispatcher-enabled: false
+    inventory:
+      verify-delay: 1s
+      order-delay: 2s
+    catalog:
+      refresh-delay: 1s

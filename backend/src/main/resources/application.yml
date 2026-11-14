@@ -40,6 +40,16 @@ operator:
       base-url: ${WEBHOOK_BASE_URL:}
       processor-enabled: true
       processor-interval: 2s
+  automation:
+    # Outbox → Temporal (ADR-0010); runs in the worker profile.
+    dispatcher-enabled: true
+    dispatcher-interval: 1s
+    inventory:
+      # Fresh read after a verification request, and after an order change without a newer stock state.
+      verify-delay: 10s
+      order-delay: 60s
+    catalog:
+      refresh-delay: 30s
 
 springdoc:
   api-docs:

@@ -56,7 +56,7 @@ class WebhookNormalizationTest {
     WooWebhooks webhooks;
 
     @Autowired
-    WooWebhookNormalizer normalizer;
+    WooPayloadNormalizer normalizer;
 
     @Autowired
     WebhookInboxRepository inbox;

@@ -38,11 +38,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Applies one minimized webhook payload to the commerce model and writes the resulting outbox events, in the
- * caller's transaction (ADR-0009). Stock never moves back in source time (IG-04).
+ * Applies one WooCommerce payload (a webhook from the inbox, or a fresh read) to the commerce model and writes
+ * the resulting outbox events, in the caller's transaction (ADR-0009, ADR-0010). Stock never moves back in
+ * source time (IG-04); only a fresh read may settle a same-second conflict.
  */
 @Component
-class WooWebhookNormalizer {
+class WooPayloadNormalizer {
 
     private static final CommerceSource SOURCE = CommerceSource.WOOCOMMERCE;
     private static final JsonMapper JSON = JsonMapper.builder().build();
@@ -53,7 +54,7 @@ class WooWebhookNormalizer {
     private final OutboxEvents outbox;
     private final Clock clock;
 
-    WooWebhookNormalizer(CatalogRepository catalog, InventoryRepository inventory, OrderRepository orders,
+    WooPayloadNormalizer(CatalogRepository catalog, InventoryRepository inventory, OrderRepository orders,
             OutboxEvents outbox, Clock clock) {
         this.catalog = catalog;
         this.inventory = inventory;
@@ -67,7 +68,12 @@ class WooWebhookNormalizer {
         if (topic.startsWith("order.")) {
             return order(scope, payload);
         }
-        return product(scope, inboxId, payload);
+        return product(scope, inboxId.toString(), payload, false);
+    }
+
+    /** A product or variation just read from the source (authoritative at the moment of the read). */
+    Result applyFresh(TrustedStoreScope scope, String readId, JsonNode payload) {
+        return product(scope, readId, payload, true);
     }
 
     private Result order(TrustedStoreScope scope, JsonNode payload) {
@@ -93,7 +99,7 @@ class WooWebhookNormalizer {
         return new Result(InboxStatus.PROCESSED, "ORDER_UPSERTED");
     }
 
-    private Result product(TrustedStoreScope scope, UUID inboxId, JsonNode payload) {
+    private Result product(TrustedStoreScope scope, String inputId, JsonNode payload, boolean fresh) {
         String externalId = text(payload, "id");
         String type = text(payload, "type");
         Instant modified = gmt(payload, "date_modified_gmt");
@@ -103,7 +109,7 @@ class WooWebhookNormalizer {
         if ("variation".equals(type)) {
             String parentId = text(payload, "parent_id");
             if (parentId == null || catalog.productIdByExternalId(scope, SOURCE, parentId).isEmpty()) {
-                verify(scope, inboxId, "product", parentId == null ? externalId : parentId, "UNKNOWN_PRODUCT");
+                verify(scope, inputId, "product", parentId == null ? externalId : parentId, "UNKNOWN_PRODUCT");
                 return new Result(InboxStatus.PROCESSED, "VERIFY_UNKNOWN_PRODUCT");
             }
             StockTracking tracking = WooPayloads.variationTracking(payload);
@@ -115,7 +121,7 @@ class WooWebhookNormalizer {
                 // Shared stock arrives with the parent product's payload.
                 return new Result(InboxStatus.PROCESSED, "CATALOG_ONLY");
             }
-            return result(List.of(stock(scope, inboxId, variantId, payload, tracking, modified)));
+            return result(List.of(stock(scope, inputId, variantId, payload, tracking, modified, fresh)));
         }
 
         String productType = type == null ? "unknown" : type;
@@ -128,7 +134,7 @@ class WooWebhookNormalizer {
             List<String> outcomes = new ArrayList<>();
             for (Variant variant : catalog.variantsOfProduct(scope, productId)) {
                 if (variant.stockTracking() == StockTracking.PARENT) {
-                    outcomes.add(stock(scope, inboxId, variant.id(), payload, StockTracking.PARENT, modified));
+                    outcomes.add(stock(scope, inputId, variant.id(), payload, StockTracking.PARENT, modified, fresh));
                 }
             }
             return outcomes.isEmpty() ? new Result(InboxStatus.PROCESSED, "CATALOG_ONLY") : result(outcomes);
@@ -137,21 +143,24 @@ class WooWebhookNormalizer {
         UUID variantId = catalog.upsertVariant(scope, SOURCE, new VariantData(externalId, externalId,
                 name == null ? "" : name, emptyToNull(text(payload, "sku")), status, tracking, backorders(payload),
                 modified));
-        return result(List.of(stock(scope, inboxId, variantId, payload, tracking, modified)));
+        return result(List.of(stock(scope, inputId, variantId, payload, tracking, modified, fresh)));
     }
 
-    private String stock(TrustedStoreScope scope, UUID inboxId, UUID variantId, JsonNode stockSource,
-            StockTracking tracking, Instant modified) {
+    private String stock(TrustedStoreScope scope, String inputId, UUID variantId, JsonNode stockSource,
+            StockTracking tracking, Instant modified, boolean fresh) {
         if (!stockSource.has("stock_status")) {
             // Legacy (v1/v2) webhook payloads do not carry the stock status we need.
-            verify(scope, inboxId, "variant", variantId.toString(), "UNSUPPORTED_PAYLOAD");
+            verify(scope, inputId, "variant", variantId.toString(), "UNSUPPORTED_PAYLOAD");
             return "VERIFY_UNSUPPORTED_PAYLOAD";
         }
         Instant observedAt = clock.instant();
         // Woo stock already includes on-hold/processing/completed orders (ADR-0008).
         InventoryReading reading = new InventoryReading(stockQuantity(stockSource, tracking), stockStatus(stockSource),
-                ReservationSemantics.ALREADY_ACCOUNTED_FOR, null, ObservationSource.WEBHOOK, modified, observedAt);
-        StockChange change = inventory.recordIfNewer(scope, variantId, reading);
+                ReservationSemantics.ALREADY_ACCOUNTED_FOR, null, fresh ? ObservationSource.POLL : ObservationSource.WEBHOOK,
+                modified, observedAt);
+        StockChange change = fresh
+                ? inventory.recordAuthoritative(scope, variantId, reading)
+                : inventory.recordIfNewer(scope, variantId, reading);
         switch (change) {
             case RECORDED -> {
                 Map<String, Object> event = new LinkedHashMap<>();
@@ -160,11 +169,11 @@ class WooWebhookNormalizer {
                 event.put("stockStatus", reading.stockStatus().name());
                 event.put("sourceUpdatedAt", string(modified));
                 event.put("observedAt", observedAt.toString());
-                event.put("observationSource", ObservationSource.WEBHOOK.name());
+                event.put("observationSource", reading.observationSource().name());
                 outbox.append(scope, OutboxEvents.INVENTORY_CHANGED, "variant", variantId.toString(), event,
                         inventoryKey(variantId, reading));
             }
-            case AMBIGUOUS -> verify(scope, inboxId, "variant", variantId.toString(), "AMBIGUOUS_SOURCE_TIME");
+            case AMBIGUOUS -> verify(scope, inputId, "variant", variantId.toString(), "AMBIGUOUS_SOURCE_TIME");
             case STALE, DUPLICATE -> {
                 // Nothing newer than what we know: no state change and no event.
             }
@@ -172,13 +181,13 @@ class WooWebhookNormalizer {
         return change.name();
     }
 
-    private void verify(TrustedStoreScope scope, UUID inboxId, String aggregateType, String aggregateId,
+    private void verify(TrustedStoreScope scope, String inputId, String aggregateType, String aggregateId,
             String reason) {
         Map<String, Object> event = new LinkedHashMap<>();
         event.put("reason", reason);
         event.put(aggregateType.equals("variant") ? "variantId" : "productExternalId", aggregateId);
         outbox.append(scope, OutboxEvents.INVENTORY_VERIFICATION_REQUESTED, aggregateType, aggregateId, event,
-                "verify:" + inboxId + ":" + aggregateType + ":" + aggregateId);
+                "verify:" + inputId + ":" + aggregateType + ":" + aggregateId);
     }
 
     private static Result result(List<String> outcomes) {

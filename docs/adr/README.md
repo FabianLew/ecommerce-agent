@@ -16,5 +16,6 @@ Statusy: `Proponowany` → `Zaakceptowany` (po akceptacji właściciela w PR) �
 | [0007](0007-woocommerce-connection.md) | Połączenie WooCommerce: sekrety, uwierzytelnianie i ochrona przed SSRF | Zaakceptowany |
 | [0008](0008-woocommerce-import-and-stock-semantics.md) | Import WooCommerce (14 dni) i semantyka stanów magazynowych | Zaakceptowany |
 | [0009](0009-woocommerce-webhooks-inbox-outbox.md) | Webhooki WooCommerce: rejestracja, podpis, inbox, normalizacja i outbox | Proponowany |
+| [0010](0010-event-dispatch-polling-reconciliation.md) | Przekazywanie zdarzeń do Temporal, polling i rekonsyliacja WooCommerce, Integration Health | Proponowany |
 
 Szablon: [0000-template.md](0000-template.md).
