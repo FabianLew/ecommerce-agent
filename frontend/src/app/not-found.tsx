@@ -1,12 +1,14 @@
 import Link from "next/link";
 
 import { StatePanel } from "@/components/StatePanel";
+import { getMessages } from "@/i18n/server";
 
-export default function NotFound() {
+export default async function NotFound() {
+  const t = await getMessages();
   return (
     <main className="centered">
-      <StatePanel tone="warning" title="Nie znaleziono strony" description="Ten adres nie istnieje albo jest niedostępny.">
-        <Link href="/" className="button primary">Przejdź do swoich sklepów</Link>
+      <StatePanel tone="warning" title={t.notFound.title} description={t.notFound.description}>
+        <Link href="/" className="button primary">{t.common.goToStores}</Link>
       </StatePanel>
     </main>
   );

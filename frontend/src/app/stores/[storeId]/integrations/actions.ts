@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import type { Messages } from "@/i18n/messages";
+import { getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { storePath } from "@/lib/store-path";
 
@@ -15,34 +17,26 @@ export type FormState = {
 
 const FIELD_NAMES = ["storeUrl", "consumerKey", "consumerSecret", "credentials"] as const;
 
-function fieldErrors(errors: { field: string; code: string }[] | undefined): FormState["fieldErrors"] {
+function fieldErrors(
+  errors: { field: string; code: string }[] | undefined,
+  t: Messages["integrations"],
+): FormState["fieldErrors"] {
   const result: FormState["fieldErrors"] = {};
   for (const error of errors ?? []) {
     const field = FIELD_NAMES.find((name) => name === error.field);
     if (field) {
-      result[field] = FIELD_MESSAGES[error.code] ?? "Nieprawidłowa wartość.";
+      result[field] = Object.hasOwn(t.fieldMessages, error.code) ? t.fieldMessages[error.code] : t.invalidValue;
     }
   }
   return result;
 }
 
-/** Polish texts for the backend's validation codes (ADR-0007). */
-const FIELD_MESSAGES: Record<string, string> = {
-  REQUIRED: "To pole jest wymagane.",
-  INVALID_URL: "Podaj poprawny adres sklepu, np. https://sklep.pl.",
-  INSECURE_SCHEME: "Adres sklepu musi zaczynać się od https://.",
-  CREDENTIALS_IN_URL: "Adres sklepu nie może zawierać loginu ani hasła.",
-  QUERY_NOT_ALLOWED: "Podaj adres sklepu bez ? i #.",
-  KEY_FORMAT: "Wartość z WooCommerce zawiera tylko litery, cyfry i _, a klucz zaczyna się od ck_, sekret od cs_.",
-  CREDENTIALS_MISSING: "Najpierw zapisz klucz API.",
-};
-
-function keyFormat(field: "consumerKey" | "consumerSecret", value: string): string | undefined {
+function keyFormat(field: "consumerKey" | "consumerSecret", value: string, t: Messages["integrations"]): string | undefined {
   const prefix = field === "consumerKey" ? "ck_" : "cs_";
   if (!value) {
-    return "To pole jest wymagane.";
+    return t.fieldMessages.REQUIRED;
   }
-  return value.startsWith(prefix) ? undefined : `Wartość z WooCommerce zaczyna się od ${prefix}.`;
+  return value.startsWith(prefix) ? undefined : t.keyPrefix(prefix);
 }
 
 /**
@@ -54,12 +48,13 @@ export async function connectWooCommerce(storeId: string, _previous: FormState, 
   const consumerKey = String(form.get("consumerKey") ?? "").trim();
   const consumerSecret = String(form.get("consumerSecret") ?? "").trim();
   const storeUrl = String(form.get("storeUrl") ?? "").trim();
+  const t = (await getMessages()).integrations;
   const errors = {
-    consumerKey: keyFormat("consumerKey", consumerKey),
-    consumerSecret: keyFormat("consumerSecret", consumerSecret),
+    consumerKey: keyFormat("consumerKey", consumerKey, t),
+    consumerSecret: keyFormat("consumerSecret", consumerSecret, t),
   };
   if (errors.consumerKey || errors.consumerSecret) {
-    return { status: "error", message: "Popraw zaznaczone pola.", fieldErrors: errors, storeUrl };
+    return { status: "error", message: t.fixFields, fieldErrors: errors, storeUrl };
   }
 
   const api = await backend(path);
@@ -71,7 +66,7 @@ export async function connectWooCommerce(storeId: string, _previous: FormState, 
     });
     redirectIfUnauthenticated(created.response.status, path);
     if (!created.data) {
-      return { ...failure(created.response.status, created.error), storeUrl };
+      return { ...failure(created.response.status, created.error, t), storeUrl };
     }
     integrationId = created.data.id;
   }
@@ -83,7 +78,7 @@ export async function connectWooCommerce(storeId: string, _previous: FormState, 
   redirectIfUnauthenticated(saved.response.status, path);
   if (!saved.data) {
     revalidatePath(path);
-    return failure(saved.response.status, saved.error);
+    return failure(saved.response.status, saved.error, t);
   }
 
   const checked = await api.POST("/api/v1/stores/{storeId}/integrations/{integrationId}/checks", {
@@ -92,11 +87,11 @@ export async function connectWooCommerce(storeId: string, _previous: FormState, 
   redirectIfUnauthenticated(checked.response.status, path);
   revalidatePath(path);
   if (!checked.data) {
-    return failure(checked.response.status, checked.error);
+    return failure(checked.response.status, checked.error, t);
   }
   return checked.data.status === "CONNECTED"
-    ? { status: "saved", message: "Połączono z WooCommerce." }
-    : { status: "error", message: "Klucz zapisany, ale test połączenia się nie powiódł. Szczegóły poniżej." };
+    ? { status: "saved", message: t.connected }
+    : { status: "error", message: t.keySavedCheckFailed };
 }
 
 export async function checkConnection(storeId: string, integrationId: string): Promise<void> {
@@ -112,19 +107,20 @@ export async function checkConnection(storeId: string, integrationId: string): P
 function failure(
   status: number,
   error: { code?: string; fieldErrors?: { field: string; code: string }[]; requestId?: string } | undefined,
+  t: Messages["integrations"],
 ): FormState {
   if (status === 403) {
-    return { status: "error", message: "Nie masz uprawnień do zmiany połączeń tego sklepu." };
+    return { status: "error", message: t.noPermission };
   }
   if (status === 409) {
-    return { status: "error", message: "Ten sklep ma już połączenie WooCommerce. Odśwież stronę." };
+    return { status: "error", message: t.alreadyConnected };
   }
   if (status === 422) {
-    return { status: "error", message: "Popraw zaznaczone pola.", fieldErrors: fieldErrors(error?.fieldErrors) };
+    return { status: "error", message: t.fixFields, fieldErrors: fieldErrors(error?.fieldErrors, t) };
   }
   return {
     status: "error",
-    message: `Nie udało się zapisać połączenia. Spróbuj ponownie (identyfikator zgłoszenia ${error?.requestId ?? "-"}).`,
+    message: t.saveFailed(error?.requestId ?? "-"),
   };
 }
 
@@ -154,8 +150,9 @@ export async function saveWebhookSecret(
 ): Promise<WebhookSecretState> {
   const path = storePath(storeId, "integrations");
   const secret = String(form.get("webhookSecret") ?? "").trim();
+  const t = (await getMessages()).integrations;
   if (secret.length < 16) {
-    return { status: "error", message: "Sekret musi mieć co najmniej 16 znaków. Wygeneruj go przyciskiem." };
+    return { status: "error", message: t.secretTooShort };
   }
   const api = await backend(path);
   const saved = await api.POST("/api/v1/stores/{storeId}/integration-connections/{connectionId}/webhook-secret", {
@@ -165,16 +162,16 @@ export async function saveWebhookSecret(
   redirectIfUnauthenticated(saved.response.status, path);
   revalidatePath(path);
   if (saved.data) {
-    return { status: "saved", message: "Sekret zapisany. Webhooki z tym sekretem będą przyjmowane." };
+    return { status: "saved", message: t.secretSaved };
   }
   if (saved.response.status === 403) {
-    return { status: "error", message: "Nie masz uprawnień do zmiany połączeń tego sklepu." };
+    return { status: "error", message: t.noPermission };
   }
   if (saved.response.status === 422) {
-    return { status: "error", message: "Sekret: 16–200 znaków bez spacji." };
+    return { status: "error", message: t.secretInvalid };
   }
   return {
     status: "error",
-    message: `Nie udało się zapisać sekretu (identyfikator zgłoszenia ${saved.error?.requestId ?? "-"}).`,
+    message: t.secretSaveFailed(saved.error?.requestId ?? "-"),
   };
 }

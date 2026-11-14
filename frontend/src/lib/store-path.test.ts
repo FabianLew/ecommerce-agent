@@ -26,7 +26,7 @@ describe("switchStorePath", () => {
 
 describe("sections", () => {
   it("has the eight views from document 04 §2", () => {
-    expect(SECTIONS.map((section) => section.slug)).toEqual([
+    expect(SECTIONS).toEqual([
       "dashboard", "decisions", "support", "analytics", "automations", "activity", "integrations", "settings",
     ]);
     expect(isSection("onboarding")).toBe(false);

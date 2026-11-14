@@ -2,6 +2,8 @@
 
 import { useActionState } from "react";
 
+import { useMessages } from "@/i18n/LocaleProvider";
+
 import { connectWooCommerce, type FormState } from "./actions";
 
 const INITIAL: FormState = { status: "idle" };
@@ -10,6 +12,7 @@ const INITIAL: FormState = { status: "idle" };
 export function WooCommerceForm({ storeId, integrationId }: { storeId: string; integrationId?: string }) {
   const [state, action, pending] = useActionState(connectWooCommerce.bind(null, storeId), INITIAL);
   const errors = state.fieldErrors ?? {};
+  const t = useMessages().integrations;
 
   return (
     <form action={action} className="form" noValidate>
@@ -17,8 +20,8 @@ export function WooCommerceForm({ storeId, integrationId }: { storeId: string; i
       {integrationId ? null : (
         <Field
           id="storeUrl"
-          label="Adres sklepu"
-          hint="Adres strony głównej sklepu, np. https://sklep.pl"
+          label={t.storeUrl}
+          hint={t.form.storeUrlHint}
           error={errors.storeUrl}
           input={{ type: "url", inputMode: "url", autoComplete: "url", placeholder: "https://", defaultValue: state.storeUrl }}
         />
@@ -26,7 +29,7 @@ export function WooCommerceForm({ storeId, integrationId }: { storeId: string; i
       <Field
         id="consumerKey"
         label="Consumer key"
-        hint="WooCommerce → Ustawienia → Zaawansowane → REST API → Dodaj klucz, uprawnienie Odczyt."
+        hint={t.form.consumerKeyHint}
         error={errors.consumerKey}
         input={{ type: "password", autoComplete: "off", spellCheck: false }}
       />
@@ -43,7 +46,7 @@ export function WooCommerceForm({ storeId, integrationId }: { storeId: string; i
       ) : null}
       <div className="form-actions">
         <button type="submit" className="button primary" disabled={pending}>
-          {pending ? "Sprawdzanie…" : integrationId ? "Zapisz nowy klucz i sprawdź" : "Połącz i sprawdź"}
+          {pending ? t.form.checking : integrationId ? t.form.saveKeyAndCheck : t.form.connectAndCheck}
         </button>
       </div>
     </form>

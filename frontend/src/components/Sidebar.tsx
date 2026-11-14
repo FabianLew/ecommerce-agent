@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useMessages } from "@/i18n/LocaleProvider";
 import { SECTIONS, storePath } from "@/lib/store-path";
 
 import { StoreSwitcher, type StoreOption } from "./StoreSwitcher";
@@ -11,6 +12,7 @@ import { StoreSwitcher, type StoreOption } from "./StoreSwitcher";
 export function Sidebar({ stores, currentStoreId }: { stores: StoreOption[]; currentStoreId: string }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const t = useMessages();
 
   // Close the mobile drawer after navigation.
   useEffect(() => setOpen(false), [pathname]);
@@ -26,20 +28,20 @@ export function Sidebar({ stores, currentStoreId }: { stores: StoreOption[]; cur
           aria-controls="main-navigation"
           onClick={() => setOpen((value) => !value)}
         >
-          Menu
+          {t.shell.menu}
         </button>
       </div>
       <div className="sidebar-body">
         <StoreSwitcher stores={stores} currentStoreId={currentStoreId} />
-        <nav id="main-navigation" aria-label="Główna nawigacja">
+        <nav id="main-navigation" aria-label={t.shell.mainNavigation}>
           <ul>
             {SECTIONS.map((section) => {
-              const href = storePath(currentStoreId, section.slug);
+              const href = storePath(currentStoreId, section);
               const active = pathname === href || pathname.startsWith(`${href}/`);
               return (
-                <li key={section.slug}>
+                <li key={section}>
                   <Link href={href} aria-current={active ? "page" : undefined} className="nav-link">
-                    {section.label}
+                    {t.sections[section]}
                   </Link>
                 </li>
               );

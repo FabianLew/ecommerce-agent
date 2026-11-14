@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useId, useTransition } from "react";
 
+import { useMessages } from "@/i18n/LocaleProvider";
 import { switchStorePath } from "@/lib/store-path";
 
 export interface StoreOption {
@@ -20,10 +21,11 @@ export function StoreSwitcher({ stores, currentStoreId }: { stores: StoreOption[
   const pathname = usePathname();
   const id = useId();
   const [pending, startTransition] = useTransition();
+  const t = useMessages();
 
   return (
     <div className="store-switcher">
-      <label htmlFor={id}>Sklep</label>
+      <label htmlFor={id}>{t.shell.store}</label>
       <select
         id={id}
         value={currentStoreId}

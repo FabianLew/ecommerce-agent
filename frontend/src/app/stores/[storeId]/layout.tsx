@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/AppShell";
 import { StatePanel } from "@/components/StatePanel";
+import { getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -30,14 +31,15 @@ export default async function StoreLayout({
     redirectIfUnauthenticated(result.response.status, returnTo);
   }
   if (store.response.status === 404 || store.response.status === 403) {
+    const t = await getMessages();
     return (
       <main className="centered">
         <StatePanel
           tone="warning"
-          title="Ten sklep jest niedostępny"
-          description="Sklep nie istnieje albo nie masz do niego dostępu."
+          title={t.store.unavailableTitle}
+          description={t.store.unavailableDescription}
         >
-          <Link href="/" className="button primary">Przejdź do swoich sklepów</Link>
+          <Link href="/" className="button primary">{t.common.goToStores}</Link>
         </StatePanel>
       </main>
     );
