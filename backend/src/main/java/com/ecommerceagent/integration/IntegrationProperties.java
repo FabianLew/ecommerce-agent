@@ -15,7 +15,7 @@ record IntegrationProperties(String secretsKey, @DefaultValue("v1") String secre
 
     IntegrationProperties {
         if (woocommerce == null) {
-            woocommerce = new WooCommerce(false, false, Duration.ofSeconds(5), Duration.ofSeconds(10), 5_000_000);
+            woocommerce = new WooCommerce(false, false, Duration.ofSeconds(5), Duration.ofSeconds(30), 5_000_000);
         }
     }
 
@@ -23,7 +23,7 @@ record IntegrationProperties(String secretsKey, @DefaultValue("v1") String secre
             @DefaultValue("false") boolean allowInsecureHttp,
             @DefaultValue("false") boolean allowPrivateNetwork,
             @DefaultValue("5s") Duration connectTimeout,
-            @DefaultValue("10s") Duration readTimeout,
+            @DefaultValue("30s") Duration responseTimeout,
             @DefaultValue("5000000") int maxResponseBytes) {
     }
 }

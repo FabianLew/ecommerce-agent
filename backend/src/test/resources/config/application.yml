@@ -7,4 +7,4 @@ operator:
       # Tests call a stub WooCommerce server on localhost over HTTP.
       allow-insecure-http: true
       allow-private-network: true
-      read-timeout: 2s
+      response-timeout: 2s
