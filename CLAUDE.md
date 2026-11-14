@@ -18,8 +18,9 @@
 
 - Model LLM tylko proponuje (`DecisionProposal`). Backend waliduje, ocenia politykę, wystawia `AuthorizedAction`
   i wykonuje przez executor z ledgerem. Model widzi wyłącznie narzędzia typu READ.
-- Spring AI nie może wykonywać narzędzi samodzielnie: pętla narzędzi należy do naszego runtime
-  (sposób wymuszenia w używanej wersji Spring AI opisuje ADR-0002).
+- Spring AI nie może wykonywać narzędzi samodzielnie: pętla narzędzi należy do naszego runtime (ADR-0002).
+  Runtime woła `ChatModel` bezpośrednio (nie `ChatClient`), a konfiguracja zawsze ma
+  `spring.ai.chat.client.tool-calling.enabled=false`.
 - Tenant/sklep pochodzi z zaufanego `TrustedStoreScope`, nigdy z argumentów modelu ani payloadu.
 - Testy bezpieczeństwa runtime muszą przechodzić w 100% i blokują merge. Jakość rekomendacji LLM oceniamy
   osobno (scenariusze eksperckie, porównanie z deterministycznym baseline) jako raport, bez wymogu zgodności.

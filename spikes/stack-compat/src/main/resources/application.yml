@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: stack-compat-spike
+  ai:
+    anthropic:
+      # Real values are never needed by the spike tests; they point the client at a local stub.
+      api-key: ${ANTHROPIC_API_KEY:spike-placeholder}
+    chat:
+      client:
+        tool-calling:
+          # ADR-0002: tool calls are returned to our runtime, never executed by Spring AI.
+          enabled: false
+  temporal:
+    workers-auto-discovery:
+      packages: com.ecommerceagent.spike.workflow
