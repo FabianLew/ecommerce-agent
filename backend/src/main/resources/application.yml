@@ -34,7 +34,8 @@ operator:
       allow-insecure-http: false
       allow-private-network: false
       connect-timeout: 5s
-      read-timeout: 10s
+      # Deadline for the whole response, headers and body (FIX-01).
+      response-timeout: 30s
     webhooks:
       # Public address of this API that shops deliver webhooks to (ADR-0009), e.g. https://api.example.com
       base-url: ${WEBHOOK_BASE_URL:}

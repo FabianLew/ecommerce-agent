@@ -264,7 +264,7 @@ public class WooCommerceImport {
         } catch (WooClientException e) {
             throw new WooImportException(switch (e.kind()) {
                 case ADDRESS_NOT_ALLOWED -> ConnectionCheckError.ADDRESS_NOT_ALLOWED;
-                case UNREACHABLE -> ConnectionCheckError.UNREACHABLE;
+                case UNREACHABLE, TIMEOUT -> ConnectionCheckError.UNREACHABLE;
                 case TLS_ERROR -> ConnectionCheckError.TLS_ERROR;
                 case RESPONSE_TOO_LARGE -> ConnectionCheckError.UNEXPECTED_RESPONSE;
             }, e.getMessage());
