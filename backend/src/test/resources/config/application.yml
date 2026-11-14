@@ -1,5 +1,8 @@
 # Test-only settings, merged over src/main/resources/application.yml.
 operator:
+  sync:
+    # Tests call SyncRunReconciler directly instead of waiting for the schedule.
+    reconciler-enabled: false
   integration:
     secrets-key: +8ixWUDP7q0PlVTSA1mCnWZsD8tYl+VhgMS+hqXdv1w=
     secrets-key-id: test-v1
