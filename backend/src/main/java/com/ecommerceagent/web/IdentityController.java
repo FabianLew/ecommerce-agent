@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.ecommerceagent.identity.AccessibleStore;
 import com.ecommerceagent.identity.RegisteredUser;
 import com.ecommerceagent.identity.StoreAccess;
+import com.ecommerceagent.identity.StorePermission;
 import com.ecommerceagent.identity.StoreRole;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,18 +39,22 @@ class IdentityController {
 
     @GetMapping("/stores/{storeId}")
     StoreResponse store(TrustedStoreScope scope) {
-        return StoreResponse.from(storeAccess.store(scope));
+        return StoreResponse.from(storeAccess.store(scope), scope.permissions());
     }
 
     record MeResponse(UUID userId, String email, String displayName) {
     }
 
     record StoreResponse(UUID storeId, UUID organizationId, String organizationName, String name,
-            String currency, String timezone, Set<StoreRole> roles) {
+            String currency, String timezone, Set<StoreRole> roles, Set<StorePermission> permissions) {
 
         static StoreResponse from(AccessibleStore store) {
+            return from(store, StoreRole.permissionsOf(store.roles()));
+        }
+
+        static StoreResponse from(AccessibleStore store, Set<StorePermission> permissions) {
             return new StoreResponse(store.storeId(), store.organizationId(), store.organizationName(),
-                    store.name(), store.currency(), store.timezone(), store.roles());
+                    store.name(), store.currency(), store.timezone(), store.roles(), permissions);
         }
     }
 

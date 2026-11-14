@@ -24,9 +24,9 @@ public class AuditTrail {
 
     public void record(AuditEntry entry) {
         jdbc.sql("""
-                        INSERT INTO audit_event (id, occurred_at, organization_id, store_id, actor_user_id,
+                        INSERT INTO audit_event (id, occurred_at, organization_id, store_id, actor_user_id, actor_service,
                                                  action, resource_type, resource_id, details)
-                        VALUES (:id, :occurredAt, :organizationId, :storeId, :actorUserId,
+                        VALUES (:id, :occurredAt, :organizationId, :storeId, :actorUserId, :actorService,
                                 :action, :resourceType, :resourceId, CAST(:details AS jsonb))
                         """)
                 .param("id", UUID.randomUUID())
@@ -34,6 +34,7 @@ public class AuditTrail {
                 .param("organizationId", entry.organizationId())
                 .param("storeId", entry.storeId())
                 .param("actorUserId", entry.actorUserId())
+                .param("actorService", entry.actorService())
                 .param("action", entry.action())
                 .param("resourceType", entry.resourceType())
                 .param("resourceId", entry.resourceId())

@@ -11,12 +11,14 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.ecommerceagent.identity.Actor.SystemActor;
+import com.ecommerceagent.identity.Actor.UserActor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 
 /**
- * Resolves which stores a user may access. Every query here is filtered by the user's memberships;
- * a missing membership and a missing store are indistinguishable to callers (ADR-0004).
+ * The trusted factory for {@link TrustedStoreScope} (ADR-0004). Every user query is filtered by the
+ * user's memberships; a missing membership and a missing store are indistinguishable to callers.
  */
 @Service
 public class StoreAccess {
@@ -29,6 +31,8 @@ public class StoreAccess {
             JOIN organization o ON o.id = s.organization_id
             WHERE m.user_id = :userId
             """;
+
+    private static final Set<StorePermission> SYSTEM_PERMISSIONS = Set.of(StorePermission.STORE_READ);
 
     private final JdbcClient jdbc;
 
@@ -43,17 +47,60 @@ public class StoreAccess {
                 .list();
     }
 
-    /** Builds the trusted scope only if the user is a member of the store. */
+    /** Builds a user scope only if the user currently has a membership in the store. */
     public Optional<TrustedStoreScope> scopeFor(UUID userId, UUID storeId) {
-        return find(userId, storeId)
-                .map(store -> new TrustedStoreScope(store.organizationId(), store.storeId(), userId, store.roles()));
+        return find(userId, storeId).map(store -> userScope(userId, store));
     }
 
-    /** Store details for an already verified scope. */
+    /**
+     * Builds a scope for a backend service acting without a signed-in user (e.g. scheduled monitoring).
+     * The store must exist in the given organization. System scopes can only read; changes go through
+     * the policy and executor path, never through a broader system scope.
+     */
+    public Optional<TrustedStoreScope> systemScope(String service, UUID organizationId, UUID storeId) {
+        SystemActor actor = new SystemActor(service);
+        return storeExists(organizationId, storeId)
+                ? Optional.of(new TrustedStoreScope(organizationId, storeId, actor, Set.of(), SYSTEM_PERMISSIONS))
+                : Optional.empty();
+    }
+
+    /**
+     * Re-checks the actor against the database right before a sensitive operation and returns a fresh
+     * scope. A scope or approval created earlier never outlives a revoked membership or a changed role.
+     *
+     * @throws StoreAccessDeniedException if the actor no longer holds the permission in this store
+     */
+    public TrustedStoreScope reauthorize(TrustedStoreScope scope, StorePermission permission) {
+        Optional<TrustedStoreScope> current = switch (scope.actor()) {
+            case UserActor user -> scopeFor(user.userId(), scope.storeId());
+            case SystemActor system -> systemScope(system.service(), scope.organizationId(), scope.storeId());
+        };
+        return current
+                .filter(fresh -> fresh.organizationId().equals(scope.organizationId()))
+                .filter(fresh -> fresh.has(permission))
+                .orElseThrow(() -> new StoreAccessDeniedException(scope.storeId(), permission));
+    }
+
+    /** Store details visible to a signed-in user in an already verified scope. */
     public AccessibleStore store(TrustedStoreScope scope) {
-        return find(scope.userId(), scope.storeId())
+        UUID userId = scope.userId()
+                .orElseThrow(() -> new IllegalArgumentException("Store details require a user scope"));
+        return find(userId, scope.storeId())
                 .filter(store -> store.organizationId().equals(scope.organizationId()))
-                .orElseThrow(() -> new IllegalStateException("Scope no longer valid for store " + scope.storeId()));
+                .orElseThrow(() -> new StoreAccessDeniedException(scope.storeId(), StorePermission.STORE_READ));
+    }
+
+    private static TrustedStoreScope userScope(UUID userId, AccessibleStore store) {
+        return new TrustedStoreScope(store.organizationId(), store.storeId(), new UserActor(userId), store.roles(),
+                StoreRole.permissionsOf(store.roles()));
+    }
+
+    private boolean storeExists(UUID organizationId, UUID storeId) {
+        return jdbc.sql("SELECT count(*) FROM store WHERE id = :storeId AND organization_id = :organizationId")
+                .param("storeId", storeId)
+                .param("organizationId", organizationId)
+                .query(Long.class)
+                .single() > 0;
     }
 
     private Optional<AccessibleStore> find(UUID userId, UUID storeId) {
