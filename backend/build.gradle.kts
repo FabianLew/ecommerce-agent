@@ -20,6 +20,7 @@ repositories {
 }
 
 val springModulithVersion = "2.1.2"
+val temporalVersion = "1.40.0"
 
 dependencies {
     implementation(platform(SpringBootPlugin.BOM_COORDINATES))
@@ -32,6 +33,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-jdbc")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.springframework.modulith:spring-modulith-starter-core")
+    implementation("io.temporal:temporal-spring-boot-starter:$temporalVersion")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
@@ -43,6 +45,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-starter-opentelemetry-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.springframework.modulith:spring-modulith-starter-test")
+    testImplementation("io.temporal:temporal-testing:$temporalVersion")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("org.testcontainers:testcontainers-postgresql")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -58,6 +61,9 @@ tasks.test {
     // Never let tests pick up a developer's real Anthropic endpoint or key (see CLAUDE.md).
     environment("ANTHROPIC_BASE_URL", "")
     environment("ANTHROPIC_API_KEY", "")
+    if (project.hasProperty("recordTemporalFixtures")) {
+        systemProperty("recordTemporalFixtures", "true")
+    }
     testLogging {
         events("passed", "skipped", "failed")
         exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL

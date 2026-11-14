@@ -23,8 +23,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 @Import(TestcontainersConfiguration.class)
 class StoreAccessTest {
 
-    static final UUID ORG = UUID.fromString("40000000-0000-4000-8000-000000000001");
-    static final UUID OTHER_ORG = UUID.fromString("40000000-0000-4000-8000-000000000002");
+    static final UUID ORG = UUID.fromString("70000000-0000-4000-8000-000000000001");
+    static final UUID OTHER_ORG = UUID.fromString("70000000-0000-4000-8000-000000000002");
     static final UUID STORE = UUID.fromString("50000000-0000-4000-8000-00000000000a");
     static final UUID OWNER = UUID.fromString("60000000-0000-4000-8000-0000000000a1");
     static final UUID ANALYST = UUID.fromString("60000000-0000-4000-8000-0000000000b1");

@@ -35,8 +35,15 @@ ani payload nie mogą go ustawić. Wyciek danych między sklepami jest najpoważ
    - `scopeFor(userId, storeId)`: aktualne członkostwo użytkownika w sklepie;
    - `systemScope(service, organizationId, storeId)`: istnienie sklepu w tej organizacji, gdy proces
      systemowy zaczyna się od zapisanego rekordu (np. harmonogram monitorowania sklepu);
-   - HTTP: użytkownik z tokenu i `{storeId}` ze ścieżki; Temporal/aktywności (B-08) i Agent Runtime:
-     aktor i sklep z zaufanego kontekstu workflow, nigdy z argumentów modelu ani payloadu.
+   - HTTP: użytkownik z tokenu i `{storeId}` ze ścieżki;
+   - Temporal (B-08): `StoreContextPropagator` przenosi w nagłówkach workflow identyfikatory
+     (`organizationId`, `storeId`, aktora: `userId` **albo** `service`) i `correlationId`. Nagłówek to tylko
+     **deklaracja**: `StoreScopeActivityInterceptor` przed każdą aktywnością buduje zakres na nowo w
+     `StoreAccess` (`scopeFor` dla użytkownika, `systemScope` dla usługi) i dopiero wtedy udostępnia
+     `ActivityStoreScope.current()`. Brak, niejednoznaczność (oba aktory) lub niezgodność deklaracji kończy
+     aktywność nieretryowalnym błędem `STORE_SCOPE_MISSING` / `STORE_SCOPE_REJECTED` (z wpisem w audycie).
+     Workflow użytkownika, któremu odebrano dostęp, nie wykona więc kolejnej aktywności;
+   - Agent Runtime: aktor i sklep z zaufanego kontekstu przebiegu, nigdy z argumentów modelu ani payloadu.
    Zapytania repozytoriów biorą `organizationId` i `storeId` z tego obiektu (ADR-0005).
 4. **Brak dostępu i brak zasobu dają tę samą odpowiedź `404 NOT_FOUND`** (dokument 04 §3), żeby nie
    ujawniać istnienia cudzych sklepów. Próba dostępu do cudzego lub nieistniejącego sklepu trafia do audytu

@@ -49,6 +49,18 @@ Błędy mają format z dokumentu 04 §3: `{code, message, fieldErrors?, retryabl
 np. `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_FOUND` (404), `METHOD_NOT_ALLOWED` (405),
 `INTERNAL_ERROR` (500, bez szczegółów wyjątku; szczegóły są w logu z tym samym `requestId`).
 
+## Temporal (B-08)
+
+- Profil `worker` uruchamia workery (kolejka `operator-main`), profil `api` używa tylko klienta.
+  Adres: `TEMPORAL_ADDRESS` (domyślnie `localhost:7233`), namespace `TEMPORAL_NAMESPACE`.
+- Workflow startujemy przez `StoreContextPropagator.callWith(context, ...)`; aktywności czytają zakres
+  wyłącznie z `ActivityStoreScope.current()` (zweryfikowany w bazie przez interceptor, ADR-0004).
+- Diagnostyka (tylko profil `local`): `POST /api/v1/stores/{storeId}/diagnostics/workflow-scope-check`
+  uruchamia workflow na workerze i zwraca zakres widziany przez aktywność.
+- Testy workflow działają na in-process `TestWorkflowEnvironment`; test replay używa zapisanej historii
+  `src/test/resources/temporal/scope-check-v1.json`. Po zamierzonej (wersjonowanej) zmianie workflow:
+  `./gradlew test -PrecordTemporalFixtures` i nowa wersja pliku.
+
 ## Zasady
 
 - Moduły to podpakiety `com.ecommerceagent`; dozwolone zależności są w `package-info.java` każdego modułu.
