@@ -71,8 +71,8 @@ Eksperyment na lokalnym WooCommerce 11.2.1 (webhooki przez wp-cli, odbiornik w s
    `commerce.order.changed.v1` z listą wariantów. Webhooki nie rozszerzają `order_sync_coverage`: kompletność
    potwierdza tylko import albo rekonsyliacja z licznikiem (ADR-0008, B-16).
 6. **Outbox.** Tabela `outbox_event`: sklep, typ zdarzenia, agregat (`variant`, `order`, `product`), payload
-   v1, `dedup_key` unikalny w sklepie, czas utworzenia i wysłania. Klucz opisuje stan, nie dostawę:
-   `inventory:{wariant}:{sourceUpdatedAt}`, `order:{id}:{sourceUpdatedAt}:{status}`, a prośba o weryfikację
+   v1, `dedup_key` unikalny w sklepie, czas utworzenia, wysłania i następnej próby. Klucz opisuje stan, nie dostawę:
+   `inventory:{wariant}:{sourceUpdatedAt}:{stan}:{status}`, `order:{id}:{sourceUpdatedAt}:{status}`, a prośba o weryfikację
    `verify:{inbox}:{agregat}`. Ten sam stan z dwóch tematów (`order.created` i `order.updated`) albo ponowne
    przetworzenie wiersza inbox nie tworzy drugiego zdarzenia. Wysyłkę do Temporal (signalWithStart z
    deterministycznym ID) dodaje B-15; do tego czasu zdarzenia czekają z `dispatched_at = null`.

@@ -162,7 +162,7 @@ class WooWebhookNormalizer {
                 event.put("observedAt", observedAt.toString());
                 event.put("observationSource", ObservationSource.WEBHOOK.name());
                 outbox.append(scope, OutboxEvents.INVENTORY_CHANGED, "variant", variantId.toString(), event,
-                        "inventory:" + variantId + ":" + modified);
+                        inventoryKey(variantId, reading));
             }
             case AMBIGUOUS -> verify(scope, inboxId, "variant", variantId.toString(), "AMBIGUOUS_SOURCE_TIME");
             case STALE, DUPLICATE -> {
@@ -185,6 +185,12 @@ class WooWebhookNormalizer {
         boolean nothingNew = outcomes.stream()
                 .allMatch(o -> o.equals(StockChange.STALE.name()) || o.equals(StockChange.DUPLICATE.name()));
         return new Result(nothingNew ? InboxStatus.IGNORED : InboxStatus.PROCESSED, String.join(",", outcomes));
+    }
+
+    /** One event per distinct stock state of a variant, whichever path observed it. */
+    static String inventoryKey(UUID variantId, InventoryReading reading) {
+        return "inventory:" + variantId + ":" + reading.sourceUpdatedAt() + ":" + reading.stockQuantity() + ":"
+                + reading.stockStatus();
     }
 
     private static String string(Instant instant) {

@@ -52,8 +52,9 @@ CREATE TABLE outbox_event (
     created_at       timestamptz NOT NULL,
     dispatched_at    timestamptz,
     attempts         integer     NOT NULL DEFAULT 0,
+    next_attempt_at  timestamptz NOT NULL,
     UNIQUE (store_id, dedup_key),
     FOREIGN KEY (store_id, organization_id) REFERENCES store (id, organization_id)
 );
 
-CREATE INDEX outbox_event_pending_idx ON outbox_event (created_at) WHERE dispatched_at IS NULL;
+CREATE INDEX outbox_event_pending_idx ON outbox_event (next_attempt_at, created_at) WHERE dispatched_at IS NULL;

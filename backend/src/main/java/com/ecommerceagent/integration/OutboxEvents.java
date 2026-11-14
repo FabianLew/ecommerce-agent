@@ -38,9 +38,10 @@ public class OutboxEvents {
             Map<String, ?> payload, String dedupKey) {
         return jdbc.sql("""
                         INSERT INTO outbox_event (id, organization_id, store_id, event_type, aggregate_type,
-                                                  aggregate_id, payload, dedup_key, created_at)
+                                                  aggregate_id, payload, dedup_key, created_at,
+                                                  next_attempt_at)
                         VALUES (:id, :organizationId, :storeId, :eventType, :aggregateType, :aggregateId,
-                                CAST(:payload AS jsonb), :dedupKey, :now)
+                                CAST(:payload AS jsonb), :dedupKey, :now, :now)
                         ON CONFLICT (store_id, dedup_key) DO NOTHING
                         """)
                 .param("id", UUID.randomUUID())
