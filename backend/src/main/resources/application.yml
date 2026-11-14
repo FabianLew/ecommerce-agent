@@ -7,6 +7,13 @@ spring:
     password: ${DB_PASSWORD:operator}
   flyway:
     locations: classpath:db/migration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OIDC_ISSUER_URI:http://localhost:8180/realms/operator}
+          # Tokens must be minted for this API, not just by the same identity provider.
+          audiences: ${OIDC_AUDIENCE:operator-api}
   jackson:
     time-zone: UTC
 

@@ -1,6 +1,6 @@
 # ADR-0001: Wersje stacku backendu
 
-- Status: Proponowany
+- Status: Zaakceptowany (merge PR, 2026-11-14)
 - Data: 2026-11-14
 - Powiązania: dokument 02 (architektura AI), backlog B-02, ADR-0002, `spikes/stack-compat`
 

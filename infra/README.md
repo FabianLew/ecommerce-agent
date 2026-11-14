@@ -30,8 +30,10 @@ Importowany z [`keycloak/operator-realm.json`](keycloak/operator-realm.json) prz
 
 - Klient `operator-web`: poufny (sesja po stronie serwera Next.js, B-09), Authorization Code + PKCE,
   redirect `http://localhost:3000/*`, sekret `local-operator-web-secret`.
-- Użytkownicy `owner-a` i `owner-b` (hasło = login). Role per sklep nie są w Keycloak, tylko w naszej bazie
-  (decyzja I6, B-06); dwóch użytkowników służy testom izolacji sklepów.
+- Klient `operator-dev-cli`: publiczny, tylko password grant, **wyłącznie lokalnie** — do wywołań API z curl.
+- Oba klienty dodają do tokenu audience `operator-api`; backend odrzuca tokeny bez niego.
+- Użytkownicy `owner-a` i `owner-b` (hasło = login) mają stałe ID (`1111…`, `2222…`), na które wskazuje
+  profil `local` backendu. Role per sklep nie są w Keycloak, tylko w naszej bazie (ADR-0004).
 
 Zmiany w realmie: edytuj JSON i zrób `down -v` (import działa tylko dla nowego realmu).
 
