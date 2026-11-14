@@ -80,6 +80,23 @@ public class InventoryRepository {
                 .optional();
     }
 
+    /** The latest reading observed at or before {@code asOf}, for metrics computed as of a moment. */
+    public Optional<InventoryObservation> latestAt(TrustedStoreScope scope, UUID variantId, Instant asOf) {
+        return jdbc.sql("SELECT " + COLUMNS + """
+                        FROM inventory_observation
+                        WHERE variant_id = :variantId AND organization_id = :organizationId AND store_id = :storeId
+                          AND observed_at <= :asOf
+                        ORDER BY observed_at DESC, ingested_at DESC
+                        LIMIT 1
+                        """)
+                .param("variantId", variantId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .param("asOf", Timestamp.from(asOf))
+                .query(InventoryRepository::map)
+                .optional();
+    }
+
     /** Readings observed in [from, toExclusive), oldest first. */
     public List<InventoryObservation> observed(TrustedStoreScope scope, UUID variantId, Instant from,
             Instant toExclusive) {
