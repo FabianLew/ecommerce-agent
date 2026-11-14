@@ -4,8 +4,8 @@ Autonomous E-commerce Operator — operator działający w tle dla istniejących
 (WooCommerce + Meta Ads + e-mail obsługi klienta). Wykrywa problemy, przygotowuje decyzje
 z dowodami, wykonuje dozwolone działania i weryfikuje ich skutek.
 
-> Status: wczesna implementacja (iteracja I1). Kod aplikacji jeszcze nie istnieje;
-> repozytorium zawiera dokumentację architektury, decyzje (ADR) i spike'i technologiczne.
+> Status: wczesna implementacja (iteracja I2): szkielet backendu, lokalne środowisko i CI.
+> Logika domenowa jeszcze nie istnieje.
 
 ## Struktura repozytorium
 
@@ -18,6 +18,14 @@ z dowodami, wykonuje dozwolone działania i weryfikuje ich skutek.
 | `frontend/` | Next.js (App Router, TypeScript) | I4 |
 | `knowledge/` | Skills, playbooks, JSON Schema kontraktów, przypadki ewaluacyjne | I7 |
 | `infra/` | Docker Compose dla środowiska lokalnego | I2 |
+| `.github/workflows/` | CI: backend, testy bezpieczeństwa runtime, smoke test środowiska | I2 |
+
+## Szybki start
+
+```bash
+docker compose -f infra/docker-compose.yml up -d --wait   # środowisko lokalne, szczegóły: infra/README.md
+cd backend && ./gradlew check                            # wymaga JDK 21 i Dockera
+```
 
 ## Dokumentacja
 
