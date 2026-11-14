@@ -20,6 +20,7 @@ Pełny reset: `docker compose -f infra/docker-compose.yml down -v`.
 | Temporal (dev server) | `localhost:7233`, UI http://localhost:8233 | brak auth |
 | Keycloak 26 | http://localhost:8180 | admin: `admin`/`admin`; realm `operator` |
 | Mailpit | SMTP `localhost:1025`, UI http://localhost:8025 | brak auth |
+| Jaeger 2 | OTLP HTTP `localhost:4318`, UI http://localhost:16686 | brak auth; backend z `OTEL_EXPORT_ENABLED=true` |
 | WooCommerce 11.2 (WordPress 7.1) | http://localhost:8081 | wp-admin: `admin`/`admin` |
 
 Backend (`backend/`) łączy się domyślnie z tą bazą: `./gradlew bootRun --args='--spring.profiles.active=api'`.

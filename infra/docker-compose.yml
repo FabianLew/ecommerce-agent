@@ -62,6 +62,13 @@ services:
       timeout: 5s
       retries: 30
 
+  jaeger:
+    # Local trace viewer. Backend exports OTLP over HTTP when OTEL_EXPORT_ENABLED=true.
+    image: jaegertracing/jaeger:2.22.0
+    ports:
+      - "4318:4318"
+      - "16686:16686"
+
   mailpit:
     image: axllent/mailpit:v1.32.0
     ports:
