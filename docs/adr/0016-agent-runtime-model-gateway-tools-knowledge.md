@@ -109,6 +109,8 @@ enters the existing episode workflow without weakening it.
 
 ## Consequences
 
+- Hosting does not limit model spending (ADR-0028 point 11): budgets, reservations and the AI kill switch are
+  ADR-0027. Real store data reaches a model only through Bedrock in the EU, the only AWS service the pilot needs.
 - The agent path needs an approved API key, a data-processing review (EU data residency is still to be verified,
   plan decision I2) and the quality report before `operator.agent.enabled` is switched on anywhere.
 - The price list is configuration with a version; it must be checked against the provider before the agent is used,

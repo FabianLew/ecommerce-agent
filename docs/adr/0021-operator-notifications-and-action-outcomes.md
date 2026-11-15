@@ -90,6 +90,8 @@ never a success.
 
 ## Consequences
 
+- The e-mail provider for notifications is optional and usage-billed: Amazon SES or another EU SMTP provider behind
+  `MailProvider` (ADR-0028). The demo may run with in-app notifications only.
 - Migrations V21 (`operator_notification`, `operator_notification_read`, `notification_delivery`) and V22
   (`action_outcome`, `outcome_observation`) on the pilot branch, renumbered when it is merged.
 - Real e-mail needs a provider (O-11) and its credentials; until then deliveries are recorded and logged. Choosing

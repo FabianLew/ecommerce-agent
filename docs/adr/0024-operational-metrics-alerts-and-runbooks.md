@@ -30,6 +30,11 @@ The metrics backend is chosen with the hosting (ADR-0023), so the definitions mu
 3. **Runbooks** in `docs/operations/runbooks.md`: one section per alert, plus the restore drill, key rotation,
    enabling retention and the response to a wrong pause. The first response to anything touching ads is the
    mutation stop.
+4. **Monitoring sized to the stage (ADR-0028 point 8).** On the demo VPS the OTLP export is off and failures are
+   detected by an external uptime check, a dead-man switch for backups and a host health script. On the pilot the
+   metrics of point 1 go to Prometheus (OTLP receiver) on the same server and the rules of point 2 run in
+   Alertmanager, with node-exporter and cAdvisor for host and container metrics instead of CloudWatch. AI cost
+   metrics and alerts are defined by ADR-0027.
 
 ## Alternatives considered
 

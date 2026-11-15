@@ -100,7 +100,8 @@ metrics); it must keep working without a general way around the policies.
    resealed with the current key the next time it is opened (`IntegrationConnections`, `MetaConnections`), so a
    rotation is: add the new key as current, move the old one to the previous list, remove it once no row uses it
    (a count by `key_id` is logged at start). Envelope encryption with a cloud KMS is chosen with the hosting in
-   E-46: it replaces where the key bytes come from, not the format.
+   E-46: it replaces where the key bytes come from, not the format. On the VPS of ADR-0028 there is no KMS: the key
+   comes from the SOPS/age secret file (ADR-0028 point 4) and is rotated the same way.
 6. **Retention.** Each module that owns data declares a `RetentionTask` (identity interface) with a name and a
    period from `operator.retention.periods`. `RetentionRunner` (worker profile) runs them every
    `operator.retention.interval` in batches of `operator.retention.batch-size`, per store under the system actor
@@ -144,8 +145,8 @@ metrics); it must keep working without a general way around the policies.
      tasks before it is used again, so data past its period does not return. This is stated in the privacy
      information for the pilot store.
    - *GDPR review before real data.* Before the pilot store's data is imported: the data processing agreement with
-     the store, the records of processing, the list of subprocessors (AWS, Temporal Cloud, the model provider of
-     ADR-0016), the transfer basis for each, and whether a DPIA is needed. Until then only test stores and synthetic
+     the store, the records of processing, the list of subprocessors (the hosting provider: Hetzner per ADR-0028,
+     Temporal Cloud, the model provider of ADR-0016 and, when used, AWS for Bedrock or SES), the transfer basis for each, and whether a DPIA is needed. Until then only test stores and synthetic
      data are processed.
 
 ## Alternatives considered

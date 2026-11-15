@@ -1,6 +1,7 @@
 # infra/terraform: staging and production on AWS (ADR-0023 point 9)
 
-Nothing here has been applied. `plan` and `apply` wait for the owner's approval of the plan and of
+**Future option, not in use** (ADR-0028 hosts the demo and the first pilot on one EU VPS). Keep it valid; do not
+apply or delete it. Nothing here has been applied. `plan` and `apply` wait for the owner's approval of the plan and of
 [the cost estimate](../../docs/operations/aws-cost-estimate.md). CI only runs `fmt -check` and `validate`
 (`-backend=false`, no AWS credentials).
 

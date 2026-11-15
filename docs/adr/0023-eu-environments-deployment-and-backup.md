@@ -3,7 +3,8 @@
 - Status: Proposed
 - Date: 2026-11-15
 - Revised: 2026-11-15 (review: a separate migration step under the migration role; hosting chosen by the project
-  owner: AWS eu-central-1 and Temporal Cloud in AWS Frankfurt)
+  owner: AWS eu-central-1 and Temporal Cloud in AWS Frankfurt); 2026-11-15 (the owner lowered fixed costs: the demo
+  and the first pilot run on one EU VPS per ADR-0028, point 9 is kept as a future option)
 - Related: plan decision I4 (Docker Compose locally, EU production, Temporal Cloud preferred), I2 (EU data
   residency of the model provider), I5 (OIDC, Keycloak), document 01 O-03, ADR-0022, epic E-46
 
@@ -14,7 +15,9 @@ a production environment in the EU, with the same code and only configuration in
 the Temporal Cloud account and the KMS were open when this ADR was first written. This ADR fixes the artifacts, the
 process roles, the configuration contract, the start-up guard and the backup and restore procedure. On 2026-11-15
 the project owner chose AWS in `eu-central-1` and Temporal Cloud in AWS Frankfurt (point 9). No paid resource is
-created before the owner approves the plan and the cost estimate.
+created before the owner approves the plan and the cost estimate. Later the same day the owner replaced AWS for the
+demo and the first pilot with a single Hetzner VPS (ADR-0028); points 1–8 stay the deployment contract on any
+hosting, and point 9 remains the planned path once customers justify its cost.
 
 ## Decision
 
@@ -70,12 +73,15 @@ created before the owner approves the plan and the cost estimate.
    `infra/backup/backup.sh` makes an independent daily logical dump (custom format with grants, plus its SHA-256)
    kept 30 days in EU object storage. `infra/backup/restore-check.sh` restores a dump into a scratch database and
    checks the migrations, row-level security policies and the runtime role's grants; it runs monthly and after every
-   schema change in staging (restore drill). Targets for the pilot: RPO 15 minutes (PITR), RTO 4 hours.
+   schema change in staging (restore drill). Targets for the pilot: RPO 15 minutes (PITR), RTO 4 hours. On the VPS
+   of ADR-0028 the managed PITR is replaced by pgBackRest with WAL archiving, and the targets count only as measured
+   drill results (ADR-0028 points 5–7).
 8. **Keys.** `INTEGRATION_SECRETS_KEY` is generated per environment, stored in the secret store and rotated as in
    ADR-0022 point 4. Envelope encryption with the provider's KMS replaces where the key bytes come from when the
    provider is chosen; the stored format does not change.
 
-9. **Hosting: AWS `eu-central-1`.** Infrastructure as code in `infra/terraform` (Terraform), one root per
+9. **Hosting: AWS `eu-central-1` (future option, not in use; ADR-0028 hosts the demo and the first pilot).**
+   Infrastructure as code in `infra/terraform` (Terraform), one root per
    environment over shared modules. It is planned and reviewed, and applied only after the owner approves the plan
    and the estimate in `docs/operations/aws-cost-estimate.md`.
    - *Compute:* ECS on Fargate, one cluster per environment. Services `api`, `worker`, `frontend` and `keycloak`; the

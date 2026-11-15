@@ -1,6 +1,7 @@
 # AWS cost estimate: staging and production (ADR-0023 point 9)
 
-- Status: draft for the owner's approval. Nothing is applied before the owner approves this estimate and the plan.
+- Status: future option, not in use. On 2026-11-15 the owner chose a single EU VPS for the demo and the first pilot
+  (ADR-0028, [VPS estimate](vps-cost-estimate.md)). Nothing here is applied without a new approval.
 - Date: 2026-11-15
 - Region: `eu-central-1` (Frankfurt), on-demand prices in USD, excluding VAT, from the public price lists as
   remembered when this was written. **Every line must be checked in the AWS Pricing Calculator before approval**;
