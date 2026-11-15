@@ -12,5 +12,7 @@ public record NotificationSettings(
         @DefaultValue("5m") Duration retryInterval,
         @DefaultValue("5") int maxAttempts,
         @DefaultValue("1m") Duration claimDuration,
-        @DefaultValue("http://localhost:3000") String appBaseUrl) {
+        @DefaultValue("http://localhost:3000") String appBaseUrl,
+        /** The right-hand side of every delivery's stable {@code Message-ID} (ADR-0021 point 2). */
+        @DefaultValue("notifications.localhost") String mailDomain) {
 }

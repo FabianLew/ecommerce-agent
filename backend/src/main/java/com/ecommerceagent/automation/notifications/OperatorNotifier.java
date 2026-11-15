@@ -145,8 +145,12 @@ public class OperatorNotifier {
     }
 
     /**
-     * Sends the open deliveries of the notification. A delivery is claimed before sending, so a concurrent sweep
-     * cannot send it at the same time; one left in SENDING by a crash is taken again after its claim expires.
+     * Works the open deliveries of the notification (ADR-0021 point 2). A claim that expired while sending becomes
+     * UNKNOWN; an UNKNOWN delivery is reconciled with the provider before anything is sent again; PENDING and
+     * retryable FAILED deliveries are sent; a delivery out of attempts becomes EXHAUSTED. Every attempt is claimed
+     * and counted before the provider is called, so a concurrent sweep cannot send the same delivery at once.
+     *
+     * @return how many deliveries are still not known to be sent
      */
     private int deliver(TrustedStoreScope scope, UUID notificationId) {
         Notification notification = jdbc.sql("SELECT " + COLUMNS + """
@@ -160,32 +164,183 @@ public class OperatorNotifier {
                 .query((rs, n) -> map(rs, false))
                 .single();
         Map<UUID, RegisteredUser> recipients = new TreeMap<>();
-        storeAccess.membersWith(scope, StorePermission.DECISION_APPROVE).forEach(user -> recipients.put(user.id(), user));
-        int failed = 0;
+        storeAccess.membersWith(scope, StorePermission.DECISION_APPROVE)
+                .forEach(user -> recipients.put(user.id(), user));
+        MailProvider.Capabilities capabilities = capabilities();
+        expireClaims(scope, notificationId);
+        int open = 0;
         for (Claimed claimed : claim(scope, notificationId)) {
             RegisteredUser user = recipients.get(claimed.recipient());
             if (user == null || user.email() == null || user.email().isBlank()) {
                 // The person lost the permission or has no address: nothing to send, and nothing to retry.
-                finishDelivery(claimed.id(), "FAILED", "RECIPIENT_UNAVAILABLE", settings.maxAttempts());
+                finish(claimed.id(), "EXHAUSTED", "RECIPIENT_UNAVAILABLE", null);
                 continue;
             }
-            try {
-                mail.send(new MailProvider.MailMessage(claimed.id().toString(), user.email(),
-                        NotificationText.subject(notification), NotificationText.body(notification,
-                                settings.appBaseUrl() + "/stores/" + scope.storeId())));
-                finishDelivery(claimed.id(), "SENT", null, 0);
-            } catch (RuntimeException e) {
-                failed++;
-                log.warn("E-mail delivery {} failed: {}", claimed.id(), e.getClass().getSimpleName());
-                finishDelivery(claimed.id(), "FAILED", "PROVIDER_ERROR", 0);
+            MailProvider.MailMessage message = new MailProvider.MailMessage(claimed.id().toString(),
+                    claimed.messageId(), user.email(), NotificationText.subject(notification),
+                    NotificationText.body(notification, settings.appBaseUrl() + "/stores/" + scope.storeId()));
+            Reconciliation reconciliation = claimed.previous().equals("UNKNOWN")
+                    ? reconcile(claimed, message, capabilities) : Reconciliation.SEND;
+            if (reconciliation == Reconciliation.SETTLED) {
+                continue;
+            }
+            if (reconciliation == Reconciliation.OPEN || !send(claimed, message)) {
+                open++;
             }
         }
-        return failed;
+        exhaust(scope, notificationId);
+        return open;
+    }
+
+    private enum Reconciliation {
+        /** The provider has it: recorded as SENT. */
+        SETTLED,
+        /** May be sent now: the provider does not have it, or honours the idempotency key. */
+        SEND,
+        /** Still unknown: not resent, it waits until its attempts are used up. */
+        OPEN
     }
 
     /**
-     * Retries the open deliveries whose last attempt is older than the retry interval; returns how many still
-     * failed. Runs as a system actor of each store: it only sends what was stored, it changes nothing else.
+     * Settles an UNKNOWN delivery before a resend. The provider is asked first when it can look messages up; a
+     * provider that honours idempotency keys may be sent to again; otherwise nothing is resent.
+     */
+    private Reconciliation reconcile(Claimed claimed, MailProvider.MailMessage message,
+            MailProvider.Capabilities capabilities) {
+        if (capabilities.statusLookup()) {
+            MailProvider.Lookup lookup;
+            try {
+                lookup = mail.lookup(message);
+            } catch (RuntimeException e) {
+                log.warn("Status lookup for e-mail delivery {} failed: {}", claimed.id(), e.getClass().getSimpleName());
+                lookup = MailProvider.Lookup.UNKNOWN;
+            }
+            lookup = lookup == null ? MailProvider.Lookup.UNKNOWN : lookup;
+            switch (lookup.status()) {
+                case FOUND -> {
+                    finish(claimed.id(), "SENT", null, lookup.providerMessageId());
+                    return Reconciliation.SETTLED;
+                }
+                case NOT_FOUND -> {
+                    return Reconciliation.SEND;
+                }
+                default -> {
+                    finish(claimed.id(), "UNKNOWN", "LOOKUP_UNKNOWN", null);
+                    return Reconciliation.OPEN;
+                }
+            }
+        }
+        if (capabilities.idempotencyKeys()) {
+            return Reconciliation.SEND;
+        }
+        finish(claimed.id(), "UNKNOWN", "NOT_RECONCILABLE", null);
+        return Reconciliation.OPEN;
+    }
+
+    /** One attempt; true when the provider accepted the message. An exception is uncertain, not a refusal. */
+    private boolean send(Claimed claimed, MailProvider.MailMessage message) {
+        MailProvider.SendResult result;
+        try {
+            result = mail.send(message);
+        } catch (RuntimeException e) {
+            log.warn("E-mail delivery {} ended uncertain: {}", claimed.id(), e.getClass().getSimpleName());
+            result = new MailProvider.Uncertain("PROVIDER_EXCEPTION");
+        }
+        if (result == null) {
+            result = new MailProvider.Uncertain("NO_ANSWER");
+        }
+        switch (result) {
+            case MailProvider.Accepted accepted -> {
+                finish(claimed.id(), "SENT", null, accepted.providerMessageId());
+                return true;
+            }
+            case MailProvider.Refused refused -> {
+                log.warn("E-mail delivery {} refused: {}", claimed.id(), refused.code());
+                finish(claimed.id(), refused.retryable() ? "FAILED" : "EXHAUSTED", refused.code(), null);
+                return false;
+            }
+            case MailProvider.Uncertain uncertain -> {
+                log.warn("E-mail delivery {} ended uncertain: {}", claimed.id(), uncertain.code());
+                finish(claimed.id(), "UNKNOWN", uncertain.code(), null);
+                return false;
+            }
+        }
+    }
+
+    private MailProvider.Capabilities capabilities() {
+        MailProvider.Capabilities capabilities = mail.capabilities();
+        return capabilities == null ? MailProvider.Capabilities.NONE : capabilities;
+    }
+
+    /**
+     * Records a provider event for a delivery once per provider event id: DELIVERED and BOUNCED move the delivery
+     * (a bounce is never retried); a complaint is kept without a change. False when the delivery is not the
+     * store's or the event was already recorded.
+     */
+    public boolean recordProviderEvent(TrustedStoreScope scope, UUID deliveryId, DeliveryEvent kind,
+            String providerEventId, Instant occurredAt) {
+        if (providerEventId == null || providerEventId.isBlank() || providerEventId.length() > 200) {
+            throw new IllegalArgumentException("A provider event id is required");
+        }
+        Boolean recorded = transactions.execute(status -> {
+            int inserted = jdbc.sql("""
+                            INSERT INTO notification_delivery_event (id, organization_id, store_id, delivery_id, kind,
+                                                                     provider_event_id, occurred_at, received_at)
+                            SELECT :id, d.organization_id, d.store_id, d.id, :kind, :eventId, :occurredAt, :now
+                            FROM notification_delivery d
+                            WHERE d.id = :deliveryId AND d.organization_id = :organizationId
+                              AND d.store_id = :storeId
+                            ON CONFLICT (delivery_id, provider_event_id) DO NOTHING
+                            """)
+                    .param("id", UUID.randomUUID())
+                    .param("kind", kind.name())
+                    .param("eventId", providerEventId)
+                    .param("occurredAt", Timestamp.from(occurredAt))
+                    .param("now", Timestamp.from(clock.instant()))
+                    .param("deliveryId", deliveryId)
+                    .param("organizationId", scope.organizationId())
+                    .param("storeId", scope.storeId())
+                    .update();
+            if (inserted == 0) {
+                return false;
+            }
+            if (kind == DeliveryEvent.DELIVERED) {
+                jdbc.sql("""
+                                UPDATE notification_delivery
+                                SET status = 'DELIVERED', delivered_at = :occurredAt, updated_at = :now,
+                                    claimed_until = NULL
+                                WHERE id = :id AND status IN ('SENDING', 'SENT', 'UNKNOWN', 'EXHAUSTED', 'FAILED')
+                                """)
+                        .param("occurredAt", Timestamp.from(occurredAt))
+                        .param("now", Timestamp.from(clock.instant()))
+                        .param("id", deliveryId)
+                        .update();
+            } else if (kind == DeliveryEvent.BOUNCED) {
+                jdbc.sql("""
+                                UPDATE notification_delivery
+                                SET status = 'BOUNCED', error_code = 'BOUNCED', updated_at = :now, claimed_until = NULL
+                                WHERE id = :id AND status <> 'BOUNCED'
+                                """)
+                        .param("now", Timestamp.from(clock.instant()))
+                        .param("id", deliveryId)
+                        .update();
+            }
+            return true;
+        });
+        return Boolean.TRUE.equals(recorded);
+    }
+
+    /** What a provider reports about a delivery after it was handed over. */
+    public enum DeliveryEvent {
+        DELIVERED,
+        BOUNCED,
+        COMPLAINT
+    }
+
+    /**
+     * Retries the open deliveries whose last attempt is older than the retry interval; returns how many are still
+     * not known to be sent. Runs as a system actor of each store: it only sends what was stored, it changes nothing
+     * else.
      */
     public int retryOpen(int limit) {
         AtomicInteger failed = new AtomicInteger();
@@ -197,14 +352,14 @@ public class OperatorNotifier {
         List<UUID> open = jdbc.sql("""
                         SELECT DISTINCT notification_id FROM notification_delivery
                         WHERE organization_id = :organizationId AND store_id = :storeId
-                          AND (status IN ('PENDING', 'FAILED') OR (status = 'SENDING' AND claimed_until < :now))
-                          AND attempts < :max AND updated_at <= :due
+                          AND (status IN ('PENDING', 'FAILED', 'UNKNOWN')
+                               OR (status = 'SENDING' AND claimed_until < :now))
+                          AND updated_at <= :due
                         LIMIT :limit
                         """)
                 .param("organizationId", scope.organizationId())
                 .param("storeId", scope.storeId())
                 .param("now", Timestamp.from(clock.instant()))
-                .param("max", settings.maxAttempts())
                 .param("due", Timestamp.from(clock.instant().minus(settings.retryInterval())))
                 .param("limit", limit)
                 .query(UUID.class)
@@ -261,43 +416,85 @@ public class OperatorNotifier {
         return id;
     }
 
-    private record Claimed(UUID id, UUID recipient) {
+    /** A delivery claimed for one attempt, with the state it was in and its stable Message-ID. */
+    private record Claimed(UUID id, UUID recipient, String previous, String messageId) {
+    }
+
+    /** A claim that expired while sending: the provider may have the message, so it is uncertain, not open. */
+    private void expireClaims(TrustedStoreScope scope, UUID notificationId) {
+        jdbc.sql("""
+                        UPDATE notification_delivery
+                        SET status = 'UNKNOWN', error_code = 'CLAIM_EXPIRED', claimed_until = NULL, updated_at = :now
+                        WHERE notification_id = :notificationId AND organization_id = :organizationId
+                          AND store_id = :storeId AND status = 'SENDING' AND claimed_until < :now
+                        """)
+                .param("now", Timestamp.from(clock.instant()))
+                .param("notificationId", notificationId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .update();
     }
 
     private List<Claimed> claim(TrustedStoreScope scope, UUID notificationId) {
         Instant now = clock.instant();
         return jdbc.sql("""
-                        UPDATE notification_delivery
-                        SET status = 'SENDING', attempts = attempts + 1, claimed_until = :until, updated_at = :now
-                        WHERE notification_id = :notificationId AND organization_id = :organizationId
-                          AND store_id = :storeId AND attempts < :max
-                          AND (status IN ('PENDING', 'FAILED') OR (status = 'SENDING' AND claimed_until < :now))
-                        RETURNING id, recipient_user_id
+                        UPDATE notification_delivery d
+                        SET status = 'SENDING', attempts = d.attempts + 1, claimed_until = :until, updated_at = :now,
+                            message_id = COALESCE(d.message_id, '<' || d.id || '@' || :domain || '>')
+                        FROM (SELECT id, status FROM notification_delivery
+                              WHERE notification_id = :notificationId AND organization_id = :organizationId
+                                AND store_id = :storeId AND attempts < :max
+                                AND status IN ('PENDING', 'FAILED', 'UNKNOWN')
+                              FOR UPDATE SKIP LOCKED) previous
+                        WHERE d.id = previous.id
+                        RETURNING d.id, d.recipient_user_id, previous.status AS previous, d.message_id
                         """)
                 .param("until", Timestamp.from(now.plus(settings.claimDuration())))
                 .param("now", Timestamp.from(now))
+                .param("domain", settings.mailDomain())
                 .param("notificationId", notificationId)
                 .param("organizationId", scope.organizationId())
                 .param("storeId", scope.storeId())
                 .param("max", settings.maxAttempts())
                 .query((rs, n) -> new Claimed(rs.getObject("id", UUID.class),
-                        rs.getObject("recipient_user_id", UUID.class)))
+                        rs.getObject("recipient_user_id", UUID.class), rs.getString("previous"),
+                        rs.getString("message_id")))
                 .list();
     }
 
-    private void finishDelivery(UUID deliveryId, String status, String errorCode, int attemptsFloor) {
+    /** Deliveries out of attempts, refused or uncertain, are EXHAUSTED: the in-app notification still tells. */
+    private void exhaust(TrustedStoreScope scope, UUID notificationId) {
+        List<String> codes = jdbc.sql("""
+                        UPDATE notification_delivery
+                        SET status = 'EXHAUSTED', updated_at = :now
+                        WHERE notification_id = :notificationId AND organization_id = :organizationId
+                          AND store_id = :storeId AND status IN ('FAILED', 'UNKNOWN') AND attempts >= :max
+                        RETURNING COALESCE(error_code, 'NONE')
+                        """)
+                .param("now", Timestamp.from(clock.instant()))
+                .param("notificationId", notificationId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .param("max", settings.maxAttempts())
+                .query(String.class)
+                .list();
+        codes.forEach(code -> meters.counter("operator.notification.deliveries", "status", "EXHAUSTED", "code", code)
+                .increment());
+    }
+
+    private void finish(UUID deliveryId, String status, String errorCode, String providerMessageId) {
         Instant now = clock.instant();
         jdbc.sql("""
                         UPDATE notification_delivery
                         SET status = :status, error_code = :error, claimed_until = NULL, updated_at = :now,
-                            attempts = GREATEST(attempts, :floor),
+                            provider_message_id = COALESCE(:providerMessageId, provider_message_id),
                             sent_at = CASE WHEN :status = 'SENT' THEN :now ELSE sent_at END
                         WHERE id = :id
                         """)
                 .param("status", status)
                 .param("error", errorCode, java.sql.Types.VARCHAR)
                 .param("now", Timestamp.from(now))
-                .param("floor", attemptsFloor)
+                .param("providerMessageId", providerMessageId, java.sql.Types.VARCHAR)
                 .param("id", deliveryId)
                 .update();
         meters.counter("operator.notification.deliveries", "status", status,

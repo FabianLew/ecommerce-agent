@@ -60,6 +60,9 @@ class RetentionTest {
         UUID keptAudit = audit(days(380));
         UUID oldNotification = notification(days(200), "SENT");
         UUID openNotification = notification(days(200), "PENDING");
+        // ADR-0021: an uncertain delivery still needs reconciliation, so its notification is kept.
+        UUID uncertainNotification = notification(days(200), "UNKNOWN");
+        UUID exhaustedNotification = notification(days(200), "EXHAUSTED");
         UUID recentNotification = notification(days(10), "SENT");
         UUID redactedRun = agentStep(days(100));
         UUID keptRun = agentStep(days(10));
@@ -74,6 +77,8 @@ class RetentionTest {
         assertThat(exists("audit_event", keptAudit)).isTrue();
         assertThat(exists("operator_notification", oldNotification)).isFalse();
         assertThat(exists("operator_notification", openNotification)).isTrue();
+        assertThat(exists("operator_notification", uncertainNotification)).isTrue();
+        assertThat(exists("operator_notification", exhaustedNotification)).isFalse();
         assertThat(exists("operator_notification", recentNotification)).isTrue();
         assertThat(payload(redactedRun)).isEqualTo("{\"redacted\": true}");
         assertThat(payload(keptRun)).contains("prompt");

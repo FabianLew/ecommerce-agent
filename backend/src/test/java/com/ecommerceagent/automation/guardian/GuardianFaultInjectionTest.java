@@ -151,11 +151,12 @@ class GuardianFaultInjectionTest extends ExecutionWorkflowScenario {
         assertThat(workflow.status().executionStatus()).isEqualTo("VERIFIED");
         assertThat(opportunities.find(scope, episode.id()).orElseThrow().status()).isEqualTo(OpportunityStatus.CLOSED);
         assertThat(writes()).isEqualTo(1);
-        // The notification exists; only its e-mail is pending a retry.
+        // The notification exists; only its e-mail is uncertain (the provider may have taken it) and is reconciled,
+        // never resent blindly (ADR-0021 point 2).
         assertThat(jdbc.sql("SELECT count(*) FROM operator_notification WHERE store_id = ? AND kind = "
                 + "'ACTION_VERIFIED'").param(STORE).query(Long.class).single()).isEqualTo(1);
         assertThat(jdbc.sql("SELECT DISTINCT status FROM notification_delivery d JOIN operator_notification n "
                 + "ON n.id = d.notification_id WHERE n.store_id = ? AND n.kind = 'ACTION_VERIFIED'").param(STORE)
-                .query(String.class).list()).containsExactly("FAILED");
+                .query(String.class).list()).containsExactly("UNKNOWN");
     }
 }

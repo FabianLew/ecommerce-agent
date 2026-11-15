@@ -66,10 +66,13 @@ A WooCommerce or Meta connection is in `ERROR`. The store's Integrations page sh
 
 ### Notification deliveries exhausted
 
-E-mails failed after the last attempt (ADR-0021). The notification is still in the app, so nobody misses it there,
-but approvers may not have been told.
+E-mail deliveries reached `EXHAUSTED` (ADR-0021): refused for good, out of attempts, or uncertain and never
+reconciled. The notification is still in the app, so nobody misses it there, but approvers may not have been told.
 
 1. Check the mail provider's status and credentials (O-11). With `LoggingMailProvider` nothing is sent at all.
+   `error_code` says why: a provider code for a refusal, `NOT_RECONCILABLE` or `LOOKUP_UNKNOWN` for an uncertain
+   dispatch the provider could not confirm. Do not resend an uncertain one by hand without checking the provider's
+   log for its `Message-ID`: it may have arrived.
 2. After the provider is fixed, new notifications are delivered; exhausted ones are not retried. Tell the approvers
    of the affected stores to open the Notifications page.
 

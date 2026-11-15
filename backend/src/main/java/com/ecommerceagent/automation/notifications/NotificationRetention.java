@@ -12,8 +12,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Deletes old notifications with their read marks and deliveries (ADR-0022 point 5). A notification with a delivery
- * still {@code PENDING} or {@code SENDING} is kept until the sweep finishes it.
+ * Deletes old notifications with their read marks, deliveries and provider events (ADR-0022 point 6). A
+ * notification with a delivery still open or uncertain ({@code PENDING}, {@code SENDING}, {@code FAILED},
+ * {@code UNKNOWN}) is kept until the sweep finishes or exhausts it.
  */
 @Component
 class NotificationRetention implements RetentionTask {
@@ -39,7 +40,8 @@ class NotificationRetention implements RetentionTask {
                             WHERE n.organization_id = :organizationId AND n.store_id = :storeId
                               AND n.created_at < :cutoff
                               AND NOT EXISTS (SELECT 1 FROM notification_delivery d
-                                              WHERE d.notification_id = n.id AND d.status IN ('PENDING', 'SENDING'))
+                                              WHERE d.notification_id = n.id
+                                                AND d.status IN ('PENDING', 'SENDING', 'FAILED', 'UNKNOWN'))
                             LIMIT :batch
                             FOR UPDATE SKIP LOCKED
                             """)
@@ -53,6 +55,10 @@ class NotificationRetention implements RetentionTask {
             }
             jdbc.sql("DELETE FROM operator_notification_read WHERE notification_id IN (:ids)").param("ids", ids)
                     .update();
+            jdbc.sql("""
+                            DELETE FROM notification_delivery_event WHERE delivery_id IN
+                                (SELECT id FROM notification_delivery WHERE notification_id IN (:ids))
+                            """).param("ids", ids).update();
             jdbc.sql("DELETE FROM notification_delivery WHERE notification_id IN (:ids)").param("ids", ids).update();
             return jdbc.sql("DELETE FROM operator_notification WHERE id IN (:ids)").param("ids", ids).update();
         });

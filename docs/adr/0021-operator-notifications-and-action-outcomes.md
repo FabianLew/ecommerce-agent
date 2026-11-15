@@ -100,16 +100,19 @@ never a success.
 
 ## Implementation status
 
-The code on the pilot branch has `PENDING`, `SENDING` with a claim, `SENT` and `FAILED`, and it passes the delivery
-id to the provider. An expired claim is retried as if nothing had been sent. After this revision is approved, a
-follow-up adds:
+Implemented on the pilot branch with migration V27 (V21 unchanged):
+- the states `UNKNOWN`, `EXHAUSTED`, `DELIVERED` and `BOUNCED`; deliveries V21 left `FAILED` for good became
+  `EXHAUSTED` and any left `SENDING` became `UNKNOWN`;
+- `MailProvider.send` answers `Accepted`, `Refused(code, retryable)` or `Uncertain(code)`, and an exception counts as
+  uncertain;
+- the stable `Message-ID` (`operator.notifications.mail-domain`), stored on the first attempt;
+- the capability flags and `lookup`; reconciliation before a resend as point 2 describes;
+- `OperatorNotifier.recordProviderEvent` with `notification_delivery_event`, once per provider event id. The HTTP
+  intake arrives with the provider adapter (O-11);
+- the gauge of ADR-0024 counts `EXHAUSTED`, and retention keeps a notification while a delivery is open or
+  `UNKNOWN`.
 
-- the states `UNKNOWN`, `EXHAUSTED`, `DELIVERED` and `BOUNCED`;
-- the classification of provider errors;
-- the stable `Message-ID`;
-- the capability flags;
-- reconciliation before a resend;
-- the event intake, once a provider with events is chosen.
+`LoggingMailProvider` has no capability, so an uncertain delivery is never resent with it.
 
 ## Verification
 
