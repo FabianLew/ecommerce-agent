@@ -132,6 +132,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stores/{storeId}/business-profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["profile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stores/{storeId}/business-profile/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["saveDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stores/{storeId}/business-profile/draft/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stores/{storeId}/business-profile/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["versions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stores/{storeId}/decisions": {
         parameters: {
             query?: never;
@@ -356,6 +420,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stores/{storeId}/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["onboarding"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["updateOnboarding"];
+        trace?: never;
+    };
     "/api/v1/stores/{storeId}/variants": {
         parameters: {
             query?: never;
@@ -455,6 +535,10 @@ export interface components {
             message: string;
             requestId?: string;
             retryable: boolean;
+        };
+        ApproveRequest: {
+            /** Format: int32 */
+            expectedRevision: number;
         };
         CheckRef: {
             code?: string;
@@ -566,6 +650,37 @@ export interface components {
             /** @enum {string} */
             status: "PROPOSED" | "APPROVED" | "REJECTED" | "EXPIRED" | "SUPERSEDED";
             subject: components["schemas"]["SubjectRef"];
+        };
+        DomainResponse: {
+            detail?: string;
+            /** @enum {string} */
+            domain: "COMMERCE" | "ADS" | "AD_MAPPINGS" | "PROFILE";
+            /** @enum {string} */
+            readiness: "READY" | "IN_PROGRESS" | "NOT_STARTED" | "SKIPPED" | "ERROR";
+        };
+        DraftRequest: {
+            /**
+             * Format: int32
+             * @description Draft revision seen; 0 for a new draft
+             */
+            expectedRevision: number;
+            /** @enum {string} */
+            goal?: "PROFITABILITY" | "GROWTH" | "BALANCED";
+            note?: string;
+            /**
+             * Format: int64
+             * @description Planned ad spend for the month, minor units of the store currency
+             */
+            plannedAdSpendMinor?: number;
+            /** @example 2026-12 */
+            plannedAdSpendPeriod?: string;
+            /** Format: int32 */
+            planningHorizonDays?: number;
+            priorities?: ("INVENTORY_CONTINUITY" | "CONTRIBUTION_MARGIN" | "CASH_PRESERVATION" | "CUSTOMER_ACQUISITION")[];
+            /** @enum {string} */
+            riskPreference?: "LOW" | "MEDIUM" | "HIGH";
+            /** @enum {string} */
+            taxBasis?: "EX_TAX" | "INC_TAX";
         };
         EvidenceItem: {
             /** Format: date-time */
@@ -715,6 +830,11 @@ export interface components {
             items: components["schemas"]["IntegrationResponse"][];
             nextCursor?: string;
         };
+        ListResponseProfileResponse: {
+            hasMore: boolean;
+            items: components["schemas"]["ProfileResponse"][];
+            nextCursor?: string;
+        };
         ListResponseStoreResponse: {
             hasMore: boolean;
             items: components["schemas"]["StoreResponse"][];
@@ -788,6 +908,34 @@ export interface components {
         MetaTokenRequest: {
             token: string;
         };
+        OnboardingRequest: {
+            acknowledgements?: ("SKIP_META" | "MAPPINGS_LATER")[];
+            /** @enum {string} */
+            currentStep: "CONNECT_STORE" | "CONNECT_TOOLS" | "BUSINESS_DATA" | "START_MONITORING";
+            /**
+             * Format: int32
+             * @description Version seen; 0 if none
+             */
+            expectedVersion: number;
+        };
+        OnboardingResponse: {
+            acknowledgements: ("SKIP_META" | "MAPPINGS_LATER")[];
+            canEdit: boolean;
+            /** @enum {string} */
+            currentStep: "CONNECT_STORE" | "CONNECT_TOOLS" | "BUSINESS_DATA" | "START_MONITORING";
+            domains: components["schemas"]["DomainResponse"][];
+            /** @enum {string} */
+            nextStep: "CONNECT_STORE" | "CONNECT_TOOLS" | "BUSINESS_DATA" | "START_MONITORING";
+            steps: components["schemas"]["StepResponse"][];
+            /** Format: int32 */
+            version: number;
+        };
+        PlannedAdSpendResponse: {
+            /** Format: int64 */
+            amountMinor: number;
+            currency: string;
+            period: string;
+        };
         PolicyRef: {
             checks: components["schemas"]["CheckRef"][];
             decisiveCode?: string;
@@ -799,6 +947,38 @@ export interface components {
             outcome: string;
             policyKey: string;
             policyVersion: string;
+        };
+        ProfileResponse: {
+            /** Format: date-time */
+            approvedAt?: string;
+            /** Format: date-time */
+            effectiveFrom?: string;
+            /** @enum {string} */
+            goal?: "PROFITABILITY" | "GROWTH" | "BALANCED";
+            /** Format: uuid */
+            id: string;
+            missingFields: ("GOAL" | "PLANNING_HORIZON" | "RISK_PREFERENCE" | "PLANNED_AD_SPEND" | "ECONOMIC_MODEL" | "MAX_ACCEPTABLE_ACQUISITION_LOSS")[];
+            note?: string;
+            plannedAdSpend?: components["schemas"]["PlannedAdSpendResponse"];
+            /** Format: int32 */
+            planningHorizonDays?: number;
+            priorities: ("INVENTORY_CONTINUITY" | "CONTRIBUTION_MARGIN" | "CASH_PRESERVATION" | "CUSTOMER_ACQUISITION")[];
+            reference: string;
+            /** Format: int32 */
+            revision: number;
+            /** @enum {string} */
+            riskPreference?: "LOW" | "MEDIUM" | "HIGH";
+            /** @enum {string} */
+            status: "DRAFT" | "APPROVED" | "SUPERSEDED";
+            /** @enum {string} */
+            taxBasis: "EX_TAX" | "INC_TAX";
+            /** Format: int32 */
+            version: number;
+        };
+        ProfileStateResponse: {
+            approved?: components["schemas"]["ProfileResponse"];
+            canEdit: boolean;
+            draft?: components["schemas"]["ProfileResponse"];
         };
         ProposerRef: {
             /** @enum {string} */
@@ -839,6 +1019,12 @@ export interface components {
             contentSchema: string;
             /** Format: uuid */
             id: string;
+        };
+        StepResponse: {
+            blockers: string[];
+            complete: boolean;
+            /** @enum {string} */
+            step: "CONNECT_STORE" | "CONNECT_TOOLS" | "BUSINESS_DATA" | "START_MONITORING";
         };
         StoreResponse: {
             currency: string;
@@ -1261,6 +1447,210 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    profile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileStateResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    saveDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    versions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListResponseProfileResponse"];
                 };
             };
             /** @description Missing or invalid access token */
@@ -2037,6 +2427,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MetaConnectionResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    onboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    updateOnboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OnboardingRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingResponse"];
                 };
             };
             /** @description Missing or invalid access token */

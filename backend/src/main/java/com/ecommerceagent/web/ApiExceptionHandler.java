@@ -2,6 +2,8 @@ package com.ecommerceagent.web;
 
 import java.util.List;
 
+import com.ecommerceagent.automation.OnboardingConflictException;
+import com.ecommerceagent.businessprofile.BusinessProfileException;
 import com.ecommerceagent.commerce.AdMappingException;
 import com.ecommerceagent.identity.StoreAccessDeniedException;
 import com.ecommerceagent.integration.IntegrationConflictException;
@@ -65,6 +67,28 @@ class ApiExceptionHandler {
                     List.of(new ApiError.FieldError(exception.field(), exception.code(), exception.getMessage())),
                     false, RequestCorrelationFilter.requestId(request), null));
         };
+    }
+
+    @ExceptionHandler(BusinessProfileException.class)
+    ResponseEntity<ApiError> businessProfile(HttpServletRequest request, BusinessProfileException exception) {
+        return switch (exception.reason()) {
+            case NOT_FOUND -> error(request, HttpStatus.NOT_FOUND, "NOT_FOUND",
+                    "The resource does not exist or is not available.", false);
+            case VERSION_CONFLICT -> error(request, HttpStatus.CONFLICT, "PROFILE_CHANGED",
+                    "The profile was changed by someone else. Reload and check it again.", false);
+            case INVALID -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(new ApiError(
+                    "VALIDATION_FAILED", "Correct the highlighted fields.",
+                    List.of(new ApiError.FieldError(exception.field(), exception.code(), exception.getMessage())),
+                    false, RequestCorrelationFilter.requestId(request), null));
+        };
+    }
+
+    @ExceptionHandler(OnboardingConflictException.class)
+    ResponseEntity<ApiError> onboarding(HttpServletRequest request, OnboardingConflictException exception) {
+        return exception.conflict()
+                ? error(request, HttpStatus.CONFLICT, "ONBOARDING_CHANGED",
+                        "The onboarding progress was changed elsewhere. Reload the page.", false)
+                : error(request, HttpStatus.UNPROCESSABLE_CONTENT, "VALIDATION_FAILED", exception.getMessage(), false);
     }
 
     @ExceptionHandler(SyncInProgressException.class)

@@ -177,6 +177,16 @@
         },
         "required" : [ "code", "message", "retryable" ]
       },
+      "ApproveRequest" : {
+        "properties" : {
+          "expectedRevision" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "expectedRevision" ],
+        "type" : "object"
+      },
       "CheckRef" : {
         "properties" : {
           "code" : {
@@ -485,6 +495,69 @@
           }
         },
         "required" : [ "businessSummary", "createdAt", "disposition", "expiresAt", "group", "openedAt", "opportunityId", "opportunityStatus", "proposalId", "reasonCodes", "revision", "status", "subject" ],
+        "type" : "object"
+      },
+      "DomainResponse" : {
+        "properties" : {
+          "detail" : {
+            "type" : "string"
+          },
+          "domain" : {
+            "enum" : [ "COMMERCE", "ADS", "AD_MAPPINGS", "PROFILE" ],
+            "type" : "string"
+          },
+          "readiness" : {
+            "enum" : [ "READY", "IN_PROGRESS", "NOT_STARTED", "SKIPPED", "ERROR" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "domain", "readiness" ],
+        "type" : "object"
+      },
+      "DraftRequest" : {
+        "properties" : {
+          "expectedRevision" : {
+            "description" : "Draft revision seen; 0 for a new draft",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "goal" : {
+            "enum" : [ "PROFITABILITY", "GROWTH", "BALANCED" ],
+            "type" : "string"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "plannedAdSpendMinor" : {
+            "description" : "Planned ad spend for the month, minor units of the store currency",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "plannedAdSpendPeriod" : {
+            "example" : "2026-12",
+            "type" : "string"
+          },
+          "planningHorizonDays" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "priorities" : {
+            "items" : {
+              "enum" : [ "INVENTORY_CONTINUITY", "CONTRIBUTION_MARGIN", "CASH_PRESERVATION", "CUSTOMER_ACQUISITION" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "riskPreference" : {
+            "enum" : [ "LOW", "MEDIUM", "HIGH" ],
+            "type" : "string"
+          },
+          "taxBasis" : {
+            "enum" : [ "EX_TAX", "INC_TAX" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "expectedRevision" ],
         "type" : "object"
       },
       "EvidenceItem" : {
@@ -865,6 +938,24 @@
         "required" : [ "hasMore", "items" ],
         "type" : "object"
       },
+      "ListResponseProfileResponse" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ProfileResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "hasMore", "items" ],
+        "type" : "object"
+      },
       "ListResponseStoreResponse" : {
         "properties" : {
           "hasMore" : {
@@ -1057,6 +1148,85 @@
         "required" : [ "token" ],
         "type" : "object"
       },
+      "OnboardingRequest" : {
+        "properties" : {
+          "acknowledgements" : {
+            "items" : {
+              "enum" : [ "SKIP_META", "MAPPINGS_LATER" ],
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "currentStep" : {
+            "enum" : [ "CONNECT_STORE", "CONNECT_TOOLS", "BUSINESS_DATA", "START_MONITORING" ],
+            "type" : "string"
+          },
+          "expectedVersion" : {
+            "description" : "Version seen; 0 if none",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "currentStep", "expectedVersion" ],
+        "type" : "object"
+      },
+      "OnboardingResponse" : {
+        "properties" : {
+          "acknowledgements" : {
+            "items" : {
+              "enum" : [ "SKIP_META", "MAPPINGS_LATER" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "canEdit" : {
+            "type" : "boolean"
+          },
+          "currentStep" : {
+            "enum" : [ "CONNECT_STORE", "CONNECT_TOOLS", "BUSINESS_DATA", "START_MONITORING" ],
+            "type" : "string"
+          },
+          "domains" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DomainResponse"
+            },
+            "type" : "array"
+          },
+          "nextStep" : {
+            "enum" : [ "CONNECT_STORE", "CONNECT_TOOLS", "BUSINESS_DATA", "START_MONITORING" ],
+            "type" : "string"
+          },
+          "steps" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StepResponse"
+            },
+            "type" : "array"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "acknowledgements", "canEdit", "currentStep", "domains", "nextStep", "steps", "version" ],
+        "type" : "object"
+      },
+      "PlannedAdSpendResponse" : {
+        "properties" : {
+          "amountMinor" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "period" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "amountMinor", "currency", "period" ],
+        "type" : "object"
+      },
       "PolicyRef" : {
         "properties" : {
           "checks" : {
@@ -1090,6 +1260,90 @@
           }
         },
         "required" : [ "checks", "evaluatedAt", "evaluationId", "mode", "outcome", "policyKey", "policyVersion" ],
+        "type" : "object"
+      },
+      "ProfileResponse" : {
+        "properties" : {
+          "approvedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "effectiveFrom" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "goal" : {
+            "enum" : [ "PROFITABILITY", "GROWTH", "BALANCED" ],
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "missingFields" : {
+            "items" : {
+              "enum" : [ "GOAL", "PLANNING_HORIZON", "RISK_PREFERENCE", "PLANNED_AD_SPEND", "ECONOMIC_MODEL", "MAX_ACCEPTABLE_ACQUISITION_LOSS" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "plannedAdSpend" : {
+            "$ref" : "#/components/schemas/PlannedAdSpendResponse"
+          },
+          "planningHorizonDays" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "priorities" : {
+            "items" : {
+              "enum" : [ "INVENTORY_CONTINUITY", "CONTRIBUTION_MARGIN", "CASH_PRESERVATION", "CUSTOMER_ACQUISITION" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "reference" : {
+            "type" : "string"
+          },
+          "revision" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "riskPreference" : {
+            "enum" : [ "LOW", "MEDIUM", "HIGH" ],
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "DRAFT", "APPROVED", "SUPERSEDED" ],
+            "type" : "string"
+          },
+          "taxBasis" : {
+            "enum" : [ "EX_TAX", "INC_TAX" ],
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "id", "missingFields", "priorities", "reference", "revision", "status", "taxBasis", "version" ],
+        "type" : "object"
+      },
+      "ProfileStateResponse" : {
+        "properties" : {
+          "approved" : {
+            "$ref" : "#/components/schemas/ProfileResponse"
+          },
+          "canEdit" : {
+            "type" : "boolean"
+          },
+          "draft" : {
+            "$ref" : "#/components/schemas/ProfileResponse"
+          }
+        },
+        "required" : [ "canEdit" ],
         "type" : "object"
       },
       "ProposerRef" : {
@@ -1191,6 +1445,25 @@
           }
         },
         "required" : [ "asOf", "contentHash", "contentSchema", "id" ],
+        "type" : "object"
+      },
+      "StepResponse" : {
+        "properties" : {
+          "blockers" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "complete" : {
+            "type" : "boolean"
+          },
+          "step" : {
+            "enum" : [ "CONNECT_STORE", "CONNECT_TOOLS", "BUSINESS_DATA", "START_MONITORING" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "blockers", "complete", "step" ],
         "type" : "object"
       },
       "StoreResponse" : {
@@ -1873,6 +2146,254 @@
           }
         },
         "tags" : [ "ad-mapping-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/business-profile" : {
+      "get" : {
+        "operationId" : "profile",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfileStateResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "business-profile-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/business-profile/draft" : {
+      "put" : {
+        "operationId" : "saveDraft",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DraftRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfileResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "business-profile-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/business-profile/draft/approval" : {
+      "post" : {
+        "operationId" : "approve",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ApproveRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfileResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "business-profile-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/business-profile/versions" : {
+      "get" : {
+        "operationId" : "versions",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseProfileResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "business-profile-controller" ]
       }
     },
     "/api/v1/stores/{storeId}/decisions" : {
@@ -2892,6 +3413,128 @@
           }
         },
         "tags" : [ "meta-connection-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/onboarding" : {
+      "get" : {
+        "operationId" : "onboarding",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "business-profile-controller" ]
+      },
+      "patch" : {
+        "operationId" : "updateOnboarding",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OnboardingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "business-profile-controller" ]
       }
     },
     "/api/v1/stores/{storeId}/variants" : {
