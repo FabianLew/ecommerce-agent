@@ -221,7 +221,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["approve"];
+        post: operations["approve_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -292,6 +292,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stores/{storeId}/decisions/{proposalId}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stores/{storeId}/decisions/{proposalId}/evidence": {
         parameters: {
             query?: never;
@@ -302,6 +318,22 @@ export interface paths {
         get: operations["evidence"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stores/{storeId}/decisions/{proposalId}/rejections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reject"];
         delete?: never;
         options?: never;
         head?: never;
@@ -692,6 +724,24 @@ export interface components {
             onboardingNextStep?: string;
             recentActivities: components["schemas"]["ActivitySummary"][];
             salesTrend: components["schemas"]["SeriesPoint"][];
+        };
+        DecisionCommandResponse: {
+            /** Format: uuid */
+            approvalId: string;
+            /** Format: date-time */
+            decidedAt: string;
+            /** @enum {string} */
+            decision: "APPROVED" | "REJECTED";
+            /** Format: date-time */
+            expiresAt: string;
+            /** Format: uuid */
+            operationId: string;
+            /** Format: uuid */
+            proposalId: string;
+            replayed: boolean;
+            /** Format: int32 */
+            revision: number;
+            statusUrl: string;
         };
         DecisionEvidenceResponse: {
             hasMore: boolean;
@@ -1209,6 +1259,12 @@ export interface components {
             timezone: string;
             warnings: string[];
         };
+        RejectionRequest: {
+            /** @description Why the proposal is rejected; at most 1000 characters */
+            reason?: string;
+            /** Format: int32 */
+            revision: number;
+        };
         RevisionRef: {
             /** Format: date-time */
             createdAt: string;
@@ -1218,6 +1274,10 @@ export interface components {
             revision: number;
             /** @enum {string} */
             status: "PROPOSED" | "APPROVED" | "REJECTED" | "EXPIRED" | "SUPERSEDED";
+        };
+        RevisionRequest: {
+            /** Format: int32 */
+            revision: number;
         };
         RevokeRequest: {
             /** Format: int32 */
@@ -1268,7 +1328,7 @@ export interface components {
             /** Format: uuid */
             organizationId: string;
             organizationName: string;
-            permissions: ("STORE_READ" | "STORE_MANAGE")[];
+            permissions: ("STORE_READ" | "STORE_MANAGE" | "DECISION_APPROVE")[];
             roles: ("OWNER" | "DECISION_OPERATOR" | "SUPPORT_OPERATOR" | "ANALYST")[];
             /** Format: uuid */
             storeId: string;
@@ -1984,7 +2044,7 @@ export interface operations {
             };
         };
     };
-    approve: {
+    approve_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -2240,6 +2300,63 @@ export interface operations {
             };
         };
     };
+    approve: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                proposalId: string;
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevisionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionCommandResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
     evidence: {
         parameters: {
             query?: never;
@@ -2259,6 +2376,63 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionEvidenceResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    reject: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                proposalId: string;
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionCommandResponse"];
                 };
             };
             /** @description Missing or invalid access token */

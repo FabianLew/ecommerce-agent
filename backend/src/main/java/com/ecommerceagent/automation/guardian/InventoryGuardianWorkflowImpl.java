@@ -55,6 +55,7 @@ public class InventoryGuardianWorkflowImpl implements InventoryGuardianWorkflow 
     private String proposerKind;
     private String agentFallback;
     private boolean resolved;
+    private final java.util.List<String> approvals = new java.util.ArrayList<>();
     private boolean reanalyze;
     private boolean finished;
     private BigDecimal significantChange = BigDecimal.ZERO;
@@ -179,6 +180,14 @@ public class InventoryGuardianWorkflowImpl implements InventoryGuardianWorkflow 
     public void riskResolved(RiskSignal signal) {
         signals++;
         resolved = true;
+    }
+
+    @Override
+    public void approvalDecided(String approvalId) {
+        signals++;
+        if (!approvals.contains(approvalId)) {
+            approvals.add(approvalId);
+        }
     }
 
     @Override

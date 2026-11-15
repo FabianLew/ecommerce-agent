@@ -25,7 +25,9 @@ public record InventoryProtectionPolicy(
 
     public enum Mode {
         /** Pilot: the outcome is recorded, nothing is authorized or executed. */
-        EVALUATION_ONLY
+        EVALUATION_ONLY,
+        /** L1 (ADR-0020): a person approves one revision, and the backend executes it after a recheck. */
+        EXECUTE_ON_APPROVAL
     }
 
     public enum Autonomy {

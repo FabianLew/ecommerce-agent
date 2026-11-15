@@ -26,5 +26,6 @@ Statuses: `Proposed` → `Accepted` (after the owner accepts it in a PR) → opt
 | [0017](0017-meta-ads-adapter.md) | Meta Ads adapter: connection, ad state polling and the pause write | Proposed |
 | [0018](0018-store-business-profile-and-onboarding.md) | Store Business Profile versions and onboarding progress | Proposed |
 | [0019](0019-sales-and-product-analytics.md) | Sales and product analytics v1: definitions, coverage and the MetricDTO | Proposed |
+| [0020](0020-approval-authorized-action-and-execution-ledger.md) | Approval, AuthorizedAction, the execution ledger and the mutation stop | Proposed |
 
 Template: [0000-template.md](0000-template.md).

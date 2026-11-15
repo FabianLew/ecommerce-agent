@@ -46,6 +46,8 @@ class ActivityController {
             Map.entry("PROPOSAL_INVALID", ActivityType.RECOMMENDATION),
             Map.entry("PROPOSAL_STATUS_CHANGED", ActivityType.RECOMMENDATION),
             Map.entry("POLICY_EVALUATED", ActivityType.POLICY),
+            Map.entry("DECISION_APPROVED", ActivityType.RECOMMENDATION),
+            Map.entry("DECISION_REJECTED", ActivityType.RECOMMENDATION),
             Map.entry("INTEGRATION_CONNECTION_CREATED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_CREDENTIALS_UPDATED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_CHECK_COMPLETED", ActivityType.INTEGRATION),

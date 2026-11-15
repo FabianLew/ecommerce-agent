@@ -26,6 +26,10 @@ public interface InventoryGuardianWorkflow {
     @SignalMethod
     void riskResolved(RiskSignal signal);
 
+    /** A person approved or rejected the episode's proposal (ADR-0020); repeats of one id are ignored. */
+    @SignalMethod
+    void approvalDecided(String approvalId);
+
     @QueryMethod
     GuardianStatus status();
 

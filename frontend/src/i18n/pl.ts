@@ -71,6 +71,7 @@ export const pl: Messages = {
     permissionLabels: {
       STORE_READ: "Odczyt danych sklepu",
       STORE_MANAGE: "Zarządzanie sklepem",
+      DECISION_APPROVE: "Zatwierdzanie decyzji i wstrzymywanie zmian",
     },
     monitoringOffTitle: "Monitorowanie sklepu nie jest jeszcze uruchomione",
     monitoringOffDescription: "Monitorowanie zacznie się po połączeniu WooCommerce i imporcie danych w sekcji Integracje.",
@@ -226,6 +227,8 @@ export const pl: Messages = {
       PROPOSAL_INVALID: "Propozycja odrzucona jako nieprawidłowa",
       PROPOSAL_STATUS_CHANGED: "Zmienił się status propozycji",
       POLICY_EVALUATED: "Oceniono politykę",
+      DECISION_APPROVED: "Zatwierdzono propozycję",
+      DECISION_REJECTED: "Odrzucono propozycję",
       INTEGRATION_CONNECTION_CREATED: "Utworzono połączenie integracji",
       INTEGRATION_CREDENTIALS_UPDATED: "Zapisano klucz API",
       INTEGRATION_CHECK_COMPLETED: "Zakończono test połączenia",

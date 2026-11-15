@@ -14,6 +14,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.ecommerceagent.automation.guardian.ApprovalException;
+import com.ecommerceagent.automation.guardian.DecisionApprovals;
 import com.ecommerceagent.automation.guardian.PolicyCheck;
 import com.ecommerceagent.automation.guardian.PolicyEvaluation;
 import com.ecommerceagent.automation.guardian.PolicyEvaluations;
@@ -36,6 +38,7 @@ import com.ecommerceagent.decisions.ProposalStatus;
 import com.ecommerceagent.decisions.ProposerKind;
 import com.ecommerceagent.decisions.StoredProposal;
 import com.ecommerceagent.identity.StoreAccess;
+import com.ecommerceagent.identity.StorePermission;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.intelligence.inventory.InventoryContext;
 import com.ecommerceagent.metrics.Evidence;
@@ -48,6 +51,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -73,11 +78,12 @@ class DecisionController {
     private final PolicyEvaluations policies;
     private final CatalogRepository catalog;
     private final StoreAccess storeAccess;
+    private final DecisionApprovals approvals;
     private final Clock clock;
 
     DecisionController(DecisionInbox inbox, DecisionProposals proposals, Opportunities opportunities,
             ContextSnapshots snapshots, EvidenceStore evidence, PolicyEvaluations policies, CatalogRepository catalog,
-            StoreAccess storeAccess, Clock clock) {
+            StoreAccess storeAccess, DecisionApprovals approvals, Clock clock) {
         this.inbox = inbox;
         this.proposals = proposals;
         this.opportunities = opportunities;
@@ -86,6 +92,7 @@ class DecisionController {
         this.policies = policies;
         this.catalog = catalog;
         this.storeAccess = storeAccess;
+        this.approvals = approvals;
         this.clock = clock;
     }
 
@@ -148,8 +155,55 @@ class DecisionController {
                 proposal.recommendation().evidence().stream().map(EvidenceRef::evidenceId).toList(),
                 evaluation.map(DecisionController::policy).orElse(null),
                 new ProposerRef(proposal.proposer().kind(), proposal.proposer().name(), proposal.proposer().version()),
-                proposal.createdAt(), proposal.expiresAt(), null, List.of(), blockedReason(status), meta);
+                proposal.createdAt(), proposal.expiresAt(), null, allowed(scope, stored, status),
+                blockedReason(scope, stored, status), meta);
         return ResponseEntity.ok().eTag(etag).body(presentation);
+    }
+
+    @PostMapping("/{proposalId}/approvals")
+    ResponseEntity<DecisionCommandResponse> approve(
+            @RequiresPermission(StorePermission.DECISION_APPROVE) TrustedStoreScope scope,
+            @PathVariable String proposalId, @RequestBody RevisionRequest body,
+            @RequestHeader(name = "If-Match", required = false) String ifMatch,
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
+        UUID id = id(proposalId);
+        checkVersion(scope, id, ifMatch, idempotencyKey);
+        return accepted(scope, approvals.approve(scope, id, body.revision(), idempotencyKey));
+    }
+
+    @PostMapping("/{proposalId}/rejections")
+    ResponseEntity<DecisionCommandResponse> reject(
+            @RequiresPermission(StorePermission.DECISION_APPROVE) TrustedStoreScope scope,
+            @PathVariable String proposalId, @RequestBody RejectionRequest body,
+            @RequestHeader(name = "If-Match", required = false) String ifMatch,
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
+        UUID id = id(proposalId);
+        checkVersion(scope, id, ifMatch, idempotencyKey);
+        return accepted(scope, approvals.reject(scope, id, body.revision(), body.reason(), idempotencyKey));
+    }
+
+    /** A repeated command is answered from its key; a new one must name the version the person saw. */
+    private void checkVersion(TrustedStoreScope scope, UUID proposalId, String ifMatch, String idempotencyKey) {
+        if (approvals.byKey(scope, idempotencyKey).isPresent()) {
+            return;
+        }
+        StoredProposal stored = proposals.find(scope, proposalId).orElseThrow(ResourceNotFoundException::new);
+        if (ifMatch == null || ifMatch.isBlank()) {
+            throw new ApprovalException(ApprovalException.Kind.PRECONDITION_REQUIRED, "IF_MATCH_REQUIRED");
+        }
+        String current = etag(stored, policies.latest(scope, proposalId).map(PolicyEvaluation::id).orElse(null));
+        if (!current.equals(ifMatch.strip())) {
+            throw new ApprovalException(ApprovalException.Kind.PRECONDITION_FAILED, "VERSION_CHANGED");
+        }
+    }
+
+    private static ResponseEntity<DecisionCommandResponse> accepted(TrustedStoreScope scope,
+            DecisionApprovals.Result result) {
+        DecisionApprovals.Approval approval = result.approval();
+        String statusUrl = "/api/v1/stores/" + scope.storeId() + "/decisions/" + approval.proposalId();
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(new DecisionCommandResponse(approval.id(),
+                approval.id(), approval.proposalId(), approval.revision(), approval.decision(), approval.decidedAt(),
+                approval.expiresAt(), statusUrl, result.replayed()));
     }
 
     @GetMapping("/{proposalId}/evidence")
@@ -242,9 +296,24 @@ class DecisionController {
                 ? ProposalStatus.EXPIRED : stored.status();
     }
 
-    private static String blockedReason(ProposalStatus status) {
+    private List<String> allowed(TrustedStoreScope scope, StoredProposal stored, ProposalStatus status) {
+        if (status != ProposalStatus.PROPOSED) {
+            return List.of();
+        }
+        List<String> actions = new ArrayList<>();
+        if (approvals.blocker(scope, stored, DecisionApprovals.Decision.APPROVED).isEmpty()) {
+            actions.add("APPROVE");
+        }
+        if (approvals.blocker(scope, stored, DecisionApprovals.Decision.REJECTED).isEmpty()) {
+            actions.add("REJECT");
+        }
+        return List.copyOf(actions);
+    }
+
+    /** Why the proposal cannot be approved now; null when it can, or when it is no longer open. */
+    private String blockedReason(TrustedStoreScope scope, StoredProposal stored, ProposalStatus status) {
         return switch (status) {
-            case PROPOSED -> SHADOW_MODE;
+            case PROPOSED -> approvals.blocker(scope, stored, DecisionApprovals.Decision.APPROVED).orElse(null);
             case EXPIRED -> PROPOSAL_EXPIRED;
             default -> null;
         };
@@ -289,6 +358,27 @@ class DecisionController {
         } catch (IllegalArgumentException e) {
             throw new ResourceNotFoundException();
         }
+    }
+
+    record RevisionRequest(@Schema(requiredMode = Schema.RequiredMode.REQUIRED) int revision) {
+    }
+
+    record RejectionRequest(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int revision,
+            @Schema(description = "Why the proposal is rejected; at most 1000 characters") String reason) {
+    }
+
+    /** {@code 202}: the decision is stored; whether the ad is paused shows in the decision's execution state. */
+    record DecisionCommandResponse(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID approvalId,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID operationId,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID proposalId,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int revision,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) DecisionApprovals.Decision decision,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant decidedAt,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant expiresAt,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String statusUrl,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean replayed) {
     }
 
     record DecisionListResponse(

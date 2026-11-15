@@ -85,6 +85,7 @@ export const en = {
     permissionLabels: {
       STORE_READ: "Read store data",
       STORE_MANAGE: "Manage the store",
+      DECISION_APPROVE: "Approve decisions and stop changes",
     } as Record<string, string>,
     monitoringOffTitle: "Store monitoring is not running yet",
     monitoringOffDescription:
@@ -250,6 +251,8 @@ export const en = {
       PROPOSAL_INVALID: "A proposal was rejected as invalid",
       PROPOSAL_STATUS_CHANGED: "The proposal status changed",
       POLICY_EVALUATED: "The policy was evaluated",
+      DECISION_APPROVED: "A proposal was approved",
+      DECISION_REJECTED: "A proposal was rejected",
       INTEGRATION_CONNECTION_CREATED: "An integration connection was created",
       INTEGRATION_CREDENTIALS_UPDATED: "The API key was saved",
       INTEGRATION_CHECK_COMPLETED: "A connection check finished",

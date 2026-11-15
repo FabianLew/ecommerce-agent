@@ -55,7 +55,8 @@ class StoreAccessTest {
         TrustedStoreScope analyst = storeAccess.scopeFor(ANALYST, STORE).orElseThrow();
 
         assertThat(owner.actor()).isEqualTo(new UserActor(OWNER));
-        assertThat(owner.permissions()).containsExactly(StorePermission.STORE_READ, StorePermission.STORE_MANAGE);
+        assertThat(owner.permissions()).containsExactly(StorePermission.STORE_READ, StorePermission.STORE_MANAGE,
+                StorePermission.DECISION_APPROVE);
         assertThat(analyst.permissions()).containsExactly(StorePermission.STORE_READ);
         assertThatThrownBy(() -> analyst.require(StorePermission.STORE_MANAGE))
                 .isInstanceOf(StoreAccessDeniedException.class);

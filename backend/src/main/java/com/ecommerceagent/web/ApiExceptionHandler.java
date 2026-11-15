@@ -3,6 +3,7 @@ package com.ecommerceagent.web;
 import java.util.List;
 
 import com.ecommerceagent.automation.OnboardingConflictException;
+import com.ecommerceagent.automation.guardian.ApprovalException;
 import com.ecommerceagent.businessprofile.BusinessProfileException;
 import com.ecommerceagent.commerce.AdMappingException;
 import com.ecommerceagent.identity.StoreAccessDeniedException;
@@ -67,6 +68,25 @@ class ApiExceptionHandler {
                     List.of(new ApiError.FieldError(exception.field(), exception.code(), exception.getMessage())),
                     false, RequestCorrelationFilter.requestId(request), null));
         };
+    }
+
+    @ExceptionHandler(ApprovalException.class)
+    ResponseEntity<ApiError> approval(ApprovalException exception, HttpServletRequest request) {
+        HttpStatus status = switch (exception.kind()) {
+            case NOT_FOUND -> HttpStatus.NOT_FOUND;
+            case INVALID -> HttpStatus.BAD_REQUEST;
+            case FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case CONFLICT -> HttpStatus.CONFLICT;
+            case PRECONDITION_FAILED -> HttpStatus.PRECONDITION_FAILED;
+            case PRECONDITION_REQUIRED -> HttpStatus.PRECONDITION_REQUIRED;
+        };
+        String message = switch (exception.kind()) {
+            case PRECONDITION_FAILED, PRECONDITION_REQUIRED ->
+                    "The decision changed since it was shown. Reload it and decide again.";
+            case NOT_FOUND -> "The resource does not exist or is not available.";
+            default -> "The decision cannot be recorded now.";
+        };
+        return error(request, status, exception.code(), message, false);
     }
 
     @ExceptionHandler(BusinessProfileException.class)

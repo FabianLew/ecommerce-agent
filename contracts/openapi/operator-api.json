@@ -417,6 +417,46 @@
         "required" : [ "attentionItems", "decisionsToApprove", "integrationHealth", "meta", "metrics", "recentActivities", "salesTrend" ],
         "type" : "object"
       },
+      "DecisionCommandResponse" : {
+        "properties" : {
+          "approvalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "decidedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "decision" : {
+            "enum" : [ "APPROVED", "REJECTED" ],
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "operationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "proposalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "replayed" : {
+            "type" : "boolean"
+          },
+          "revision" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "statusUrl" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "approvalId", "decidedAt", "decision", "expiresAt", "operationId", "proposalId", "replayed", "revision", "statusUrl" ],
+        "type" : "object"
+      },
       "DecisionEvidenceResponse" : {
         "properties" : {
           "hasMore" : {
@@ -1783,6 +1823,20 @@
         "required" : [ "asOf", "completeness", "generatedAt", "timezone", "warnings" ],
         "type" : "object"
       },
+      "RejectionRequest" : {
+        "properties" : {
+          "reason" : {
+            "description" : "Why the proposal is rejected; at most 1000 characters",
+            "type" : "string"
+          },
+          "revision" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "revision" ],
+        "type" : "object"
+      },
       "RevisionRef" : {
         "properties" : {
           "createdAt" : {
@@ -1803,6 +1857,16 @@
           }
         },
         "required" : [ "createdAt", "proposalId", "revision", "status" ],
+        "type" : "object"
+      },
+      "RevisionRequest" : {
+        "properties" : {
+          "revision" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "revision" ],
         "type" : "object"
       },
       "RevokeRequest" : {
@@ -1932,7 +1996,7 @@
           },
           "permissions" : {
             "items" : {
-              "enum" : [ "STORE_READ", "STORE_MANAGE" ],
+              "enum" : [ "STORE_READ", "STORE_MANAGE", "DECISION_APPROVE" ],
               "type" : "string"
             },
             "type" : "array",
@@ -2996,7 +3060,7 @@
     },
     "/api/v1/stores/{storeId}/business-profile/draft/approval" : {
       "post" : {
-        "operationId" : "approve",
+        "operationId" : "approve_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "storeId",
@@ -3325,6 +3389,94 @@
         "tags" : [ "decision-controller" ]
       }
     },
+    "/api/v1/stores/{storeId}/decisions/{proposalId}/approvals" : {
+      "post" : {
+        "operationId" : "approve",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "proposalId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RevisionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DecisionCommandResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "decision-controller" ]
+      }
+    },
     "/api/v1/stores/{storeId}/decisions/{proposalId}/evidence" : {
       "get" : {
         "operationId" : "evidence",
@@ -3350,6 +3502,94 @@
               "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/DecisionEvidenceResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "decision-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/decisions/{proposalId}/rejections" : {
+      "post" : {
+        "operationId" : "reject",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "proposalId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RejectionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DecisionCommandResponse"
                 }
               }
             },

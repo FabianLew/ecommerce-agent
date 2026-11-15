@@ -174,7 +174,7 @@ class StoreIsolationTest {
     @Test
     void storeDetailsExposeCurrentPermissions() throws Exception {
         mvc.perform(get("/api/v1/stores/{id}", STORE_A).with(user("subject-a")))
-                .andExpect(jsonPath("$.permissions.length()").value(2))
+                .andExpect(jsonPath("$.permissions.length()").value(3))
                 .andExpect(jsonPath("$.permissions[1]").value("STORE_MANAGE"));
         mvc.perform(get("/api/v1/stores/{id}", STORE_A).with(user("subject-b")))
                 .andExpect(jsonPath("$.permissions.length()").value(1))
