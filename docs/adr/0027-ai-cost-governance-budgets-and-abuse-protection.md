@@ -647,6 +647,37 @@ below.
     rules, and are read by store users only through store-level views.
 13. **Migration numbers.** The new tables use the next free versions on `pilot` (V30 onwards).
 
+### Implementation status
+
+**Stage 1, step 1 (V30, module `aigovernance`): budgets, pricing catalog and reservations.**
+
+- Tables `ai_price`, `ai_budget_policy`, `ai_budget_balance`, `ai_budget_reservation` and `ai_budget_charge`.
+  Amounts are `numeric(20, 8)`, never floating point; every window is in UTC.
+- `ai_price` is append-only: a new price is a new `price_version`, and only `verified_at` may be set later. A
+  price is used only when it is verified, in effect, the newest version for (provider, model, region) and checked
+  within `operator.ai-governance.price-max-verification-age` (90 days). The prices copied from the old price list
+  are seeded unverified, so no paid call can be reserved until someone checks them against the provider.
+- `ai_budget_policy` rows are versioned and immutable; a change supersedes the active row and inserts the next
+  version. Platform and store budgets are required: without them a call is refused (`NO_PLATFORM_BUDGET`,
+  `NO_STORE_BUDGET`). Organization and automation budgets apply when they exist. Periods are `MONTHLY` and
+  `DAILY`.
+- Balances are kept per scope and period window, not per policy version, so a mid-period policy change keeps what
+  was already reserved and spent.
+- The reservation is one call of the `SECURITY DEFINER` function `ai_reserve`. It takes the store from the session
+  settings, locks every applicable balance in a fixed order (level, period, scope), checks every limit and the
+  currency, and writes the reservation and its charges, all in one statement. The idempotency key is unique per
+  store; a repeated key returns the first reservation and charges nothing. `ai_release` returns the budget only
+  for a reservation still in `RESERVED`, that is, a call known not to have been sent.
+- The estimate is conservative: estimated input tokens plus `input-token-margin` (25%), the input price raised to
+  the cache-write price when caching is requested, the full maximum output, priced extra units, rounded up. A
+  feature without a price (cache, extras) is refused, never treated as free.
+- The runtime role reads only its store's reservations and the price catalog. It cannot read or write budget
+  policies, balances or charges, so a store never sees platform economics. Prices and policies are changed by
+  reviewed migrations (`operator_migrator`) until an administrative interface exists.
+- Not yet: settlement, `UNKNOWN`, the usage ledger and the reconciliation of overdue reservations (step 2); the
+  `GovernedModelGateway` and the boundary test (step 3); run limits as versioned policies (step 4). Until step 3
+  the agent runtime does not call the governor, and the agent stays off.
+
 ### Rollout relative to the pilot
 
 The agent stays off on the pilot until stage 1 is complete, because the pilot runs on the platform's money and the

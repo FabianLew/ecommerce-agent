@@ -88,6 +88,9 @@ metrics); it must keep working without a general way around the policies.
        - `webhook_endpoint(key)`: which store owns a webhook endpoint, before the delivery is resolved;
        - `operational_metric(name)`: the worker's gauges in ADR-0024;
        - `apply_audit_retention(...)`: see below.
+       - `ai_reserve(...)` and `ai_release(...)` (V30, ADR-0027): the atomic budget reservation and its release.
+         They take the store only from the session settings, fail closed when none is bound, and are the only way
+         the runtime reaches platform and organization budgets.
      - The schema test fails on any other definer function.
    - **Privileged maintenance is a function too.** Deleting audit rows (point 6) runs only through
      `apply_audit_retention(cutoff, batch_size)`, a definer function that enforces the 365-day floor itself. The
