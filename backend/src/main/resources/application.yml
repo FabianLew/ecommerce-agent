@@ -112,6 +112,16 @@ operator:
       autonomy: L1
       l2-enabled: false
 
+  execution:
+    # The executor (ADR-0020). It acts only in policy mode EXECUTE_ON_APPROVAL; this switch stops every external
+    # write of the deployment, while reads, verification and reconciliation continue.
+    mutations-enabled: ${OPERATOR_MUTATIONS_ENABLED:true}
+    authorization-ttl: 60s
+    lease-duration: 2m
+    max-pauses-per-store-24h: 3
+    cooldown-per-ad: 24h
+    verify-delays: 5s,15s,30s,60s
+
   agent:
     # The agent proposer (ADR-0016). Off: the deterministic baseline is the only proposer.
     enabled: ${OPERATOR_AGENT_ENABLED:false}
