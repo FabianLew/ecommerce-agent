@@ -174,6 +174,13 @@ class SpringAiAnthropicGateway implements ModelGateway {
             if (cause instanceof AnthropicServiceException service) {
                 requestId = service.headers().values("request-id").stream().findFirst().orElse(null);
             }
+            int status = cause instanceof AnthropicServiceException service ? service.statusCode() : 0;
+            if (status == 408 || status == 504) {
+                // A timeout reported as a response (by the API or a gateway in between): the request may have been
+                // processed and billed, so it is possibly charged (ADR-0027 section 4.5).
+                return new ModelFailure(ModelFailure.Type.TIMEOUT, cause.getClass().getSimpleName(), null, requestId,
+                        false, null);
+            }
             ModelFailure.Type type = switch (cause) {
                 case RateLimitException ignored -> ModelFailure.Type.RATE_LIMITED;
                 case InternalServerException ignored -> ModelFailure.Type.UNAVAILABLE;
@@ -189,9 +196,11 @@ class SpringAiAnthropicGateway implements ModelGateway {
                 default -> null;
             };
             if (type != null) {
-                // An HTTP error response from the API is not billed; a broken connection or timeout may have been.
-                boolean errorResponse = cause instanceof AnthropicServiceException;
-                return new ModelFailure(type, cause.getClass().getSimpleName(), null, requestId, errorResponse, null);
+                // Only a response that says the request was refused before processing is known not to be billed:
+                // a client error (4xx), rate limiting (429) or overload (529). Any other server error, a broken
+                // connection or a timeout may have been processed, so it stays possibly charged (UNKNOWN).
+                boolean notCharged = status >= 400 && status < 500 || status == 529;
+                return new ModelFailure(type, cause.getClass().getSimpleName(), null, requestId, notCharged, null);
             }
         }
         return new ModelFailure(ModelFailure.Type.UNKNOWN, error.getClass().getSimpleName(), null, null, null);

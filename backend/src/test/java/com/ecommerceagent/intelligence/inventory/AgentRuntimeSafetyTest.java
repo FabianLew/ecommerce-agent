@@ -429,6 +429,20 @@ class AgentRuntimeSafetyTest {
         assertThat(model.requests()).isEmpty();
     }
 
+    /** ADR-0027 criterion 32: when governance itself fails, no paid call is made. */
+    @Test
+    void aFailingGovernanceFailsClosed() {
+        for (String step : List.of("admit", "reserve", "markSent")) {
+            governance.breakStep(step);
+            model.thenText(pause());
+            AgentRunResult result = run();
+            assertThat(result.status()).as(step).isEqualTo(AgentRunStatus.MODEL_FAILED);
+            assertThat(result.succeeded()).isFalse();
+        }
+        assertThat(model.requests()).as("nothing reached the provider").isEmpty();
+        assertThat(governance.leases()).isEmpty();
+    }
+
     @Test
     void aTimeoutIsPossiblyChargedAndCountsAgainstTheRun() {
         model.thenFailure(ModelFailure.Type.TIMEOUT);

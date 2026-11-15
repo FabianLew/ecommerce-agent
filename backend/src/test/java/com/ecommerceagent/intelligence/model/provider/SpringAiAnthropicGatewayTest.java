@@ -142,6 +142,27 @@ class SpringAiAnthropicGatewayTest {
                 });
     }
 
+    /** ADR-0027 section 4.5: only a refusal before processing is known not to be charged. */
+    @Test
+    void onlyRefusalsBeforeProcessingAreConfirmedNotCharged() {
+        int[] statuses = {429, 529, 400, 500, 502, 503, 504, 408};
+        boolean[] notCharged = {true, true, true, false, false, false, false, false};
+        for (int status : statuses) {
+            stub.enqueue(status, AnthropicStubServer.error(status == 429 ? "rate_limit_error" : "api_error"));
+        }
+        for (int i = 0; i < statuses.length; i++) {
+            int index = i;
+            assertThatThrownBy(() -> gateway.complete(request(List.of(new ModelMessage.User("s" + index)))))
+                    .as("status %d", statuses[index])
+                    .isInstanceOfSatisfying(ModelFailure.class,
+                            failure -> assertThat(failure.confirmedNotCharged()).isEqualTo(notCharged[index]));
+        }
+        stub.enqueue(504, AnthropicStubServer.error("api_error"));
+        assertThatThrownBy(() -> gateway.complete(request(List.of(new ModelMessage.User("t")))))
+                .isInstanceOfSatisfying(ModelFailure.class,
+                        failure -> assertThat(failure.type()).isEqualTo(ModelFailure.Type.TIMEOUT));
+    }
+
     @Test
     void onlyAnthropicModelsAreAccepted() {
         assertThatThrownBy(() -> gateway.capabilities(new ModelId("other", "x")))
