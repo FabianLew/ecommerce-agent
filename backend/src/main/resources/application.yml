@@ -177,16 +177,7 @@ operator:
     #   inventory-agent:
     #     version: inventory-agent-run/3
     #     max-run-cost-usd: "0.08"
-    # USD per million tokens. Check against the provider before switching the agent on; change the version with it.
-    price-list:
-      version: anthropic-2026-11
-      models:
-        "[anthropic/claude-opus-5-5]":
-          input: "4.00"
-          output: "20.00"
-        "[anthropic/claude-sonnet-5-5]":
-          input: "2.00"
-          output: "10.00"
+    # Prices are not configured here: every cost comes from the catalog ai_price (ADR-0027 section 9).
 
 springdoc:
   api-docs:

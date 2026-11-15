@@ -333,6 +333,8 @@ class AiBudgetGovernorTest {
         assertThat(reserved.priceId()).isEqualTo(v3);
         assertThat(reserved.priceVersion()).isEqualTo("v3");
         assertThat(reserved.amount()).isEqualByComparingTo("0.25");
+        // A quote uses the same price and the same calculation as the reservation, and reserves nothing.
+        assertThat(governor.quote(estimate())).isEqualTo(new CostQuote.Priced(reserved.amount(), "USD", v3, "v3"));
         // No cache prices on v3: a call that may write the cache has no upper bound, so it is refused.
         assertThat(inScope(storeA, () -> governor.reserve(scope(storeA), new ReservationRequest("c-1", "inventory",
                 null, new AiCallEstimate("anthropic", model, "global", 100_000, 1, true, Map.of())))))
@@ -340,6 +342,9 @@ class AiBudgetGovernorTest {
 
         price("v4", "1.00", Instant.now().minus(10, ChronoUnit.MINUTES), Instant.now().minus(91, ChronoUnit.DAYS));
         assertThat(reserve(storeA, "s-1", "inventory")).isEqualTo(new ReservationDecision.Denied("PRICE_STALE"));
+        assertThat(governor.quote(estimate())).isEqualTo(new CostQuote.Unpriced("PRICE_STALE"));
+        assertThat(governor.quote(AiCallEstimate.of("anthropic", unpriced, "global", 100_000, 1)))
+                .isEqualTo(new CostQuote.Unpriced("NOT_PRICED"));
 
         assertThatThrownBy(() -> fixtures.sql("UPDATE ai_price SET input_per_mtok = 0 WHERE id = ?").param(v3).update())
                 .isInstanceOf(DataAccessException.class).rootCause().hasMessageContaining("append-only");

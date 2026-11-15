@@ -17,7 +17,48 @@ import com.ecommerceagent.identity.TrustedStoreScope;
  */
 public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedger, AiAdmission {
 
-    public static final BigDecimal AMOUNT = new BigDecimal("0.01");
+
+    /** USD per million input and output tokens, by model name; a model without an entry uses {@link #DEFAULT_PRICE}. */
+    public record Price(BigDecimal inputPerMillion, BigDecimal outputPerMillion) {
+
+        BigDecimal cost(long inputTokens, long outputTokens) {
+            return inputPerMillion.multiply(BigDecimal.valueOf(inputTokens))
+                    .add(outputPerMillion.multiply(BigDecimal.valueOf(outputTokens)))
+                    .divide(BigDecimal.valueOf(1_000_000), 6, java.math.RoundingMode.UP);
+        }
+    }
+
+    public static final Price DEFAULT_PRICE = new Price(new BigDecimal("4"), new BigDecimal("20"));
+
+    private final java.util.Map<String, Price> prices = new java.util.HashMap<>();
+    private final java.util.Map<String, String> unpriced = new java.util.HashMap<>();
+
+    /** Sets the catalog price of a model (by its name, without the provider). */
+    public synchronized InMemoryAiGovernance price(String model, String inputPerMillion, String outputPerMillion) {
+        prices.put(model, new Price(new BigDecimal(inputPerMillion), new BigDecimal(outputPerMillion)));
+        return this;
+    }
+
+    /** The catalog cannot price this model; quotes and reservations are refused with {@code reason}. */
+    public synchronized InMemoryAiGovernance unpriced(String model, String reason) {
+        unpriced.put(model, reason);
+        return this;
+    }
+
+    private Price priceOf(String model) {
+        return prices.getOrDefault(model, DEFAULT_PRICE);
+    }
+
+    @Override
+    public synchronized CostQuote quote(AiCallEstimate estimate) {
+        failIfBroken("quote");
+        String reason = unpriced.get(estimate.model());
+        if (reason != null) {
+            return new CostQuote.Unpriced(reason);
+        }
+        return new CostQuote.Priced(priceOf(estimate.model()).cost(estimate.estimatedInputTokens(),
+                estimate.maxOutputTokens()), "USD", UUID.randomUUID(), "in-memory");
+    }
 
     private final Map<String, Reservation> byKey = new LinkedHashMap<>();
     private final Map<UUID, Reservation> byId = new LinkedHashMap<>();
@@ -115,6 +156,8 @@ public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedg
         byId.clear();
         events.clear();
         denyReason = null;
+        prices.clear();
+        unpriced.clear();
     }
 
     @Override
@@ -123,6 +166,11 @@ public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedg
         if (denyReason != null) {
             events.add("DENIED:" + denyReason);
             return new ReservationDecision.Denied(denyReason);
+        }
+        String unpricedReason = unpriced.get(request.estimate().model());
+        if (unpricedReason != null) {
+            events.add("DENIED:" + unpricedReason);
+            return new ReservationDecision.Denied(unpricedReason);
         }
         Reservation existing = byKey.get(request.idempotencyKey());
         if (existing != null) {
@@ -136,8 +184,10 @@ public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedg
         return reserved(reservation, false);
     }
 
-    private static ReservationDecision.Reserved reserved(Reservation reservation, boolean repeated) {
-        return new ReservationDecision.Reserved(reservation.id, AMOUNT, "USD", UUID.randomUUID(), "in-memory",
+    private ReservationDecision.Reserved reserved(Reservation reservation, boolean repeated) {
+        BigDecimal amount = priceOf(reservation.estimate.model()).cost(reservation.estimate.estimatedInputTokens(),
+                reservation.estimate.maxOutputTokens());
+        return new ReservationDecision.Reserved(reservation.id, amount, "USD", UUID.randomUUID(), "in-memory",
                 reservation.estimate.estimatedInputTokens(), reservation.estimate.maxOutputTokens(), repeated,
                 reservation.state);
     }
@@ -175,8 +225,10 @@ public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedg
         reservation.state = "SETTLED";
         reservation.usage = usage;
         events.add("SETTLED:" + reservation.key + ":" + usage.inputTokens() + "/" + usage.outputTokens());
-        BigDecimal cost = BigDecimal.valueOf(usage.inputTokens() + usage.outputTokens(), 6);
-        return new Settlement("SETTLED", cost, cost.subtract(AMOUNT).max(BigDecimal.ZERO), false);
+        BigDecimal cost = priceOf(reservation.estimate.model()).cost(usage.inputTokens(), usage.outputTokens());
+        BigDecimal reserved = priceOf(reservation.estimate.model()).cost(reservation.estimate.estimatedInputTokens(),
+                reservation.estimate.maxOutputTokens());
+        return new Settlement("SETTLED", cost, cost.subtract(reserved).max(BigDecimal.ZERO), false);
     }
 
     @Override

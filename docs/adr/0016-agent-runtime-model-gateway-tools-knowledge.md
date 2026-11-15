@@ -113,8 +113,8 @@ enters the existing episode workflow without weakening it.
   ADR-0027. Real store data reaches a model only through Bedrock in the EU, the only AWS service the pilot needs.
 - The agent path needs an approved API key, a data-processing review (EU data residency is still to be verified,
   plan decision I2) and the quality report before `operator.agent.enabled` is switched on anywhere.
-- The price list is configuration with a version; it must be checked against the provider before the agent is used,
-  and changing it needs a new version string.
+- Prices are the versioned catalog `ai_price` of ADR-0027 (section 9), the only price source; a price must be
+  verified against the provider before the agent is used (superseded the configured price list, E-54.2).
 - Opus-class models think adaptively and thinking counts as output, so the run limits of document 02 may be tight;
   the quality report measures stop reasons and cost, and the limits are changed only with a new ADR revision.
 - Two activity paths exist in the workflow until old episodes have finished.

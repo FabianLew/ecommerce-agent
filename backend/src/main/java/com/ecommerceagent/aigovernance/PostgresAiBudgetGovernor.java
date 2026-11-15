@@ -32,29 +32,61 @@ class PostgresAiBudgetGovernor implements AiBudgetGovernor {
     }
 
     @Override
+    public CostQuote quote(AiCallEstimate estimate) {
+        return switch (price(estimate, clock.instant())) {
+            case Priced p -> new CostQuote.Priced(p.cost.amount(), p.price.currency(), p.price.id(),
+                    p.price.priceVersion());
+            case Unpriced u -> new CostQuote.Unpriced(u.reason);
+        };
+    }
+
+    private sealed interface Pricing {
+    }
+
+    private record Priced(AiPrice price, CostCalculator.MaxCost cost) implements Pricing {
+    }
+
+    private record Unpriced(String reason) implements Pricing {
+    }
+
+    /** The current, verified price and the call's conservative maximum cost; shared by quotes and reservations. */
+    private Pricing price(AiCallEstimate estimate, Instant now) {
+        Optional<AiPrice> found = catalog.current(estimate.provider(), estimate.model(), estimate.region(), now);
+        if (found.isEmpty()) {
+            return new Unpriced("NOT_PRICED");
+        }
+        AiPrice price = found.get();
+        if (price.verifiedAt() == null) {
+            return new Unpriced("PRICE_UNVERIFIED");
+        }
+        if (price.verifiedAt().isBefore(now.minus(settings.priceMaxVerificationAge()))) {
+            return new Unpriced("PRICE_STALE");
+        }
+        Optional<String> unbounded = CostCalculator.unboundedReason(price, estimate);
+        if (unbounded.isPresent()) {
+            return new Unpriced(unbounded.get());
+        }
+        CostCalculator.MaxCost cost = CostCalculator.maxCost(price, estimate, settings.inputTokenMargin());
+        if (cost.maxInputTokens() > Integer.MAX_VALUE || cost.maxOutputTokens() > Integer.MAX_VALUE) {
+            return new Unpriced("TOKEN_LIMIT_TOO_LARGE");
+        }
+        return new Priced(price, cost);
+    }
+
+    @Override
     public ReservationDecision reserve(TrustedStoreScope scope, ReservationRequest request) {
         requireBound(scope);
         Instant now = clock.instant();
         AiCallEstimate estimate = request.estimate();
-        Optional<AiPrice> found = catalog.current(estimate.provider(), estimate.model(), estimate.region(), now);
-        if (found.isEmpty()) {
-            return new ReservationDecision.Denied("NOT_PRICED");
+        Priced priced;
+        switch (price(estimate, now)) {
+            case Priced p -> priced = p;
+            case Unpriced u -> {
+                return new ReservationDecision.Denied(u.reason);
+            }
         }
-        AiPrice price = found.get();
-        if (price.verifiedAt() == null) {
-            return new ReservationDecision.Denied("PRICE_UNVERIFIED");
-        }
-        if (price.verifiedAt().isBefore(now.minus(settings.priceMaxVerificationAge()))) {
-            return new ReservationDecision.Denied("PRICE_STALE");
-        }
-        Optional<String> unbounded = CostCalculator.unboundedReason(price, estimate);
-        if (unbounded.isPresent()) {
-            return new ReservationDecision.Denied(unbounded.get());
-        }
-        CostCalculator.MaxCost cost = CostCalculator.maxCost(price, estimate, settings.inputTokenMargin());
-        if (cost.maxInputTokens() > Integer.MAX_VALUE || cost.maxOutputTokens() > Integer.MAX_VALUE) {
-            return new ReservationDecision.Denied("TOKEN_LIMIT_TOO_LARGE");
-        }
+        AiPrice price = priced.price;
+        CostCalculator.MaxCost cost = priced.cost;
         Instant expiresAt = now.plus(settings.reservationTimeout());
         return jdbc.sql("""
                         SELECT reservation_id, outcome, reason, state, amount

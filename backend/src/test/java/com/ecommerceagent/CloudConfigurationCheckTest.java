@@ -97,6 +97,16 @@ class CloudConfigurationCheckTest {
         assertThat(CloudConfigurationCheck.problems(versioned)).isEmpty();
     }
 
+    /** ADR-0027 section 9: the catalog is the only price source, so a configured price list is refused. */
+    @Test
+    void aConfiguredPriceListIsRefused() {
+        MockEnvironment environment = cloud()
+                .withProperty("operator.agent.price-list.models[anthropic/claude-opus-5-5].input", "4.00");
+
+        assertThat(CloudConfigurationCheck.problems(environment))
+                .containsExactly("operator.agent.price-list is no longer read; prices come from the catalog ai_price");
+    }
+
     private static MockEnvironment cloud() {
         MockEnvironment environment = new MockEnvironment()
                 .withProperty("spring.datasource.url", "jdbc:postgresql://db.internal.example:5432/operator")
