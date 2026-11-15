@@ -2,6 +2,7 @@ package com.ecommerceagent.automation.guardian;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.ecommerceagent.automation.TaskQueues;
@@ -17,7 +18,10 @@ import com.ecommerceagent.decisions.ProposalStatus;
 import com.ecommerceagent.decisions.ProposalSubmission;
 import com.ecommerceagent.decisions.Recommendation;
 import com.ecommerceagent.identity.TrustedStoreScope;
+import com.ecommerceagent.decisions.Proposer;
+import com.ecommerceagent.decisions.StoredProposal;
 import com.ecommerceagent.intelligence.inventory.BaselineProposer;
+import com.ecommerceagent.intelligence.inventory.InventoryAgentProposer;
 import com.ecommerceagent.intelligence.inventory.InventoryContext;
 import com.ecommerceagent.intelligence.inventory.InventoryContextBuilder;
 import com.ecommerceagent.metrics.CanonicalJson;
@@ -33,6 +37,7 @@ public class GuardianActivitiesImpl implements GuardianActivities {
     private final InventoryContextBuilder contexts;
     private final ContextSnapshots snapshots;
     private final BaselineProposer baseline;
+    private final InventoryAgentProposer agent;
     private final DecisionProposals proposals;
     private final PolicyEvaluations policies;
     private final GuardianSettings settings;
@@ -40,12 +45,13 @@ public class GuardianActivitiesImpl implements GuardianActivities {
     private final Clock clock;
 
     GuardianActivitiesImpl(Opportunities opportunities, InventoryContextBuilder contexts, ContextSnapshots snapshots,
-            BaselineProposer baseline, DecisionProposals proposals, PolicyEvaluations policies,
-            GuardianSettings settings, TransactionTemplate transactions, Clock clock) {
+            BaselineProposer baseline, InventoryAgentProposer agent, DecisionProposals proposals,
+            PolicyEvaluations policies, GuardianSettings settings, TransactionTemplate transactions, Clock clock) {
         this.opportunities = opportunities;
         this.contexts = contexts;
         this.snapshots = snapshots;
         this.baseline = baseline;
+        this.agent = agent;
         this.proposals = proposals;
         this.policies = policies;
         this.settings = settings;
@@ -81,11 +87,50 @@ public class GuardianActivitiesImpl implements GuardianActivities {
         if (!submission.accepted()) {
             return new ProposalOutcome(null, null, String.join(",", submission.codes()), null);
         }
-        Recommendation accepted = submission.proposal().proposal().recommendation();
+        return outcome(submission.proposal(), null);
+    }
+
+    @Override
+    public ProposalOutcome proposeAndPersist(String opportunityId, String snapshotId) {
+        TrustedStoreScope scope = ActivityStoreScope.current();
+        UUID opportunity = UUID.fromString(opportunityId);
+        UUID snapshotKey = UUID.fromString(snapshotId);
+        // A retried step finds the proposal it already stored for this snapshot.
+        Optional<StoredProposal> stored = proposals.ofOpportunity(scope, opportunity).stream()
+                .filter(proposal -> proposal.proposal().contextSnapshotId().equals(snapshotKey))
+                .reduce((first, second) -> second);
+        if (stored.isPresent()) {
+            return outcome(stored.get(), null);
+        }
+        ContextSnapshot snapshot = snapshots.find(scope, snapshotKey).orElseThrow();
+        String fallback = agent.enabled() ? "AGENT_FAILED" : "AGENT_DISABLED";
+        Optional<InventoryAgentProposer.AgentProposal> proposal = agent.propose(scope, opportunity, snapshot);
+        if (proposal.isPresent()) {
+            ProposalSubmission submission = proposals.submit(scope, opportunity, snapshotKey,
+                    proposal.get().proposer(), proposal.get().agentRunId(), proposal.get().recommendation(),
+                    settings.proposalTtl());
+            if (submission.accepted()) {
+                return outcome(submission.proposal(), null);
+            }
+            agent.rejected(scope, proposal.get().agentRunId(), submission.codes());
+            fallback = "AGENT_PROPOSAL_REJECTED:" + String.join(",", submission.codes());
+        }
+        Proposer proposer = BaselineProposer.PROPOSER;
+        ProposalSubmission submission = proposals.submit(scope, opportunity, snapshotKey, proposer, null,
+                ProposalJson.write(baseline.propose(InventoryContext.of(snapshot))), settings.proposalTtl());
+        if (!submission.accepted()) {
+            return new ProposalOutcome(null, null, String.join(",", submission.codes()), null,
+                    proposer.kind().name(), fallback);
+        }
+        return outcome(submission.proposal(), fallback);
+    }
+
+    private ProposalOutcome outcome(StoredProposal stored, String fallback) {
+        Recommendation accepted = stored.proposal().recommendation();
         Long review = accepted.monitorPlan() == null ? null
                 : Math.max(1, Duration.between(clock.instant(), accepted.monitorPlan().nextReviewAt()).toSeconds());
-        return new ProposalOutcome(submission.proposal().proposal().proposalId().toString(),
-                accepted.disposition().name(), null, review);
+        return new ProposalOutcome(stored.proposal().proposalId().toString(), accepted.disposition().name(), null,
+                review, stored.proposal().proposer().kind().name(), fallback);
     }
 
     @Override

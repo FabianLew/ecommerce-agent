@@ -18,6 +18,8 @@ import org.slf4j.Logger;
 @WorkflowImpl(taskQueues = TaskQueues.MAIN)
 public class InventoryGuardianWorkflowImpl implements InventoryGuardianWorkflow {
 
+    /** Episodes started before ADR-0016 replay with the baseline-only steps. */
+    static final String AGENT_PROPOSER_CHANGE = "agent-proposer";
     private static final Logger log = Workflow.getLogger(InventoryGuardianWorkflowImpl.class);
 
     private final GuardianActivities activities = Workflow.newActivityStub(GuardianActivities.class,
@@ -30,6 +32,17 @@ public class InventoryGuardianWorkflowImpl implements InventoryGuardianWorkflow 
                             .build())
                     .build());
 
+    /** The agent path (ADR-0016): model attempts take longer than the other steps; the step itself is idempotent. */
+    private final GuardianActivities proposing = Workflow.newActivityStub(GuardianActivities.class,
+            ActivityOptions.newBuilder()
+                    .setStartToCloseTimeout(Duration.ofMinutes(5))
+                    .setRetryOptions(RetryOptions.newBuilder()
+                            .setInitialInterval(Duration.ofSeconds(10))
+                            .setBackoffCoefficient(2)
+                            .setMaximumAttempts(3)
+                            .build())
+                    .build());
+
     private int analyses;
     private int dataRetries;
     private int signals;
@@ -39,6 +52,8 @@ public class InventoryGuardianWorkflowImpl implements InventoryGuardianWorkflow 
     private String policyOutcome;
     private String rejectionCodes;
     private String analyzedCover;
+    private String proposerKind;
+    private String agentFallback;
     private boolean resolved;
     private boolean reanalyze;
     private boolean finished;
@@ -94,9 +109,15 @@ public class InventoryGuardianWorkflowImpl implements InventoryGuardianWorkflow 
         analyses++;
         ContextRef context = activities.buildContext(input.opportunityId());
         analyzedCover = context.daysOfCover();
-        String recommendation = activities.propose(context.snapshotId());
-        ProposalOutcome outcome = activities.validateAndPersist(input.opportunityId(), context.snapshotId(),
-                recommendation);
+        ProposalOutcome outcome;
+        if (Workflow.getVersion(AGENT_PROPOSER_CHANGE, Workflow.DEFAULT_VERSION, 1) == Workflow.DEFAULT_VERSION) {
+            String recommendation = activities.propose(context.snapshotId());
+            outcome = activities.validateAndPersist(input.opportunityId(), context.snapshotId(), recommendation);
+        } else {
+            outcome = proposing.proposeAndPersist(input.opportunityId(), context.snapshotId());
+            proposerKind = outcome.proposerKind();
+            agentFallback = outcome.agentFallback();
+        }
         proposalId = outcome.proposalId();
         disposition = outcome.disposition();
         rejectionCodes = outcome.rejectionCodes();
@@ -163,7 +184,7 @@ public class InventoryGuardianWorkflowImpl implements InventoryGuardianWorkflow 
     @Override
     public GuardianStatus status() {
         return new GuardianStatus(analyses, opportunityStatus, proposalId, disposition, policyOutcome, rejectionCodes,
-                signals, finished);
+                signals, finished, proposerKind, agentFallback);
     }
 
     /** A change of days of cover by at least the significant amount, or cover becoming known. */

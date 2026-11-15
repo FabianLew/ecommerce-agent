@@ -14,6 +14,12 @@ public interface GuardianActivities {
 
     ProposalOutcome validateAndPersist(String opportunityId, String snapshotId, String recommendation);
 
+    /**
+     * The agent's proposal for the snapshot, validated and stored; the baseline's when the agent is off, fails, or
+     * its proposal is rejected (ADR-0016 point 8). Idempotent per snapshot.
+     */
+    ProposalOutcome proposeAndPersist(String opportunityId, String snapshotId);
+
     /** Evaluates and records the policy for the proposal's action; returns the outcome. */
     String evaluatePolicy(String proposalId);
 

@@ -211,7 +211,7 @@ class InventoryGuardianWorkflowTest {
         WorkflowReplayer.replayWorkflowExecution(history, InventoryGuardianWorkflowImpl.class);
         // ./gradlew test -PrecordTemporalFixtures refreshes the fixture after an intentional, versioned change.
         if (Boolean.getBoolean("recordTemporalFixtures")) {
-            Files.writeString(Path.of("src/test/resources/temporal/inventory-guardian-v1.json"),
+            Files.writeString(Path.of("src/test/resources/temporal/inventory-guardian-v2-baseline.json"),
                     history.toJson(true));
         }
     }
@@ -233,7 +233,13 @@ class InventoryGuardianWorkflowTest {
 
     @Test
     void recordedGuardianHistoryStillReplays() throws Exception {
+        // v1: before the agent proposer (ADR-0016) — replays on the baseline-only steps.
         WorkflowReplayer.replayWorkflowExecutionFromResource("temporal/inventory-guardian-v1.json",
+                InventoryGuardianWorkflowImpl.class);
+        // v2: proposeAndPersist, with the agent off and with the agent on.
+        WorkflowReplayer.replayWorkflowExecutionFromResource("temporal/inventory-guardian-v2-baseline.json",
+                InventoryGuardianWorkflowImpl.class);
+        WorkflowReplayer.replayWorkflowExecutionFromResource("temporal/inventory-guardian-v2.json",
                 InventoryGuardianWorkflowImpl.class);
     }
 
