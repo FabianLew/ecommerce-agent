@@ -110,5 +110,10 @@ enters the existing episode workflow without weakening it.
   inside Spring AI, the tool result goes back with its id, usage and finish reason are mapped, failures are typed.
 - Runtime safety suite on a fake gateway, merge-blocking (B-36): IG-07, IG-11, IG-22, IG-24, IG-28, every limit, the
   hooks, idempotency of the activity and the fallback to the baseline.
+- Quality report (B-36): `QualityReportTest` runs every case of `evals/cases.jsonl` through the baseline (which
+  must meet all of them) and writes `build/reports/quality/inventory-guardian.{md,json}`. `LiveQualityReportTest`
+  adds the agent column on the configured model policy only with `OPERATOR_QUALITY_LIVE=true`, an API key and an
+  explicit `OPERATOR_ANTHROPIC_BASE_URL`; it reports agreement, stop reasons, calls and cost and never asserts
+  agreement.
 - `InventoryGuardianWorkflowTest` runs the scenario with the agent switched off (baseline) and on (fake gateway), and
   replays the recorded histories of the old path.
