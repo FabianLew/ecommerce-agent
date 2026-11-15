@@ -20,7 +20,7 @@ Statuses: `Proposed` → `Accepted` (after the owner accepts it in a PR) → opt
 | [0011](0011-evidence-snapshot-risk-detection-opportunity.md) | Evidence, ContextSnapshot, risk detector and the Opportunity episode | Accepted |
 | [0012](0012-decision-proposal-v1-policy-evaluation.md) | DecisionProposal v1, policy evaluation and InventoryGuardianWorkflow in shadow mode | Accepted |
 | [0013](0013-ui-languages.md) | Interface languages (English default, Polish second) | Accepted |
-| [0014](0014-decision-and-activity-read-api.md) | Decision and activity read API | Proposed |
-| [0015](0015-woocommerce-order-history-import.md) | WooCommerce order history import (12 months) in the background | Proposed |
+| [0014](0014-decision-and-activity-read-api.md) | Decision and activity read API | Accepted |
+| [0015](0015-woocommerce-order-history-import.md) | WooCommerce order history import (12 months) in the background | Accepted |
 
 Template: [0000-template.md](0000-template.md).

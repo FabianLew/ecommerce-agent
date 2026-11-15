@@ -1,6 +1,6 @@
 # ADR-0014: Decision and activity read API
 
-- Status: Proposed
+- Status: Accepted (PR merge, 2026-11-15)
 - Date: 2026-11-14
 - Related: 04 §3 (transport conventions, shared DTOs), 04 §5 (Decision Inbox and Detail), 04 §9 (Activity
   History), ADR-0004 (store scope, audit), ADR-0011 (evidence, snapshot, Opportunity), ADR-0012 (DecisionProposal
