@@ -69,6 +69,7 @@ class AiUsageLedgerTest {
 
     @BeforeEach
     void setUp() {
+        fixtures.registerAutomations("inventory");
         organization = UUID.randomUUID();
         storeA = UUID.randomUUID();
         storeB = UUID.randomUUID();

@@ -31,7 +31,9 @@ public interface AiAdmission {
         /** The platform already has as many active runs as its limit allows. */
         GLOBAL_LIMIT,
         /** The run was admitted before and its lease ended: a run is admitted once. */
-        LEASE_ENDED;
+        LEASE_ENDED,
+        /** The automation is not registered in {@code ai_automation_type} (fail closed). */
+        UNKNOWN_AUTOMATION;
 
         public boolean granted() {
             return this == GRANTED;

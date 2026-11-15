@@ -861,3 +861,12 @@ Also in this review: the failure classification of section 4.5 replaced the earl
 rule with the explicit rule set `anthropic-charge/1`, with regression tests per status and error type, for errors
 after a stream started and for calls that were never sent.
 
+
+### Stage 2 implementation status (E-54)
+
+- **E-54.1, platform independence.** Automations are registered identifiers in `ai_automation_type` (V34), added
+  only by a migration; budget policies, leases and reservations reference it, and `ai_acquire_run_lease` answers
+  `UNKNOWN_AUTOMATION` for an unregistered one (the run ends `MODEL_FAILED`, nothing is reserved).
+  `AiGovernancePlatformIndependenceTest` fails the build when the governance module depends on anything but
+  `identity`, when the governed model path depends on an integration, commerce or automation module, or when a
+  governance source or migration names a commerce or ad platform.
