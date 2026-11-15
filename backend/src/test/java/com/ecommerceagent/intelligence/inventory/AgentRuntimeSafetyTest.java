@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.ecommerceagent.aigovernance.InMemoryAiGovernance;
+import com.ecommerceagent.aigovernance.SendDecision;
 import com.ecommerceagent.decisions.ContextSnapshot;
 import com.ecommerceagent.decisions.RiskDetectorSettings;
 import com.ecommerceagent.identity.TestScopes;
@@ -636,6 +637,46 @@ class AgentRuntimeSafetyTest {
                 .containsExactly("ADMISSION:GRANTED:1", "ADMISSION:GRANTED:1");
         assertThat(governance.events()).filteredOn("LEASE_RELEASED"::equals).hasSize(2);
         assertThat(governance.leases()).isEmpty();
+    }
+
+    /** ADR-0027 section 12 (E-54.8): a store stop ends a running run before its next call, like the platform stop. */
+    @Test
+    void aStoreStopEndsARunningRunBeforeItsNextCall() {
+        assertAScopedStopEndsTheRun(SendDecision.STORE_STOPPED);
+    }
+
+    /** ADR-0027 section 12 (E-54.8): so does an automation stop. */
+    @Test
+    void anAutomationStopEndsARunningRunBeforeItsNextCall() {
+        assertAScopedStopEndsTheRun(SendDecision.AUTOMATION_STOPPED);
+    }
+
+    private void assertAScopedStopEndsTheRun(SendDecision stop) {
+        hooks = List.of(new AgentHook() {
+            int calls;
+
+            @Override
+            public void beforeModelCall(AgentRunContext run, ModelRequest request) {
+                if (++calls == 2) {
+                    governance.stop(stop);
+                }
+            }
+        });
+        model.thenTools(call("t1", InventoryReadTools.FORECAST, "{\"productVariantId\":\"" + VARIANT + "\"}"))
+                .thenText(pause());
+
+        var decision = proposer().decide(scope, SnapshotFixture.OPPORTUNITY, snapshot);
+
+        assertThat(decision.proposal()).isEmpty();
+        assertThat(decision.fallback()).isEqualTo("AI_GOVERNANCE:" + stop.name());
+        assertThat(model.requests()).as("the second call was reserved but never sent").hasSize(1);
+        assertThat(runs.only().status()).isEqualTo(AgentRunStatus.STOPPED);
+        assertThat(runs.only().stopReason()).isEqualTo("AI_GOVERNANCE:" + stop.name());
+        assertThat(governance.leases()).isEmpty();
+
+        var next = proposer().decide(scope, SnapshotFixture.OPPORTUNITY, snapshot(UUID.randomUUID(), 0));
+        assertThat(next.fallback()).as("no new run is admitted").isEqualTo("AI_GOVERNANCE:" + stop.name());
+        assertThat(model.requests()).hasSize(1);
     }
 
     /** ADR-0027 section 12: the stop takes effect before the next call of a running run, without a restart. */

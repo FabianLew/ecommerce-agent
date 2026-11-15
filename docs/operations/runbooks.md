@@ -135,6 +135,18 @@ proposing and store monitoring continues; the stop of business mutations (ADR-00
   in the history, and the newest row is the current state.
 - The alert repeats while the stop is on, so a forgotten stop is noticed.
 
+### AI stopped for a store or an automation
+
+A platform operator stopped AI for one store, for one automation on every store, or for one automation on one store
+(ADR-0027 section 12), and it has been on for a day. Like the platform stop it refuses new runs and every reserved
+call not yet sent, and the baseline keeps proposing. The stops are independent: resuming one, or the platform stop,
+never resumes another, and none is switched on automatically.
+
+- See what is stopped and why: `GET /api/v1/platform/ai/stops` (history: `/stops/history`).
+- Stop or resume, as a platform operator: `POST /api/v1/platform/ai/stops` with `storeId`, `automationType` (either or
+  both) and `stopped`, `reason`. Every decision is kept and audited (`AI_STOPPED_SCOPED`, `AI_RESUMED_SCOPED`).
+- Confirm with the person who stopped it that it is still intended.
+
 ### AI admission denied
 
 Agent runs were not admitted because the store or the platform reached its limit of active runs

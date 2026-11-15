@@ -86,6 +86,45 @@ class PlatformAiApiTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void onlyAPlatformOperatorStopsAndResumesAi() throws Exception {
+        String member = "member-" + UUID.randomUUID();
+        String operator = "ops-" + UUID.randomUUID();
+        String automation = "api-stop-" + UUID.randomUUID().toString().substring(0, 8);
+        fixtures.registerAutomations(automation);
+        String stop = "{\"automationType\":\"" + automation + "\",\"stopped\":true,\"reason\":\"Regression\"}";
+        String resume = "{\"automationType\":\"" + automation + "\",\"stopped\":false,\"reason\":\"Fixed\"}";
+
+        mvc.perform(post("/api/v1/platform/ai/stops").with(user(member)).contentType(MediaType.APPLICATION_JSON)
+                .content(stop)).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/platform/ai/stops").with(user(member))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/platform/ai/stops/history").with(user(member))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/platform/ai/stops").with(user(operator))).andExpect(status().isForbidden());
+        fixtures.sql("""
+                        INSERT INTO platform_operator (user_id, granted_by, reason)
+                        SELECT id, 'ops:test', 'test' FROM app_user WHERE issuer = ? AND subject = ?
+                        """).params(ISSUER, operator).update();
+
+        mvc.perform(post("/api/v1/platform/ai/stops").with(user(operator)).contentType(MediaType.APPLICATION_JSON)
+                .content(stop)).andExpect(status().isOk()).andExpect(jsonPath("$.changed").value(true));
+        mvc.perform(post("/api/v1/platform/ai/stops").with(user(operator)).contentType(MediaType.APPLICATION_JSON)
+                .content(stop)).andExpect(status().isOk()).andExpect(jsonPath("$.changed").value(false));
+        mvc.perform(get("/api/v1/platform/ai/stops").with(user(operator))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[?(@.automationType == '" + automation + "')].level").value("AUTOMATION"));
+        mvc.perform(post("/api/v1/platform/ai/stops").with(user(operator)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"stopped\":true,\"reason\":\"everything\"}")).andExpect(status().is(422));
+        mvc.perform(post("/api/v1/platform/ai/stops").with(user(operator)).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"storeId\":\"" + UUID.randomUUID() + "\",\"stopped\":true,\"reason\":\"x\"}"))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/api/v1/platform/ai/stops").with(user(operator)).contentType(MediaType.APPLICATION_JSON)
+                .content(resume)).andExpect(status().isOk()).andExpect(jsonPath("$.changed").value(true));
+        mvc.perform(get("/api/v1/platform/ai/stops/history").param("limit", "5").with(user(operator)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].automationType").value(automation))
+                .andExpect(jsonPath("$.items[0].stopped").value(false))
+                .andExpect(jsonPath("$.items[1].stopped").value(true));
+    }
+
     static RequestPostProcessor user(String subject) {
         return jwt().jwt(token -> token.issuer(ISSUER).subject(subject).claim("email", subject + "@shop.test"));
     }

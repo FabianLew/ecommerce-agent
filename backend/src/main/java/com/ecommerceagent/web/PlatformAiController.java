@@ -8,6 +8,8 @@ import java.util.UUID;
 import com.ecommerceagent.aigovernance.Adjustment;
 import com.ecommerceagent.aigovernance.AiReconciliation;
 import com.ecommerceagent.aigovernance.AiReconciliationException;
+import com.ecommerceagent.aigovernance.AiStopChange;
+import com.ecommerceagent.aigovernance.AiStops;
 import com.ecommerceagent.aigovernance.ReconciliationOutcome;
 import com.ecommerceagent.aigovernance.Settlement;
 import com.ecommerceagent.aigovernance.UncertainReservation;
@@ -24,23 +26,52 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Platform operations on AI spending (ADR-0027 sections 4.5 and 15), for platform operators only: the calls whose
- * cost is not confirmed, their reconciliation and the correction of a conservative one. Store members get 403 like
+ * Platform operations on AI spending (ADR-0027 sections 4.5, 12 and 15), for platform operators only: the calls whose
+ * cost is not confirmed, their reconciliation and the correction of a conservative one, and the scoped AI stops. Store members get 403 like
  * anyone else who is not listed in {@code platform_operator}.
  */
 @RestController
-@RequestMapping("/api/v1/platform/ai/reservations")
+@RequestMapping("/api/v1/platform/ai")
 class PlatformAiController {
 
     private final PlatformOperators operators;
     private final AiReconciliation reconciliation;
+    private final AiStops stops;
 
-    PlatformAiController(PlatformOperators operators, AiReconciliation reconciliation) {
+    PlatformAiController(PlatformOperators operators, AiReconciliation reconciliation, AiStops stops) {
         this.operators = operators;
         this.reconciliation = reconciliation;
+        this.stops = stops;
     }
 
-    @GetMapping("/uncertain")
+    /** The scoped AI stops in force now (the platform stop is shown by the {@code operator_ai_stopped} gauge). */
+    @GetMapping("/stops")
+    ListResponse<AiStopDto> activeAiStops(RegisteredUser user) {
+        PlatformOperator operator = operators.require(user.id());
+        return ListResponse.complete(stops.active(operator).stream().map(AiStopDto::from).toList());
+    }
+
+    /** Every stop and resume decision, newest first. */
+    @GetMapping("/stops/history")
+    ListResponse<AiStopDto> aiStopHistory(RegisteredUser user,
+            @RequestParam(name = "limit", defaultValue = "100") int limit) {
+        if (limit < 1 || limit > 1000) {
+            throw new InvalidQueryException("INVALID_LIMIT");
+        }
+        PlatformOperator operator = operators.require(user.id());
+        return ListResponse.complete(stops.history(operator, limit).stream().map(AiStopDto::from).toList());
+    }
+
+    /** Stops or resumes AI for a store, an automation on every store, or an automation on one store. */
+    @PostMapping("/stops")
+    AiStopChangeResponse changeAiStop(RegisteredUser user, @RequestBody AiStopRequest body) {
+        PlatformOperator operator = operators.require(user.id());
+        boolean changed = stops.change(operator, body.storeId(), body.automationType(), body.stopped(),
+                body.reason());
+        return new AiStopChangeResponse(changed);
+    }
+
+    @GetMapping("/reservations/uncertain")
     ListResponse<UncertainReservationDto> uncertainReservations(RegisteredUser user,
             @RequestParam(name = "limit", defaultValue = "100") int limit) {
         if (limit < 1 || limit > 500) {
@@ -51,7 +82,7 @@ class PlatformAiController {
                 .map(UncertainReservationDto::from).toList());
     }
 
-    @PostMapping("/{reservationId}/reconciliation")
+    @PostMapping("/reservations/{reservationId}/reconciliation")
     ReconciliationResponse reconcileReservation(RegisteredUser user, @PathVariable UUID reservationId,
             @RequestBody ReconciliationRequest body) {
         PlatformOperator operator = operators.require(user.id());
@@ -60,7 +91,7 @@ class PlatformAiController {
         return new ReconciliationResponse(settlement.outcome(), settlement.cost(), null, settlement.repeated());
     }
 
-    @PostMapping("/{reservationId}/correction")
+    @PostMapping("/reservations/{reservationId}/correction")
     ReconciliationResponse correctReservation(RegisteredUser user, @PathVariable UUID reservationId,
             @RequestBody ReconciliationRequest body) {
         PlatformOperator operator = operators.require(user.id());
@@ -75,6 +106,39 @@ class PlatformAiController {
             return ReconciliationOutcome.valueOf(String.valueOf(value));
         } catch (IllegalArgumentException e) {
             throw new AiReconciliationException(AiReconciliationException.Kind.INVALID, "UNKNOWN_OUTCOME", e);
+        }
+    }
+
+    record AiStopRequest(
+            @Schema(description = "The store; null for an automation on every store") UUID storeId,
+            @Schema(description = "The automation; null for every automation of the store") String automationType,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "true stops AI, false resumes it")
+            boolean stopped,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "Why, 1 to 500 characters")
+            String reason) {
+    }
+
+    record AiStopChangeResponse(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED,
+                    description = "false when the target was already in that state; nothing was recorded")
+            boolean changed) {
+    }
+
+    record AiStopDto(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long id,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED,
+                    description = "STORE, AUTOMATION or STORE_AUTOMATION") String level,
+            UUID organizationId,
+            UUID storeId,
+            String automationType,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean stopped,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String reason,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String changedBy,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant changedAt) {
+
+        static AiStopDto from(AiStopChange c) {
+            return new AiStopDto(c.id(), c.level(), c.organizationId(), c.storeId(), c.automationType(), c.stopped(),
+                    c.reason(), c.changedBy(), c.changedAt());
         }
     }
 

@@ -14,5 +14,14 @@ public enum SendDecision {
     /** The reservation was released; a new call needs a new reservation. */
     RELEASED,
     /** AI is stopped for the platform (ADR-0027 section 12): nothing is sent, and the reservation was released. */
-    STOPPED
+    STOPPED,
+    /** AI is stopped for the store: nothing is sent, and the reservation was released. */
+    STORE_STOPPED,
+    /** AI is stopped for the automation (on every store or on this one): nothing is sent, the reservation released. */
+    AUTOMATION_STOPPED;
+
+    /** One of the stops: the run must end, whatever its limits say. */
+    public boolean stopped() {
+        return this == STOPPED || this == STORE_STOPPED || this == AUTOMATION_STOPPED;
+    }
 }
