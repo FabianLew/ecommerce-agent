@@ -50,7 +50,14 @@ export default async function NotificationsPage({
                 <span className={`badge${item.severity === "CRITICAL" ? " badge-error" : ""}`}>
                   {t.severity[item.severity] ?? item.severity}
                 </span>{" "}
-                {t.text(item.kind, ad, p.sku ?? p.variantName ?? "—", item.code ?? "—")}{" "}
+                {t.text(
+                  item.kind,
+                  ad,
+                  p.sku ?? p.variantName ?? "—",
+                  item.code ?? "—",
+                  p.daysOfCover ?? "—",
+                  p.warningDays ?? "—",
+                )}{" "}
                 <span className="muted">{formatInstant(item.createdAt, timezone, locale)}</span>{" "}
                 {item.proposalId ? <Link href={decisionPath(storeId, item.proposalId)}>{t.open}</Link> : null}{" "}
                 {item.read ? (

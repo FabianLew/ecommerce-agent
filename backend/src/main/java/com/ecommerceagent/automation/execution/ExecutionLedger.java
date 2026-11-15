@@ -4,6 +4,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -143,6 +144,34 @@ public class ExecutionLedger {
                 .update();
     }
 
+    /** The limits of the policy evaluation an action was authorised under (ADR-0026 point 6). */
+    record Limits(int maxPausesPerStore24h, Duration cooldownPerAd) {
+
+        /** Policy {@code inventory-protection@1.0.0} did not record its limits; these were its only values. */
+        static final Limits V1_0_0 = new Limits(3, Duration.ofHours(24));
+    }
+
+    Limits limits(TrustedStoreScope scope, UUID authorizedActionId) {
+        return jdbc.sql("""
+                        SELECT e.parameters ->> 'maxPausesPerStore24h' AS max_pauses,
+                               e.parameters ->> 'cooldownPerAd' AS cooldown
+                        FROM authorized_action a
+                        JOIN policy_evaluation e ON e.id = a.policy_evaluation_id
+                        WHERE a.id = :id AND a.organization_id = :organizationId AND a.store_id = :storeId
+                        """)
+                .param("id", authorizedActionId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .query((rs, n) -> {
+                    String maxPauses = rs.getString("max_pauses");
+                    String cooldown = rs.getString("cooldown");
+                    return new Limits(
+                            maxPauses == null ? Limits.V1_0_0.maxPausesPerStore24h() : Integer.parseInt(maxPauses),
+                            cooldown == null ? Limits.V1_0_0.cooldownPerAd() : Duration.parse(cooldown));
+                })
+                .single();
+    }
+
     /**
      * Admits the write: under a per-store lock, checks the cooldown of the target and the rolling limit, reserves a
      * slot unless this execution already holds one, and records the intent {@code IN_PROGRESS} with the pre-state.
@@ -150,6 +179,7 @@ public class ExecutionLedger {
     @Transactional
     public Admission admit(TrustedStoreScope scope, UUID executionId, JsonNode preState, String requestHash) {
         ActionExecution execution = find(scope, executionId).orElseThrow();
+        Limits limits = limits(scope, execution.authorizedActionId());
         Instant now = clock.instant();
         jdbc.sql("SELECT pg_advisory_xact_lock(hashtextextended(:lock, 0))")
                 .param("lock", "action-limit:" + scope.storeId() + ":" + execution.actionType())
@@ -166,7 +196,7 @@ public class ExecutionLedger {
                 .param("targetType", execution.targetType())
                 .param("targetId", execution.targetId())
                 .param("id", executionId)
-                .param("since", Timestamp.from(now.minus(settings.cooldownPerAd())))
+                .param("since", Timestamp.from(now.minus(limits.cooldownPerAd())))
                 .query(Long.class).single();
         if (recent > 0) {
             return Admission.COOLDOWN;
@@ -184,7 +214,7 @@ public class ExecutionLedger {
                     .param("type", execution.actionType())
                     .param("since", Timestamp.from(now.minus(ExecutionSettings.LIMIT_WINDOW)))
                     .query(Long.class).single();
-            if (used >= settings.maxPausesPerStore24h()) {
+            if (used >= limits.maxPausesPerStore24h()) {
                 return Admission.LIMIT_REACHED;
             }
             jdbc.sql("""

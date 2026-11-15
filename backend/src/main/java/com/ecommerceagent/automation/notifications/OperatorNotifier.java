@@ -11,9 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.ecommerceagent.identity.RegisteredUser;
-import com.ecommerceagent.identity.StoreAccess;
 import com.ecommerceagent.identity.SystemStoreRunner;
-import com.ecommerceagent.identity.StorePermission;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.metrics.CanonicalJson;
 import org.slf4j.Logger;
@@ -43,7 +41,7 @@ public class OperatorNotifier {
             n.id, n.kind, n.severity, n.code, n.parameters, n.opportunity_id, n.proposal_id, n.execution_id,
             n.created_at""";
 
-    private final StoreAccess storeAccess;
+    private final AlertSettings alerts;
     private final SystemStoreRunner stores;
     private final MailProvider mail;
     private final NotificationSettings settings;
@@ -51,10 +49,10 @@ public class OperatorNotifier {
     private final TransactionTemplate transactions;
     private final Clock clock;
 
-    OperatorNotifier(StoreAccess storeAccess, SystemStoreRunner stores, MailProvider mail, NotificationSettings settings, JdbcClient jdbc,
-            TransactionTemplate transactions, Clock clock, MeterRegistry meters) {
+    OperatorNotifier(AlertSettings alerts, SystemStoreRunner stores, MailProvider mail, NotificationSettings settings,
+            JdbcClient jdbc, TransactionTemplate transactions, Clock clock, MeterRegistry meters) {
         this.meters = meters;
-        this.storeAccess = storeAccess;
+        this.alerts = alerts;
         this.stores = stores;
         this.mail = mail;
         this.settings = settings;
@@ -164,8 +162,8 @@ public class OperatorNotifier {
                 .query((rs, n) -> map(rs, false))
                 .single();
         Map<UUID, RegisteredUser> recipients = new TreeMap<>();
-        storeAccess.membersWith(scope, StorePermission.DECISION_APPROVE)
-                .forEach(user -> recipients.put(user.id(), user));
+        // Recipients now (ADR-0026 point 5): a deputy who lost the permission since the notification gets nothing.
+        alerts.recipients(scope).forEach(user -> recipients.put(user.id(), user));
         MailProvider.Capabilities capabilities = capabilities();
         expireClaims(scope, notificationId);
         int open = 0;
@@ -397,7 +395,7 @@ public class OperatorNotifier {
                 .param("now", Timestamp.from(now))
                 .update();
         UUID id = byKey(scope, event.dedupKey()).orElseThrow().id();
-        for (RegisteredUser user : storeAccess.membersWith(scope, StorePermission.DECISION_APPROVE)) {
+        for (RegisteredUser user : alerts.recipients(scope)) {
             jdbc.sql("""
                             INSERT INTO notification_delivery (id, organization_id, store_id, notification_id, channel,
                                                                recipient_user_id, status, created_at, updated_at)

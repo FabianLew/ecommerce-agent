@@ -37,14 +37,16 @@ public class VariantInventoryActivitiesImpl implements VariantInventoryActivitie
     private final Clock clock;
     private final WorkflowClient client;
     private final GuardianSettings guardianSettings;
+    private final StockWarnings stockWarnings;
 
     VariantInventoryActivitiesImpl(WooSourceRefresh refresh, InventoryRiskDetector detector, Clock clock,
-            WorkflowClient client, GuardianSettings guardianSettings) {
+            WorkflowClient client, GuardianSettings guardianSettings, StockWarnings stockWarnings) {
         this.refresh = refresh;
         this.detector = detector;
         this.clock = clock;
         this.client = client;
         this.guardianSettings = guardianSettings;
+        this.stockWarnings = stockWarnings;
     }
 
     @Override
@@ -55,7 +57,8 @@ public class VariantInventoryActivitiesImpl implements VariantInventoryActivitie
 
     @Override
     public RiskCheck assessRisk(String variantId) {
-        return check(detector.assess(ActivityStoreScope.current(), UUID.fromString(variantId), null));
+        TrustedStoreScope scope = ActivityStoreScope.current();
+        return check(scope, detector.assess(scope, UUID.fromString(variantId), null));
     }
 
     @Override
@@ -66,7 +69,7 @@ public class VariantInventoryActivitiesImpl implements VariantInventoryActivitie
         String outcome = ActivityErrors.guarded(() -> refresh.refreshVariant(scope, id));
         // A read that recorded the stock, or found it unchanged, confirms it as of the read.
         Instant confirmedAt = confirms(outcome) ? readAt : null;
-        return check(detector.assess(scope, id, confirmedAt));
+        return check(scope, detector.assess(scope, id, confirmedAt));
     }
 
     @Override
@@ -107,7 +110,9 @@ public class VariantInventoryActivitiesImpl implements VariantInventoryActivitie
                 .allMatch(part -> part.equals("RECORDED") || part.equals("DUPLICATE"));
     }
 
-    private RiskCheck check(RiskAssessment assessment) {
+    /** After every observation: the L0 warning of the day (ADR-0026 point 1), then the result for the workflow. */
+    private RiskCheck check(TrustedStoreScope scope, RiskAssessment assessment) {
+        stockWarnings.warnIfLow(scope, assessment.observation());
         Long next = assessment.nextCheckAt() == null ? null
                 : Math.max(1, Duration.between(clock.instant(), assessment.nextCheckAt()).toSeconds());
         Opportunity opportunity = assessment.opportunity();

@@ -14,9 +14,7 @@ import org.junit.jupiter.api.Test;
 /** ADR-0012 point 5: every check of PauseAdPolicy in order; L1 means approval is required. */
 class PauseAdPolicyTest {
 
-    static final InventoryProtectionPolicy L1 = new InventoryProtectionPolicy("1.0.0",
-            InventoryProtectionPolicy.Mode.EVALUATION_ONLY, Duration.ofSeconds(120), Duration.ofSeconds(60),
-            Duration.ofHours(24), InventoryProtectionPolicy.Autonomy.L1, false);
+    static final InventoryProtectionPolicy L1 = policy(InventoryProtectionPolicy.Autonomy.L1, false);
     static final Instant NOW = InventoryContextFixture.AS_OF.plusSeconds(5);
     static final PauseAd PAUSE_9001 = new PauseAd(InventoryContextFixture.AD_9001);
 
@@ -31,18 +29,24 @@ class PauseAdPolicyTest {
         assertThat(result.checks().getLast().code()).isEqualTo("AUTONOMY_L1");
     }
 
+    /** ADR-0026 point 4: L2 is not available, whatever is configured. */
     @Test
-    void l2NeedsTheFlag() {
-        InventoryProtectionPolicy l2Off = new InventoryProtectionPolicy("1.0.0",
-                InventoryProtectionPolicy.Mode.EVALUATION_ONLY, Duration.ofSeconds(120), Duration.ofSeconds(60),
-                Duration.ofHours(24), InventoryProtectionPolicy.Autonomy.L2, false);
-        InventoryProtectionPolicy l2On = new InventoryProtectionPolicy("1.0.0",
-                InventoryProtectionPolicy.Mode.EVALUATION_ONLY, Duration.ofSeconds(120), Duration.ofSeconds(60),
-                Duration.ofHours(24), InventoryProtectionPolicy.Autonomy.L2, true);
-        assertThat(outcome(new InventoryContextFixture(), PAUSE_9001, IntegrationHealth.Status.HEALTHY, l2Off))
+    void l2IsNotAvailable() {
+        for (boolean flag : new boolean[] {false, true}) {
+            PauseAdPolicy.Evaluation result = evaluate(new InventoryContextFixture(), PAUSE_9001,
+                    IntegrationHealth.Status.HEALTHY, policy(InventoryProtectionPolicy.Autonomy.L2, flag));
+            assertThat(result.outcome()).isEqualTo(PolicyOutcome.REQUIRE_APPROVAL);
+            assertThat(result.checks().getLast().code()).isEqualTo("L2_NOT_AVAILABLE");
+        }
+        assertThat(evaluate(new InventoryContextFixture(), PAUSE_9001, IntegrationHealth.Status.HEALTHY,
+                policy(InventoryProtectionPolicy.Autonomy.L1, true)).outcome())
                 .isEqualTo(PolicyOutcome.REQUIRE_APPROVAL);
-        assertThat(outcome(new InventoryContextFixture(), PAUSE_9001, IntegrationHealth.Status.HEALTHY, l2On))
-                .isEqualTo(PolicyOutcome.ALLOW);
+    }
+
+    static InventoryProtectionPolicy policy(InventoryProtectionPolicy.Autonomy autonomy, boolean l2Enabled) {
+        return new InventoryProtectionPolicy("1.1.0", InventoryProtectionPolicy.Mode.EVALUATION_ONLY,
+                Duration.ofSeconds(120), Duration.ofSeconds(60), Duration.ofHours(24), 3, Duration.ofHours(24),
+                autonomy, l2Enabled);
     }
 
     @Test

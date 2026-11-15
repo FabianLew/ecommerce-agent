@@ -102,6 +102,21 @@ public class StoreAccess {
                 .orElseThrow(() -> new StoreAccessDeniedException(scope.storeId(), StorePermission.STORE_READ));
     }
 
+    /** The store's time zone for any trusted scope, user or system (UTC when unset or not valid). */
+    public java.time.ZoneId zone(TrustedStoreScope scope) {
+        String timezone = jdbc.sql("SELECT timezone FROM store WHERE id = :storeId AND organization_id = :organizationId")
+                .param("storeId", scope.storeId())
+                .param("organizationId", scope.organizationId())
+                .query(String.class)
+                .optional()
+                .orElse(null);
+        try {
+            return timezone == null || timezone.isBlank() ? java.time.ZoneOffset.UTC : java.time.ZoneId.of(timezone);
+        } catch (java.time.DateTimeException e) {
+            return java.time.ZoneOffset.UTC;
+        }
+    }
+
     private static TrustedStoreScope userScope(UUID userId, AccessibleStore store) {
         return new TrustedStoreScope(store.organizationId(), store.storeId(), new UserActor(userId), store.roles(),
                 StoreRole.permissionsOf(store.roles()));
@@ -126,6 +141,23 @@ public class StoreAccess {
                 .param("organizationId", scope.organizationId())
                 .param("storeId", scope.storeId())
                 .param("roles", roles)
+                .query((rs, n) -> new RegisteredUser(rs.getObject("id", UUID.class), rs.getString("email"),
+                        rs.getString("display_name")))
+                .list();
+    }
+
+    /** Members of the store with exactly this role, ordered by id (the alert owners of ADR-0026 point 5). */
+    public List<RegisteredUser> membersWithRole(TrustedStoreScope scope, StoreRole role) {
+        return jdbc.sql("""
+                        SELECT DISTINCT u.id, u.email, u.display_name
+                        FROM store_membership m
+                        JOIN app_user u ON u.id = m.user_id
+                        WHERE m.organization_id = :organizationId AND m.store_id = :storeId AND m.role = :role
+                        ORDER BY u.id
+                        """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .param("role", role.name())
                 .query((rs, n) -> new RegisteredUser(rs.getObject("id", UUID.class), rs.getString("email"),
                         rs.getString("display_name")))
                 .list();

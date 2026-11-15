@@ -5,7 +5,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import com.ecommerceagent.automation.guardian.InventoryProtectionPolicy;
+import com.ecommerceagent.decisions.RiskDetectorSettings;
 import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;
+import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.ApplicationListener;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.Profiles;
@@ -65,7 +68,52 @@ public class CloudConfigurationCheck implements ApplicationListener<ApplicationE
         if ("false".equalsIgnoreCase(value(environment, "operator.row-security.enabled"))) {
             problems.add("operator.row-security.enabled cannot be switched off");
         }
+        // ADR-0026 point 4: L2 is not available in this version.
+        if ("true".equalsIgnoreCase(value(environment, InventoryProtectionPolicy.PREFIX + ".l2-enabled"))) {
+            problems.add(InventoryProtectionPolicy.PREFIX + ".l2-enabled cannot be switched on (L2 is not available)");
+        }
+        problems.addAll(parameterSetProblems(environment));
         return problems;
+    }
+
+    /**
+     * ADR-0026 point 6: a parameter set that differs from its defaults must carry its own version, so that a
+     * recorded version always names one set of values.
+     */
+    static List<String> parameterSetProblems(ConfigurableEnvironment environment) {
+        List<String> problems = new ArrayList<>();
+        Binder binder = Binder.get(environment);
+        Binder defaults = new Binder(List.of());
+        try {
+            RiskDetectorSettings risk = binder.bindOrCreate(RiskDetectorSettings.PREFIX, RiskDetectorSettings.class);
+            RiskDetectorSettings riskDefaults = defaults.bindOrCreate(RiskDetectorSettings.PREFIX,
+                    RiskDetectorSettings.class);
+            if (overridden(risk.parameters(), riskDefaults.parameters())
+                    && risk.version().equals(riskDefaults.version())) {
+                problems.add(RiskDetectorSettings.PREFIX + " differs from the defaults of " + riskDefaults.version()
+                        + "; set its own version");
+            }
+            InventoryProtectionPolicy policy = binder.bindOrCreate(InventoryProtectionPolicy.PREFIX,
+                    InventoryProtectionPolicy.class);
+            InventoryProtectionPolicy policyDefaults = defaults.bindOrCreate(InventoryProtectionPolicy.PREFIX,
+                    InventoryProtectionPolicy.class);
+            if (overridden(policy.parameters(), policyDefaults.parameters())
+                    && policy.version().equals(policyDefaults.version())) {
+                problems.add(InventoryProtectionPolicy.PREFIX + " differs from the defaults of "
+                        + policyDefaults.ref() + "; set its own version");
+            }
+        } catch (RuntimeException e) {
+            problems.add("the inventory parameter sets cannot be read: " + e.getMessage());
+        }
+        return problems;
+    }
+
+    private static boolean overridden(Map<String, String> actual, Map<String, String> defaults) {
+        Map<String, String> a = new java.util.HashMap<>(actual);
+        Map<String, String> d = new java.util.HashMap<>(defaults);
+        a.remove("version");
+        d.remove("version");
+        return !a.equals(d);
     }
 
     /** The resolved value; a placeholder without an environment variable counts as missing. */

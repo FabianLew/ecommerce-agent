@@ -4,6 +4,7 @@ import java.util.List;
 
 import com.ecommerceagent.automation.OnboardingConflictException;
 import com.ecommerceagent.automation.execution.ActionPermissionException;
+import com.ecommerceagent.automation.notifications.AlertSettingException;
 import com.ecommerceagent.automation.execution.MutationStopException;
 import com.ecommerceagent.automation.guardian.ApprovalException;
 import com.ecommerceagent.businessprofile.BusinessProfileException;
@@ -121,6 +122,20 @@ class ApiExceptionHandler {
                     "The permission was changed by someone else. Reload it and try again.", false);
             case PRECONDITION_REQUIRED -> error(request, HttpStatus.PRECONDITION_REQUIRED, exception.code(),
                     "Reload the permission and try again.", false);
+        };
+    }
+
+    @ExceptionHandler(AlertSettingException.class)
+    ResponseEntity<ApiError> alertSetting(AlertSettingException exception, HttpServletRequest request) {
+        return switch (exception.kind()) {
+            case INVALID -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(new ApiError(
+                    "VALIDATION_FAILED", "Correct the highlighted fields.",
+                    List.of(new ApiError.FieldError("deputyUserId", exception.code(), exception.getMessage())), false,
+                    RequestCorrelationFilter.requestId(request), null));
+            case PRECONDITION_FAILED -> error(request, HttpStatus.PRECONDITION_FAILED, exception.code(),
+                    "The setting was changed by someone else. Reload it and try again.", false);
+            case PRECONDITION_REQUIRED -> error(request, HttpStatus.PRECONDITION_REQUIRED, exception.code(),
+                    "Reload the setting and try again.", false);
         };
     }
 

@@ -116,7 +116,7 @@ public class InventoryContextBuilder {
 
         ObjectNode risk = content.putObject("risk");
         risk.put("thresholdDays", detector.settings().thresholdDays().toPlainString());
-        risk.put("detectorVersion", com.ecommerceagent.decisions.RiskDetectorSettings.VERSION);
+        risk.put("detectorVersion", detector.settings().version());
         risk.put("lastOutcome", latest.isEmpty() ? null : latest.getFirst().outcome().name());
 
         ArrayNode adNodes = content.putArray("ads");

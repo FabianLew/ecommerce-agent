@@ -156,6 +156,24 @@ class ExecutionAuthorityTest extends DecisionScenario {
         ActionExecution failing = ledger.byKey(scope, action.idempotencyKey() + "/b").orElseThrow();
         ledger.move(scope, failing.id(), ExecutionStatus.FAILED, "META_RATE_LIMITED", null);
         assertThat(ledger.admit(scope, fourth.id(), pre, "h")).isEqualTo(ExecutionLedger.Admission.ADMITTED);
+
+        // ADR-0026 point 6: the limits are the ones recorded in the evaluation the action was authorised under.
+        ActionExecution fifth = ledger.plan(scope, variant(action, "e", UUID.randomUUID()));
+        assertThat(ledger.admit(scope, fifth.id(), pre, "h")).isEqualTo(ExecutionLedger.Admission.LIMIT_REACHED);
+        recordedLimits(action, "parameters - 'maxPausesPerStore24h' - 'cooldownPerAd'");
+        // An evaluation of 1.0.0 did not record them: its only values (3, 24 h) apply.
+        assertThat(ledger.admit(scope, fifth.id(), pre, "h")).isEqualTo(ExecutionLedger.Admission.LIMIT_REACHED);
+        recordedLimits(action, "parameters || '{\"maxPausesPerStore24h\": 4}'::jsonb");
+        assertThat(ledger.admit(scope, fifth.id(), pre, "h")).isEqualTo(ExecutionLedger.Admission.ADMITTED);
+    }
+
+    /** Rewrites the recorded evaluation, which is immutable for the application, as the fixture's superuser. */
+    void recordedLimits(AuthorizedAction action, String expression) {
+        jdbc.inTransaction(tx -> {
+            tx.sql("SET LOCAL session_replication_role = replica").update();
+            tx.sql("UPDATE policy_evaluation SET parameters = " + expression + " WHERE id = ("
+                    + "SELECT policy_evaluation_id FROM authorized_action WHERE id = ?)").param(action.id()).update();
+        });
     }
 
     long slots() {

@@ -14,6 +14,7 @@ final class NotificationText {
     static String subject(Notification notification) {
         String ad = ad(notification.parameters());
         return switch (notification.kind()) {
+            case STOCK_WARNING -> "Low stock: " + product(notification.parameters());
             case DECISION_NEEDED -> "Decision needed: pause " + ad + "?";
             case ACTION_VERIFIED -> "Paused and confirmed: " + ad;
             case ACTION_NOOP -> "Already paused: " + ad;
@@ -28,6 +29,10 @@ final class NotificationText {
         String ad = ad(p);
         String product = p.getOrDefault("sku", "the product");
         String text = switch (notification.kind()) {
+            case STOCK_WARNING -> "Stock of " + product(p) + " covers about " + p.getOrDefault("daysOfCover", "?")
+                    + " days of sales (" + p.getOrDefault("availableToSell", "?") + " available), below the warning"
+                    + " threshold of " + p.getOrDefault("warningDays", "?") + " days. Nothing is proposed or changed;"
+                    + " the operator proposes a pause only below " + p.getOrDefault("thresholdDays", "?") + " days.";
             case DECISION_NEEDED -> "The operator recommends pausing " + ad + " because stock of " + product
                     + " may run out. Nothing changes until a person approves it.";
             case ACTION_VERIFIED -> "The ad " + ad + " was paused and the pause was confirmed by reading it from Meta."
@@ -39,8 +44,18 @@ final class NotificationText {
             case ACTION_CONFLICT -> "The ad " + ad + " was not paused because it changed since the approval ("
                     + code(notification) + "). A new analysis decides again.";
         };
-        return text + "\n\nDetails: " + storeUrl + "/decisions" + (notification.proposalId() == null ? ""
-                : "/" + notification.proposalId()) + "\n";
+        String details = notification.kind() == NotificationKind.STOCK_WARNING ? storeUrl + "/notifications"
+                : storeUrl + "/decisions" + (notification.proposalId() == null ? "" : "/" + notification.proposalId());
+        return text + "\n\nDetails: " + details + "\n";
+    }
+
+    private static String product(Map<String, String> p) {
+        String sku = p.get("sku");
+        String name = p.get("variantName");
+        if (name == null || name.isBlank()) {
+            return sku == null ? "the product" : sku;
+        }
+        return sku == null ? name : name + " (" + sku + ")";
     }
 
     private static String ad(Map<String, String> p) {

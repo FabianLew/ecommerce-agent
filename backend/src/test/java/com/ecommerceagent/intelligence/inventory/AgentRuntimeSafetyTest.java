@@ -67,7 +67,8 @@ class AgentRuntimeSafetyTest {
     @BeforeEach
     void tools() {
         InventoryReadTools tools = new InventoryReadTools();
-        RiskDetectorSettings risk = new RiskDetectorSettings(new BigDecimal("3"), 2, Duration.ofMinutes(5),
+        RiskDetectorSettings risk = new RiskDetectorSettings(
+            RiskDetectorSettings.DEFAULT_VERSION, new BigDecimal("3"), new BigDecimal("5"), 2, Duration.ofMinutes(5),
                 Duration.ofSeconds(120));
         List<AgentTool> all = List.of(tools.inventoryForecastTool(risk), tools.replenishmentPlanTool(),
                 tools.productAdMappingsTool(), tools.adDeliveryStateTool(), tools.recentActionsTool());

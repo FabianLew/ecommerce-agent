@@ -10,6 +10,7 @@ import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { storePath } from "@/lib/store-path";
 
 import { ActionPermissionForm } from "./ActionPermissionForm";
+import { AlertDeputyForm } from "./AlertDeputyForm";
 import { MutationStopForm } from "./MutationStopForm";
 import { ProfileForm } from "./ProfileForm";
 
@@ -18,22 +19,24 @@ export const dynamic = "force-dynamic";
 type Profile = components["schemas"]["ProfileResponse"];
 type Stop = components["schemas"]["MutationStopResponse"];
 type Permission = components["schemas"]["ActionPermissionResponse"];
+type AlertSetting = components["schemas"]["AlertSettingResponse"];
 
 /**
- * Settings: the mutation stop (B-40, ADR-0020), the ad pause permission (ADR-0025) and the Store Business Profile
- * (B-33, ADR-0018).
+ * Settings: the mutation stop (B-40, ADR-0020), the ad pause permission (ADR-0025), who is told by e-mail
+ * (ADR-0026) and the Store Business Profile (B-33, ADR-0018).
  */
 export default async function SettingsPage({ params }: { params: Promise<{ storeId: string }> }) {
   const { storeId } = await params;
   const path = storePath(storeId, "settings");
   const api = await backend(path);
-  const [store, profile, stop, permission, locale, messages] = await Promise.all([
+  const [store, profile, stop, permission, alerts, locale, messages] = await Promise.all([
     api.GET("/api/v1/stores/{storeId}", { params: { path: { storeId } } }),
     api.GET("/api/v1/stores/{storeId}/business-profile", { params: { path: { storeId } } }),
     api.GET("/api/v1/stores/{storeId}/mutation-stop", { params: { path: { storeId } } }),
     api.GET("/api/v1/stores/{storeId}/action-permissions/{actionType}", {
       params: { path: { storeId, actionType: "PAUSE_AD" } },
     }),
+    api.GET("/api/v1/stores/{storeId}/alert-settings", { params: { path: { storeId } } }),
     getLocale(),
     getMessages(),
   ]);
@@ -55,6 +58,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ store
         <ActionPermissionCard storeId={storeId} permission={permission.data} timezone={store.data.timezone}
           locale={locale} t={messages.actionPermission} />
       ) : null}
+      {alerts.data ? <AlertDeputyCard storeId={storeId} setting={alerts.data} t={messages.alertDeputy} /> : null}
       <section className="card" aria-labelledby="profile-title" data-testid="profile-card">
         <div className="card-header">
           <h2 id="profile-title">{t.title}</h2>
@@ -160,6 +164,45 @@ function MutationStopCard({
         <MutationStopForm key={stop.version} storeId={storeId} version={stop.version} stopped={stop.stopped} />
       ) : (
         <p className="muted">{stop.stopped ? t.resumeReadOnly : t.readOnly}</p>
+      )}
+    </section>
+  );
+}
+
+function AlertDeputyCard({
+  storeId,
+  setting,
+  t,
+}: {
+  storeId: string;
+  setting: AlertSetting;
+  t: Messages["alertDeputy"];
+}) {
+  const current = setting.candidates.find((candidate) => candidate.userId === setting.deputyUserId);
+  return (
+    <section className="card" aria-labelledby="alert-deputy-title" data-testid="alert-deputy-card">
+      <div className="card-header">
+        <h2 id="alert-deputy-title">{t.title}</h2>
+      </div>
+      <p className="muted">{t.intro}</p>
+      <dl className="details">
+        <dt>{t.deputy}</dt>
+        <dd data-testid="alert-deputy-current">
+          {setting.deputyUserId ? (current?.displayName ?? t.unnamed) : t.none}
+        </dd>
+      </dl>
+      {setting.deputyUserId && !setting.deputyActive ? (
+        <p className="form-message error" data-testid="alert-deputy-inactive">{t.inactive}</p>
+      ) : null}
+      {setting.canChange ? (
+        setting.candidates.length || setting.deputyUserId ? (
+          <AlertDeputyForm key={setting.version} storeId={storeId} version={setting.version}
+            deputy={setting.deputyActive ? setting.deputyUserId : undefined} candidates={setting.candidates} />
+        ) : (
+          <p className="muted">{t.noCandidates}</p>
+        )
+      ) : (
+        <p className="muted">{t.readOnly}</p>
       )}
     </section>
   );

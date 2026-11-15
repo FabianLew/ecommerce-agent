@@ -22,8 +22,7 @@ class SettingsValidationTest {
 
     @Test
     void anAuthorizationTtlMustBePositive() {
-        assertThatThrownBy(() -> new ExecutionSettings(true, Duration.ZERO, Duration.ofMinutes(2), 3,
-                Duration.ofHours(24))).isInstanceOf(IllegalArgumentException.class)
+        assertThatThrownBy(() -> new ExecutionSettings(true, Duration.ZERO, Duration.ofMinutes(2))).isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("authorization-ttl");
     }
 }

@@ -161,6 +161,8 @@ public class PolicyEvaluations {
         node.put("maxStockAge", policy.maxStockAge().toString());
         node.put("maxAdStateAge", policy.maxAdStateAge().toString());
         node.put("maxVerificationAge", policy.maxVerificationAge().toString());
+        node.put("maxPausesPerStore24h", policy.maxPausesPerStore24h());
+        node.put("cooldownPerAd", policy.cooldownPerAd().toString());
         node.put("autonomy", policy.autonomy().name());
         node.put("l2Enabled", policy.l2Enabled());
         return node;

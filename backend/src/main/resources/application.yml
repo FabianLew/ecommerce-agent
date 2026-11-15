@@ -90,13 +90,10 @@ operator:
       pause: 2s
 
   inventory-guardian:
-    risk:
-      # Detector inventory-risk/1 (ADR-0011): risk is days of cover below the threshold; an episode opens after
-      # min-observations current risk observations at least min-gap apart, with stock no older than max-stock-age.
-      threshold-days: 3
-      min-observations: 2
-      min-gap: 5m
-      max-stock-age: 120s
+    # risk: parameter set inventory-risk/2 (ADR-0011, ADR-0026 point 6). The defaults live in RiskDetectorSettings
+    # and are pinned to their version by ParameterSetVersionTest: an override here or in the environment needs its
+    # own version (the cloud profile refuses it otherwise). threshold-days 3, warning-days 5, min-observations 2,
+    # min-gap 5m, max-stock-age 120s.
     workflow:
       # Episode limits (ADR-0012): proposal validity, episode time limit, retries when data is missing.
       proposal-ttl: 24h
@@ -108,14 +105,11 @@ operator:
       significant-cover-change: 0.5
   policies:
     inventory-protection:
-      # Policy inventory-protection@1.0.0 (ADR-0012); the pilot only evaluates (L1, L2 disabled).
-      version: 1.0.0
+      # Parameter set inventory-protection@1.1.0 (ADR-0012, ADR-0026 point 6). The defaults live in
+      # InventoryProtectionPolicy and are pinned to their version: max-stock-age 120s, max-ad-state-age 60s,
+      # max-verification-age 24h, max-pauses-per-store-24h 3, cooldown-per-ad 24h, autonomy L1. L2 is not available
+      # (ADR-0026 point 4). The mode is the deployment's choice: the pilot only evaluates.
       mode: EVALUATION_ONLY
-      max-stock-age: 120s
-      max-ad-state-age: 60s
-      max-verification-age: 24h
-      autonomy: L1
-      l2-enabled: false
 
   execution:
     # The executor (ADR-0020). It acts only in policy mode EXECUTE_ON_APPROVAL; this switch stops every external
@@ -123,8 +117,7 @@ operator:
     mutations-enabled: ${OPERATOR_MUTATIONS_ENABLED:true}
     authorization-ttl: 60s
     lease-duration: 2m
-    max-pauses-per-store-24h: 3
-    cooldown-per-ad: 24h
+    # The pause limit and the cooldown are policy parameters (operator.policies.inventory-protection, ADR-0026).
 
   outcomes:
     # Observation checkpoints of verified outcomes (ADR-0021 point 5), observed in the worker profile.

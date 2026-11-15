@@ -179,7 +179,7 @@ class InventoryGuardianWorkflowTest {
                 .isEqualTo(proposal.proposal().createdAt().plus(settings.proposalTtl()));
 
         PolicyEvaluation evaluation = policies.latest(scope, proposal.proposal().proposalId()).orElseThrow();
-        assertThat(evaluation.policyKey() + "@" + evaluation.policyVersion()).isEqualTo("inventory-protection@1.0.0");
+        assertThat(evaluation.policyKey() + "@" + evaluation.policyVersion()).isEqualTo("inventory-protection@1.1.0");
         assertThat(evaluation.mode()).isEqualTo(InventoryProtectionPolicy.Mode.EVALUATION_ONLY);
         assertThat(evaluation.outcome()).isEqualTo(PolicyOutcome.REQUIRE_APPROVAL);
         assertThat(evaluation.checks()).allMatch(check -> check.result() == PolicyCheck.Result.PASSED);

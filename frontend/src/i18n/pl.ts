@@ -107,6 +107,7 @@ export const pl: Messages = {
     pauseAd: (name) => `Wstrzymaj reklamę „${name}”`,
     noAction: "Brak proponowanej akcji",
     target: "Cel",
+    blockedTitle: "Zatwierdzenie nie jest teraz możliwe",
     shadowModeTitle: "Tryb shadow",
     shadowMode:
       "W pilocie operator tylko proponuje. Akceptacja jest wyłączona i nic nie zmienia się w Meta ani w WooCommerce.",
@@ -529,8 +530,9 @@ export const pl: Messages = {
     open: "Otwórz decyzję",
     loadMore: "Pokaż więcej",
     severity: { INFO: "Informacja", WARNING: "Ostrzeżenie", CRITICAL: "Wymaga uwagi" },
-    text: (kind, ad, product, code) =>
+    text: (kind, ad, product, code, cover = "—", warningDays = "—") =>
       ({
+        STOCK_WARNING: `Niski zapas: ${product} wystarczy na około ${cover} dni sprzedaży (ostrzeżenie poniżej ${warningDays} dni). Na razie nic nie jest proponowane.`,
         DECISION_NEEDED: `Potrzebna decyzja: wstrzymać ${ad}, aby chronić zapas ${product}?`,
         ACTION_VERIFIED: `Wstrzymano ${ad} i potwierdzono pauzę.`,
         ACTION_NOOP: `${ad} była już wstrzymana; nic nie zmieniono.`,
@@ -571,6 +573,24 @@ export const pl: Messages = {
     noPermission: "Nie masz uprawnień do tej operacji.",
     failed: (requestId) => `Nie udało się zmienić wstrzymania (identyfikator zgłoszenia ${requestId}).`,
     done: "Zapisano.",
+  },
+  alertDeputy: {
+    title: "Kto dostaje e-maile",
+    intro:
+      "E-maile o niskim zapasie, decyzjach i zmianach reklam trafiają do właścicieli sklepu oraz, jeśli go wybierzesz, do zastępcy, który może zatwierdzać decyzje. Wszyscy w sklepie widzą powiadomienia w aplikacji. Brak odpowiedzi nigdy nie jest zgodą.",
+    deputy: "Zastępca",
+    none: "Bez zastępcy",
+    inactive: "Zastępca nie może już zatwierdzać decyzji i nie dostaje e-maili. Wybierz kogoś innego albo usuń zastępcę.",
+    noCandidates: "Nikt inny w sklepie nie może zatwierdzać decyzji. Najpierw nadaj komuś rolę operatora decyzji.",
+    save: "Zapisz",
+    saving: "Zapisywanie…",
+    done: "Zapisano.",
+    readOnly: "Tylko właściciel może zmienić, kto dostaje e-maile.",
+    noPermission: "Nie masz uprawnień do tej zmiany.",
+    changed: "Ktoś w międzyczasie to zmienił. Odśwież stronę i spróbuj ponownie.",
+    notApprover: "Ta osoba nie może zatwierdzać decyzji.",
+    unnamed: "Członek bez nazwy",
+    failed: (requestId) => `Nie udało się zapisać ustawienia (ID żądania ${requestId}).`,
   },
   actionPermission: {
     title: "Wstrzymywanie reklam",

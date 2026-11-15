@@ -234,6 +234,53 @@
         "required" : [ "accountExternalId", "allowedActions", "effectiveStatus", "externalId", "id", "mappingState", "name", "observedAt", "ownStatus", "source" ],
         "type" : "object"
       },
+      "AlertSettingRequest" : {
+        "properties" : {
+          "deputyUserId" : {
+            "description" : "A member who may approve decisions; null clears the deputy",
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AlertSettingResponse" : {
+        "properties" : {
+          "canChange" : {
+            "type" : "boolean"
+          },
+          "candidates" : {
+            "description" : "Members who may approve decisions and are not owners",
+            "items" : {
+              "$ref" : "#/components/schemas/CandidateResponse"
+            },
+            "type" : "array"
+          },
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changedBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "deputyActive" : {
+            "description" : "False when the deputy lost the permission or the membership",
+            "type" : "boolean"
+          },
+          "deputyUserId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "version" : {
+            "description" : "0 until the first change",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "canChange", "candidates", "deputyActive", "version" ],
+        "type" : "object"
+      },
       "AnalyticsMeta" : {
         "properties" : {
           "computedAt" : {
@@ -330,6 +377,19 @@
           }
         },
         "required" : [ "kind" ],
+        "type" : "object"
+      },
+      "CandidateResponse" : {
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "userId" ],
         "type" : "object"
       },
       "CapResponse" : {
@@ -1737,7 +1797,7 @@
             "type" : "string"
           },
           "kind" : {
-            "enum" : [ "DECISION_NEEDED", "ACTION_VERIFIED", "ACTION_NOOP", "ACTION_UNKNOWN", "ACTION_FAILED", "ACTION_CONFLICT" ],
+            "enum" : [ "STOCK_WARNING", "DECISION_NEEDED", "ACTION_VERIFIED", "ACTION_NOOP", "ACTION_UNKNOWN", "ACTION_FAILED", "ACTION_CONFLICT" ],
             "type" : "string"
           },
           "opportunityId" : {
@@ -3281,6 +3341,135 @@
           }
         },
         "tags" : [ "ad-mapping-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/alert-settings" : {
+      "get" : {
+        "operationId" : "alertSettings",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertSettingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "alert-setting-controller" ]
+      },
+      "put" : {
+        "operationId" : "changeAlertSettings",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AlertSettingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertSettingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "alert-setting-controller" ]
       }
     },
     "/api/v1/stores/{storeId}/analytics/products" : {

@@ -92,6 +92,26 @@ flag (`l2-enabled`), which returns `ALLOW`.
   `operator.policies.inventory-protection.*`; the old names are refused at start-up so that a stale override is not
   ignored silently.
 
+## Implementation status
+
+Implemented on the pilot branch with migration V29:
+- `StockWarnings` after every observation of the variant activities: one `STOCK_WARNING` per variant and day in
+  the store's time zone, with the cover, the stock, both thresholds and the detector version; e-mail and in-app
+  text in both languages;
+- `PauseAdPolicy` always requires approval and records `L2_NOT_AVAILABLE` when L2 is configured;
+  `CloudConfigurationCheck` refuses `l2-enabled=true`;
+- `RiskDetectorSettings` (`inventory-risk/2`, with `warning-days`) and `InventoryProtectionPolicy` (`1.1.0`, with
+  the pause limit and the cooldown) record their parameters with every observation
+  (`inventory_risk_observation.detector_parameters`) and evaluation; `ExecutionLedger.admit` reads the limits
+  from the evaluation the action was authorised under (an evaluation of `1.0.0` recorded none, so its only values,
+  3 and 24 h, apply);
+- `ParameterSetVersionTest` pins a SHA-256 of each default set to its version; the cloud check refuses a set that
+  differs from its defaults without its own version; `operator.execution` refuses unknown keys, so the old names
+  stop the start;
+- `store_alert_setting` with `AlertSettings` and `GET/PUT /api/v1/stores/{storeId}/alert-settings` (`If-Match`
+  `"alert-setting-{version}"`, the candidates are the members with `DECISION_APPROVE` who are not owners);
+  e-mail recipients are the owners and the active deputy; the settings page has the control.
+
 ## Verification
 
 - Detector tests: a warning below 5 days, one per variant and day; none at 5 days or more; none on a stale or

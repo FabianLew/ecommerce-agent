@@ -47,7 +47,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * B-19 (ADR-0011): detector {@code inventory-risk/1} opens an episode only after a series of current risk
+ * B-19 (ADR-0011): detector {@code inventory-risk/2} opens an episode only after a series of current risk
  * observations, and a subject has at most one active episode even under concurrent opening (IG-05).
  *
  * <p>Scenario from 03 §2: 18 sellable units, 49 sold in the 7 full local days before 14.11.2026, so 2.5714
@@ -63,7 +63,8 @@ class InventoryRiskDetectorTest {
     static final Instant AS_OF = Instant.parse("2026-11-14T08:00:30Z");
     /** 07.11.2026 00:00 in Europe/Warsaw. */
     static final Instant WINDOW_FROM = Instant.parse("2026-11-06T23:00:00Z");
-    static final RiskDetectorSettings SETTINGS = new RiskDetectorSettings(new BigDecimal("3"), 2,
+    static final RiskDetectorSettings SETTINGS = new RiskDetectorSettings(
+            RiskDetectorSettings.DEFAULT_VERSION, new BigDecimal("3"), new BigDecimal("5"), 2,
             Duration.ofMinutes(5), Duration.ofSeconds(120));
 
     @Autowired
@@ -130,7 +131,7 @@ class InventoryRiskDetectorTest {
         RiskAssessment first = detector.assess(scopeA, serum, null);
         assertThat(first.observation().outcome()).isEqualTo(RiskOutcome.AT_RISK);
         assertThat(first.observation().daysOfCover()).isEqualByComparingTo("2.5714");
-        assertThat(first.observation().detectorVersion()).isEqualTo("inventory-risk/1");
+        assertThat(first.observation().detectorVersion()).isEqualTo("inventory-risk/2");
         assertThat(first.opportunity()).isNull();
         assertThat(first.nextCheckAt()).isEqualTo(AS_OF.plus(Duration.ofMinutes(5)));
 

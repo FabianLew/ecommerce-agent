@@ -55,6 +55,29 @@ class CloudConfigurationCheckTest {
                 "operator.row-security.enabled cannot be switched off");
     }
 
+    /** ADR-0026: L2 cannot be switched on, and an overridden parameter set needs its own version. */
+    @Test
+    void l2AndUnversionedParameterOverridesAreRefused() {
+        MockEnvironment environment = cloud()
+                .withProperty("operator.policies.inventory-protection.l2-enabled", "true")
+                .withProperty("operator.policies.inventory-protection.max-pauses-per-store-24h", "5")
+                .withProperty("operator.inventory-guardian.risk.warning-days", "7");
+
+        assertThat(CloudConfigurationCheck.problems(environment)).containsExactly(
+                "operator.policies.inventory-protection.l2-enabled cannot be switched on (L2 is not available)",
+                "operator.inventory-guardian.risk differs from the defaults of inventory-risk/2; set its own version",
+                "operator.policies.inventory-protection differs from the defaults of inventory-protection@1.1.0;"
+                        + " set its own version");
+
+        MockEnvironment versioned = cloud()
+                .withProperty("operator.policies.inventory-protection.max-pauses-per-store-24h", "2")
+                .withProperty("operator.policies.inventory-protection.version", "1.1.0-store-trial")
+                .withProperty("operator.inventory-guardian.risk.warning-days", "7")
+                .withProperty("operator.inventory-guardian.risk.version", "inventory-risk/2001")
+                .withProperty("operator.policies.inventory-protection.mode", "EXECUTE_ON_APPROVAL");
+        assertThat(CloudConfigurationCheck.problems(versioned)).isEmpty();
+    }
+
     private static MockEnvironment cloud() {
         MockEnvironment environment = new MockEnvironment()
                 .withProperty("spring.datasource.url", "jdbc:postgresql://db.internal.example:5432/operator")

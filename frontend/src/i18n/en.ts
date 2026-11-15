@@ -126,6 +126,7 @@ export const en = {
     pauseAd: (name: string) => `Pause the ad “${name}”`,
     noAction: "No action proposed",
     target: "Target",
+    blockedTitle: "Approval is not possible now",
     shadowModeTitle: "Shadow mode",
     shadowMode:
       "The operator only proposes in the pilot. Approval is turned off, and nothing is changed in Meta or WooCommerce.",
@@ -564,8 +565,9 @@ export const en = {
     open: "Open the decision",
     loadMore: "Show more",
     severity: { INFO: "Info", WARNING: "Warning", CRITICAL: "Needs attention" } as Record<string, string>,
-    text: (kind: string, ad: string, product: string, code: string) =>
+    text: (kind: string, ad: string, product: string, code: string, cover = "—", warningDays = "—") =>
       ({
+        STOCK_WARNING: `Low stock: ${product} covers about ${cover} days of sales (warning below ${warningDays} days). Nothing is proposed yet.`,
         DECISION_NEEDED: `Decision needed: pause ${ad} to protect the stock of ${product}?`,
         ACTION_VERIFIED: `${ad} was paused and the pause was confirmed.`,
         ACTION_NOOP: `${ad} was already paused; nothing changed.`,
@@ -606,6 +608,24 @@ export const en = {
     noPermission: "You do not have permission to do this.",
     failed: (requestId: string) => `The stop could not be changed (request ID ${requestId}).`,
     done: "Saved.",
+  },
+  alertDeputy: {
+    title: "Who is told by e-mail",
+    intro:
+      "E-mails about low stock, decisions and ad changes go to the store's owners and, if you choose one, a deputy who may approve decisions. Everyone in the store sees the notifications in the app. No answer is never taken as approval.",
+    deputy: "Deputy",
+    none: "No deputy",
+    inactive: "The deputy can no longer approve decisions and gets no e-mails. Choose someone else or clear it.",
+    noCandidates: "No one else in the store may approve decisions. Give someone the decision operator role first.",
+    save: "Save",
+    saving: "Saving…",
+    done: "Saved.",
+    readOnly: "Only an owner can change who is told.",
+    noPermission: "You do not have permission to change this.",
+    changed: "Someone changed this in the meantime. Reload the page and try again.",
+    notApprover: "This person may not approve decisions.",
+    unnamed: "Unnamed member",
+    failed: (requestId: string) => `The setting could not be saved (request ID ${requestId}).`,
   },
   actionPermission: {
     title: "Ad pauses",

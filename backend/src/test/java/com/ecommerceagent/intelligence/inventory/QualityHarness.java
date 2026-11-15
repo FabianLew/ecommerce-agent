@@ -38,7 +38,8 @@ import tools.jackson.databind.node.ObjectNode;
  */
 final class QualityHarness {
 
-    static final RiskDetectorSettings RISK = new RiskDetectorSettings(new BigDecimal("3"), 2, Duration.ofMinutes(5),
+    static final RiskDetectorSettings RISK = new RiskDetectorSettings(
+            RiskDetectorSettings.DEFAULT_VERSION, new BigDecimal("3"), new BigDecimal("5"), 2, Duration.ofMinutes(5),
             Duration.ofSeconds(120));
 
     /** One expert case. Expected reason codes and missing requirements must be contained in the answer. */

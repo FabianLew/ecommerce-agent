@@ -16,7 +16,8 @@ import org.junit.jupiter.api.Test;
 /** ADR-0012 point 4: the deterministic baseline's rules, in order. */
 class BaselineProposerTest {
 
-    final BaselineProposer baseline = new BaselineProposer(new RiskDetectorSettings(new BigDecimal("3"), 2,
+    final BaselineProposer baseline = new BaselineProposer(new RiskDetectorSettings(
+            RiskDetectorSettings.DEFAULT_VERSION, new BigDecimal("3"), new BigDecimal("5"), 2,
             Duration.ofMinutes(5), Duration.ofSeconds(120)));
 
     @Test

@@ -164,6 +164,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stores/{storeId}/alert-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["alertSettings"];
+        put: operations["changeAlertSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stores/{storeId}/analytics/products": {
         parameters: {
             query?: never;
@@ -782,6 +798,31 @@ export interface components {
             /** @enum {string} */
             source: "FIXTURE" | "META_API";
         };
+        AlertSettingRequest: {
+            /**
+             * Format: uuid
+             * @description A member who may approve decisions; null clears the deputy
+             */
+            deputyUserId?: string;
+        };
+        AlertSettingResponse: {
+            canChange: boolean;
+            /** @description Members who may approve decisions and are not owners */
+            candidates: components["schemas"]["CandidateResponse"][];
+            /** Format: date-time */
+            changedAt?: string;
+            /** Format: uuid */
+            changedBy?: string;
+            /** @description False when the deputy lost the permission or the membership */
+            deputyActive: boolean;
+            /** Format: uuid */
+            deputyUserId?: string;
+            /**
+             * Format: int32
+             * @description 0 until the first change
+             */
+            version: number;
+        };
         AnalyticsMeta: {
             /** Format: date-time */
             computedAt: string;
@@ -823,6 +864,11 @@ export interface components {
             resourceId?: string;
             /** @description Business summary of a decision */
             summary?: string;
+        };
+        CandidateResponse: {
+            displayName?: string;
+            /** Format: uuid */
+            userId: string;
         };
         CapResponse: {
             code: string;
@@ -1374,7 +1420,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "DECISION_NEEDED" | "ACTION_VERIFIED" | "ACTION_NOOP" | "ACTION_UNKNOWN" | "ACTION_FAILED" | "ACTION_CONFLICT";
+            kind: "STOCK_WARNING" | "DECISION_NEEDED" | "ACTION_VERIFIED" | "ACTION_NOOP" | "ACTION_UNKNOWN" | "ACTION_FAILED" | "ACTION_CONFLICT";
             /** Format: uuid */
             opportunityId?: string;
             /** @description Backend-set values the UI renders: adExternalId, adName, sku, variantName */
@@ -2200,6 +2246,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    alertSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertSettingResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    changeAlertSettings: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertSettingRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertSettingResponse"];
                 };
             };
             /** @description Missing or invalid access token */

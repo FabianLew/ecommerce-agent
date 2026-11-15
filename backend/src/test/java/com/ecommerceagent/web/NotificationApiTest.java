@@ -8,6 +8,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -19,6 +21,7 @@ import java.util.stream.Collectors;
 
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.automation.guardian.GuardianSignals;
+import com.ecommerceagent.automation.notifications.AlertSettings;
 import com.ecommerceagent.automation.notifications.MailProvider;
 import com.ecommerceagent.automation.notifications.NotificationDeliveryException;
 import com.ecommerceagent.automation.notifications.NotificationEvent;
@@ -31,6 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -55,6 +59,8 @@ class NotificationApiTest extends DecisionScenario {
     MailProvider mail;
     @Autowired
     OperatorNotifier notifier;
+    @Autowired
+    AlertSettings alerts;
 
     @BeforeEach
     void people() {
@@ -65,6 +71,12 @@ class NotificationApiTest extends DecisionScenario {
                 INSERT INTO store_membership (organization_id, store_id, user_id, role) VALUES
                   (?, ?, ?, 'DECISION_OPERATOR'), (?, ?, ?, 'ANALYST')
                 """).params(ORG, store, OPERATOR, ORG, store, ANALYST).update();
+        // ADR-0026 point 5: e-mails go to the owners and the deputy; the decision operator is the deputy here.
+        jdbc.sql("""
+                INSERT INTO store_alert_setting (store_id, organization_id, deputy_user_id, version, changed_by,
+                                                 changed_at)
+                VALUES (?, ?, ?, 1, ?, now())
+                """).params(store, ORG, OPERATOR, OWNER).update();
     }
 
     NotificationEvent verified(String key) {
@@ -82,13 +94,75 @@ class NotificationApiTest extends DecisionScenario {
         assertThat(again).isEqualTo(first);
         ArgumentCaptor<MailProvider.MailMessage> sent = ArgumentCaptor.forClass(MailProvider.MailMessage.class);
         verify(mail, times(2)).send(sent.capture());
-        // The owner and the decision operator, not the analyst.
+        // The owner and the deputy, not the analyst.
         assertThat(sent.getAllValues()).extracting(MailProvider.MailMessage::to)
                 .containsExactlyInAnyOrder("o@shop.test", "op@shop.test");
         assertThat(sent.getValue().subject()).isEqualTo("Paused and confirmed: Serum dedicated (ad-9001)");
         assertThat(sent.getValue().body()).contains("SERUM-30", "confirmed by reading it from Meta");
         assertThat(jdbc.sql("SELECT status FROM notification_delivery WHERE store_id = ?").param(store)
                 .query(String.class).list()).containsOnly("SENT");
+    }
+
+    List<String> recipientsOf(String key) {
+        UUID id = notifier.notify(scope, verified(key));
+        return jdbc.sql("""
+                        SELECT u.email FROM notification_delivery d JOIN app_user u ON u.id = d.recipient_user_id
+                        WHERE d.notification_id = ?
+                        """).param(id).query(String.class).list();
+    }
+
+    /** ADR-0026 point 5: owners and the deputy only; a deputy who lost the permission gets nothing. */
+    @Test
+    void eMailsGoToTheOwnersAndTheDeputyOnly() {
+        assertThat(recipientsOf("r-1/VERIFIED")).containsExactlyInAnyOrder("o@shop.test", "op@shop.test");
+
+        jdbc.sql("UPDATE store_alert_setting SET deputy_user_id = NULL WHERE store_id = ?").param(store).update();
+        assertThat(recipientsOf("r-2/VERIFIED")).containsExactly("o@shop.test");
+
+        jdbc.sql("UPDATE store_alert_setting SET deputy_user_id = ? WHERE store_id = ?").params(OPERATOR, store)
+                .update();
+        jdbc.sql("UPDATE store_membership SET role = 'ANALYST' WHERE user_id = ? AND store_id = ?")
+                .params(OPERATOR, store).update();
+        assertThat(recipientsOf("r-3/VERIFIED")).containsExactly("o@shop.test");
+        assertThat(alerts.setting(scope).deputyActive()).isFalse();
+        assertThat(alerts.setting(scope).deputyUserId()).isEqualTo(OPERATOR);
+    }
+
+    @Test
+    void onlyAStoreManagerSetsTheDeputyFromTheVersionSeen() throws Exception {
+        mvc.perform(get("/api/v1/stores/{id}/alert-settings", store).with(user("operator")))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", "\"alert-setting-1\""))
+                .andExpect(jsonPath("$.deputyUserId").value(OPERATOR.toString()))
+                .andExpect(jsonPath("$.deputyActive").value(true))
+                .andExpect(jsonPath("$.candidates[0].userId").value(OPERATOR.toString()))
+                .andExpect(jsonPath("$.candidates.length()").value(1))
+                .andExpect(jsonPath("$.canChange").value(false));
+        String clear = "{\"deputyUserId\":null}";
+        mvc.perform(put("/api/v1/stores/{id}/alert-settings", store).with(user("operator"))
+                .header("If-Match", "\"alert-setting-1\"").contentType(MediaType.APPLICATION_JSON).content(clear))
+                .andExpect(status().isForbidden());
+        mvc.perform(put("/api/v1/stores/{id}/alert-settings", store).with(user("owner"))
+                .contentType(MediaType.APPLICATION_JSON).content(clear))
+                .andExpect(status().isPreconditionRequired());
+        mvc.perform(put("/api/v1/stores/{id}/alert-settings", store).with(user("owner"))
+                .header("If-Match", "\"alert-setting-0\"").contentType(MediaType.APPLICATION_JSON).content(clear))
+                .andExpect(status().isPreconditionFailed());
+        mvc.perform(put("/api/v1/stores/{id}/alert-settings", store).with(user("owner"))
+                .header("If-Match", "\"alert-setting-1\"").contentType(MediaType.APPLICATION_JSON)
+                .content("{\"deputyUserId\":\"" + ANALYST + "\"}"))
+                .andExpect(status().isUnprocessableContent())
+                .andExpect(jsonPath("$.fieldErrors[0].code").value("DEPUTY_NOT_APPROVER"));
+        mvc.perform(put("/api/v1/stores/{id}/alert-settings", store).with(user("owner"))
+                .header("If-Match", "\"alert-setting-1\"").contentType(MediaType.APPLICATION_JSON).content(clear))
+                .andExpect(status().isOk())
+                .andExpect(header().string("ETag", "\"alert-setting-2\""))
+                .andExpect(jsonPath("$.deputyUserId").doesNotExist())
+                .andExpect(jsonPath("$.changedBy").value(OWNER.toString()));
+        assertThat(jdbc.sql("""
+                        SELECT details ->> 'from' FROM audit_event
+                        WHERE store_id = ? AND action = 'ALERT_DEPUTY_CHANGED'
+                        """).param(store).query(String.class).list()).containsExactly(OPERATOR.toString());
     }
 
     List<String> statuses() {
