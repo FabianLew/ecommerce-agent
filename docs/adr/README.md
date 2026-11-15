@@ -22,5 +22,6 @@ Statuses: `Proposed` → `Accepted` (after the owner accepts it in a PR) → opt
 | [0013](0013-ui-languages.md) | Interface languages (English default, Polish second) | Accepted |
 | [0014](0014-decision-and-activity-read-api.md) | Decision and activity read API | Accepted |
 | [0015](0015-woocommerce-order-history-import.md) | WooCommerce order history import (12 months) in the background | Accepted |
+| [0016](0016-agent-runtime-model-gateway-tools-knowledge.md) | Agent runtime, ModelGateway, read tools, knowledge registry and the agent proposer | Proposed |
 
 Template: [0000-template.md](0000-template.md).
