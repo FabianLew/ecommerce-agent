@@ -162,15 +162,23 @@ public class ExecutionAuthority {
     }
 
     public Optional<AuthorizedAction> find(TrustedStoreScope scope, UUID actionId) {
+        return select(scope, "id = :value", actionId);
+    }
+
+    /** The newest authorization issued for the approval, valid or not. */
+    public Optional<AuthorizedAction> latest(TrustedStoreScope scope, UUID approvalId) {
+        return select(scope, "approval_id = :value ORDER BY issued_at DESC LIMIT 1", approvalId);
+    }
+
+    private Optional<AuthorizedAction> select(TrustedStoreScope scope, String condition, UUID value) {
         return jdbc.sql("""
                         SELECT id, proposal_id, revision, payload_hash, action_hash, approval_id,
                                policy_evaluation_id, action_type, connection_id, target_type, target_id,
                                target_external_id, parameters_hash, expected_status, mapping_version,
                                creative_fingerprint, idempotency_key, issued_at, expires_at
                         FROM authorized_action
-                        WHERE id = :id AND organization_id = :organizationId AND store_id = :storeId
-                        """)
-                .param("id", actionId)
+                        WHERE organization_id = :organizationId AND store_id = :storeId AND\s""" + condition)
+                .param("value", value)
                 .param("organizationId", scope.organizationId())
                 .param("storeId", scope.storeId())
                 .query((rs, n) -> new AuthorizedAction(rs.getObject("id", UUID.class),

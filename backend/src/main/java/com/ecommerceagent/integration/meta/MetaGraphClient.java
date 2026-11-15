@@ -172,7 +172,10 @@ public class MetaGraphClient {
             }
         }).orElse(null);
         MetaApiException.Kind kind;
-        if (status == 429 || RATE_LIMIT_CODES.contains(code)) {
+        if (write && status >= 500) {
+            // A server error after a write does not say whether the change was applied.
+            kind = MetaApiException.Kind.UNCERTAIN;
+        } else if (status == 429 || RATE_LIMIT_CODES.contains(code)) {
             kind = MetaApiException.Kind.RATE_LIMITED;
         } else if (code == 190 || status == 401) {
             kind = MetaApiException.Kind.AUTH_FAILED;

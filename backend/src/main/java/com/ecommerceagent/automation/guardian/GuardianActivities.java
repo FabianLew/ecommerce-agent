@@ -28,6 +28,21 @@ public interface GuardianActivities {
 
     void expireProposal(String proposalId);
 
+    /** Whether the proposal waits for a person: policy REQUIRE_APPROVAL in mode EXECUTE_ON_APPROVAL (ADR-0020). */
+    boolean awaitsApproval(String proposalId);
+
+    /** The decision of a stored approval of this proposal, APPROVED or REJECTED; null when it is another one's. */
+    String approvalDecision(String approvalId, String proposalId);
+
+    /** The id of a stored decision on the proposal, so a lost signal is caught up; null when there is none. */
+    String storedApproval(String proposalId);
+
+    /** Authorizes the approval after a recheck and runs the executor; idempotent by the action's key. */
+    ExecutionRef authorizeAndExecute(String approvalId);
+
+    /** One verification read of the execution; the last one turns an unconfirmed pause into UNKNOWN. */
+    ExecutionRef verifyExecution(String executionId, boolean last);
+
     /** Marks the active proposal superseded and the episode resolved. */
     void resolve(String opportunityId, String proposalId);
 }

@@ -236,9 +236,15 @@ public class ExecutionLedger {
      * Moves the row to {@code next} when the transition is allowed. A {@code FAILED} row whose write never left gives
      * its limit slot back; an uncertain or applied one keeps it.
      */
-    @Transactional
     public ActionExecution move(TrustedStoreScope scope, UUID executionId, ExecutionStatus next, String resultCode,
             String providerRequestId) {
+        return move(scope, executionId, next, resultCode, providerRequestId, false);
+    }
+
+    /** As {@link #move}; {@code nothingChanged} when the provider refused the write, which also gives the slot back. */
+    @Transactional
+    public ActionExecution move(TrustedStoreScope scope, UUID executionId, ExecutionStatus next, String resultCode,
+            String providerRequestId, boolean nothingChanged) {
         ActionExecution current = find(scope, executionId).orElseThrow();
         if (current.status() == next) {
             return current;
@@ -269,7 +275,7 @@ public class ExecutionLedger {
             throw new IllegalStateException("Execution " + executionId + " changed concurrently");
         }
         if ((next == ExecutionStatus.FAILED || next == ExecutionStatus.CONFLICT || next == ExecutionStatus.NOOP)
-                && !current.writeSent()) {
+                && (!current.writeSent() || nothingChanged)) {
             jdbc.sql("""
                             UPDATE action_limit_slot SET released_at = :now
                             WHERE execution_id = :id AND organization_id = :organizationId AND store_id = :storeId

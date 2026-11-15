@@ -7,6 +7,10 @@ import java.util.UUID;
 
 import com.ecommerceagent.automation.TaskQueues;
 import com.ecommerceagent.automation.temporal.ActivityStoreScope;
+import com.ecommerceagent.automation.execution.AdPauseExecutor;
+import com.ecommerceagent.automation.execution.ExecutionAuthority;
+import com.ecommerceagent.automation.execution.ExecutionLedger;
+import com.ecommerceagent.automation.execution.ExecutionStatus;
 import com.ecommerceagent.decisions.ContextSnapshot;
 import com.ecommerceagent.decisions.ContextSnapshots;
 import com.ecommerceagent.decisions.DecisionProposals;
@@ -41,12 +45,19 @@ public class GuardianActivitiesImpl implements GuardianActivities {
     private final DecisionProposals proposals;
     private final PolicyEvaluations policies;
     private final GuardianSettings settings;
+    private final InventoryProtectionPolicy policy;
+    private final DecisionApprovals approvals;
+    private final ExecutionAuthority authority;
+    private final AdPauseExecutor executor;
+    private final ExecutionLedger ledger;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
     GuardianActivitiesImpl(Opportunities opportunities, InventoryContextBuilder contexts, ContextSnapshots snapshots,
             BaselineProposer baseline, InventoryAgentProposer agent, DecisionProposals proposals,
-            PolicyEvaluations policies, GuardianSettings settings, TransactionTemplate transactions, Clock clock) {
+            PolicyEvaluations policies, GuardianSettings settings, InventoryProtectionPolicy policy,
+            DecisionApprovals approvals, ExecutionAuthority authority, AdPauseExecutor executor, ExecutionLedger ledger,
+            TransactionTemplate transactions, Clock clock) {
         this.opportunities = opportunities;
         this.contexts = contexts;
         this.snapshots = snapshots;
@@ -55,6 +66,11 @@ public class GuardianActivitiesImpl implements GuardianActivities {
         this.proposals = proposals;
         this.policies = policies;
         this.settings = settings;
+        this.policy = policy;
+        this.approvals = approvals;
+        this.authority = authority;
+        this.executor = executor;
+        this.ledger = ledger;
         this.transactions = transactions;
         this.clock = clock;
     }
@@ -147,6 +163,57 @@ public class GuardianActivitiesImpl implements GuardianActivities {
     @Override
     public void expireProposal(String proposalId) {
         proposals.close(ActivityStoreScope.current(), UUID.fromString(proposalId), ProposalStatus.EXPIRED);
+    }
+
+    @Override
+    public boolean awaitsApproval(String proposalId) {
+        if (policy.mode() != InventoryProtectionPolicy.Mode.EXECUTE_ON_APPROVAL) {
+            return false;
+        }
+        return policies.latest(ActivityStoreScope.current(), UUID.fromString(proposalId))
+                .filter(evaluation -> evaluation.outcome() == PolicyOutcome.REQUIRE_APPROVAL).isPresent();
+    }
+
+    @Override
+    public String approvalDecision(String approvalId, String proposalId) {
+        return approvals.find(ActivityStoreScope.current(), UUID.fromString(approvalId))
+                .filter(approval -> approval.proposalId().toString().equals(proposalId))
+                .map(approval -> approval.decision().name()).orElse(null);
+    }
+
+    @Override
+    public String storedApproval(String proposalId) {
+        return approvals.ofProposal(ActivityStoreScope.current(), UUID.fromString(proposalId))
+                .map(approval -> approval.id().toString()).orElse(null);
+    }
+
+    @Override
+    public ExecutionRef authorizeAndExecute(String approvalId) {
+        TrustedStoreScope scope = ActivityStoreScope.current();
+        UUID id = UUID.fromString(approvalId);
+        // A retried step continues its authorization while it is valid, or once its write has started: an expired
+        // authorization still reconciles its own attempt, it only cannot start a new one (ADR-0020 point 6).
+        ExecutionAuthority.Authorization authorization = authority.latest(scope, id)
+                .filter(action -> action.validAt(clock.instant()) || ledger.byKey(scope, action.idempotencyKey())
+                        .filter(row -> row.status() != ExecutionStatus.PLANNED).isPresent())
+                .map(action -> new ExecutionAuthority.Authorization(action, null))
+                .orElseGet(() -> authority.authorize(scope, id));
+        if (!authorization.issued()) {
+            return new ExecutionRef(null, null, authorization.refusal());
+        }
+        AdPauseExecutor.Outcome outcome = executor.execute(scope, authorization.action().id());
+        if (outcome.retryable()) {
+            throw io.temporal.failure.ApplicationFailure.newFailure("Execution not finished: " + outcome.code(),
+                    "EXECUTION_RETRY");
+        }
+        return new ExecutionRef(outcome.executionId().toString(), outcome.status().name(), outcome.code());
+    }
+
+    @Override
+    public ExecutionRef verifyExecution(String executionId, boolean last) {
+        AdPauseExecutor.Outcome outcome = executor.verify(ActivityStoreScope.current(), UUID.fromString(executionId),
+                last);
+        return new ExecutionRef(executionId, outcome.status().name(), outcome.code());
     }
 
     @Override

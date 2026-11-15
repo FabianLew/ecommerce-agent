@@ -120,7 +120,6 @@ operator:
     lease-duration: 2m
     max-pauses-per-store-24h: 3
     cooldown-per-ad: 24h
-    verify-delays: 5s,15s,30s,60s
 
   agent:
     # The agent proposer (ADR-0016). Off: the deterministic baseline is the only proposer.
