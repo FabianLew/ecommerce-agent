@@ -32,9 +32,12 @@ public class AiCallDenied extends RuntimeException {
     /** The actor of the run no longer has access to the store. */
     public static final String AUTHORIZATION_REVOKED = "AUTHORIZATION_REVOKED";
 
-    /** A budget or concurrency limit, not a price or configuration problem: the run ended on a limit. */
+    /** Prefix of a refused provider slot: {@code PROVIDER_LIMIT:REQUEST_LIMIT}, {@code PROVIDER_LIMIT:PROVIDER_PAUSED}. */
+    public static final String PROVIDER_LIMIT_PREFIX = "PROVIDER_LIMIT:";
+
+    /** A budget, concurrency or rate limit, not a price or configuration problem: the run ended on a limit. */
     public boolean budget() {
-        return reason.startsWith("BUDGET_EXHAUSTED") || reason.startsWith("NO_PLATFORM_BUDGET")
+        return reason.startsWith(PROVIDER_LIMIT_PREFIX) || reason.startsWith("BUDGET_EXHAUSTED") || reason.startsWith("NO_PLATFORM_BUDGET")
                 || reason.startsWith("NO_STORE_BUDGET") || reason.equals("STORE_LIMIT")
                 || reason.equals("GLOBAL_LIMIT");
     }

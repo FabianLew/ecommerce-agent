@@ -876,3 +876,12 @@ after a stream started and for calls that were never sent.
   `AI_GOVERNANCE:<reason>` (for example `NOT_PRICED`, `PRICE_STALE`) before anything is reserved. The run's cost is
   the settled cost of each call, or the full reservation while it is unknown. Runs record `ai_price` as their price
   source; each call's price version is on its reservation. The cloud profile refuses a configured price list.
+- **E-54.3, provider rate limits.** Every paid call takes a slot of its provider model before it is marked sent
+  (`ai_acquire_provider_slot`, V35): at most a number of requests and of input and output tokens per minute (counted
+  at the call's reserved maxima) and of calls in flight, from the versioned parameter set `ai-provider-limits/1`
+  (`operator.ai-provider-limits`, per-model overrides). One advisory lock per provider model serialises the check
+  across instances. A refused slot releases the reservation and ends the run `LIMIT_EXCEEDED` with
+  `AI_GOVERNANCE:PROVIDER_LIMIT:<reason>`; nothing is sent. A rate-limited answer pauses the model for the provider's
+  `retry-after` (default 30 seconds, at most 10 minutes; a pause is only extended) and later calls answer
+  `PROVIDER_PAUSED`. The slot is released when the call ends, and expires on its own after a lost worker. Metrics
+  `operator_ai_provider_slots_total` and `operator_ai_provider_throttled_total`, alert `AiProviderThrottled`.

@@ -133,6 +133,8 @@ class SpringAiAnthropicGatewayTest {
                 .isInstanceOfSatisfying(ModelFailure.class, failure -> {
                     assertThat(failure.type()).isEqualTo(ModelFailure.Type.RATE_LIMITED);
                     assertThat(failure.retryable()).isTrue();
+                    assertThat(failure.retryAfter()).as("the provider's retry-after").isEqualTo(
+                            java.time.Duration.ofSeconds(7));
                 });
         assertThatThrownBy(() -> gateway.complete(request(List.of(new ModelMessage.User("b")))))
                 .isInstanceOfSatisfying(ModelFailure.class,

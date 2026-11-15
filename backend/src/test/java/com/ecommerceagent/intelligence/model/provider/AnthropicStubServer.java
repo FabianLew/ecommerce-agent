@@ -39,6 +39,9 @@ final class AnthropicStubServer implements AutoCloseable {
                     ? "{\"type\":\"error\",\"error\":{\"type\":\"api_error\",\"message\":\"no stubbed response\"}}"
                     : body).getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
+            if (status == 429) {
+                exchange.getResponseHeaders().add("retry-after", "7");
+            }
             exchange.sendResponseHeaders(status, bytes.length);
             try (OutputStream out = exchange.getResponseBody()) {
                 out.write(bytes);

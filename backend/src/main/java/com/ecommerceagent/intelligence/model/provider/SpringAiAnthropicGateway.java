@@ -208,7 +208,19 @@ class SpringAiAnthropicGateway implements ModelGateway {
         } else {
             type = ModelFailure.Type.REJECTED;
         }
-        return new ModelFailure(type, service.getClass().getSimpleName(), null, requestId, notCharged, null);
+        Duration retryAfter = type == ModelFailure.Type.RATE_LIMITED || status == 529 ? retryAfter(service) : null;
+        return new ModelFailure(type, service.getClass().getSimpleName(), retryAfter, requestId, notCharged, null);
+    }
+
+    /** The provider's {@code retry-after} in seconds, when it gave a sensible one. */
+    static Duration retryAfter(AnthropicServiceException service) {
+        try {
+            return service.headers().values("retry-after").stream().findFirst().map(String::trim)
+                    .map(Long::parseLong).filter(seconds -> seconds > 0 && seconds <= 3600)
+                    .map(Duration::ofSeconds).orElse(null);
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
     }
 
     private static String errorType(AnthropicServiceException service) {

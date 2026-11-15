@@ -15,7 +15,7 @@ import com.ecommerceagent.identity.TrustedStoreScope;
  * life of each call. The real governance is tested on PostgreSQL ({@link AiBudgetGovernorTest},
  * {@link AiUsageLedgerTest}).
  */
-public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedger, AiAdmission {
+public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedger, AiAdmission, AiProviderLimiter {
 
 
     /** USD per million input and output tokens, by model name; a model without an entry uses {@link #DEFAULT_PRICE}. */
@@ -245,5 +245,43 @@ public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedg
     public Settlement reconcile(TrustedStoreScope scope, UUID reservationId, ReconciliationOutcome outcome,
             BigDecimal cost, String reason) {
         throw new UnsupportedOperationException("Reconciliation is tested on PostgreSQL");
+    }
+
+    private Slot slotAnswer = Slot.GRANTED;
+    private final java.util.Set<UUID> openSlots = new java.util.HashSet<>();
+    private final List<String> pauses = new ArrayList<>();
+
+    /** The answer of the next slot requests. */
+    public synchronized void slot(Slot answer) {
+        slotAnswer = answer;
+    }
+
+    public synchronized java.util.Set<UUID> openSlots() {
+        return java.util.Set.copyOf(openSlots);
+    }
+
+    public synchronized List<String> pauses() {
+        return List.copyOf(pauses);
+    }
+
+    @Override
+    public synchronized Slot acquire(UUID callId, String provider, String model, long inputTokens, long outputTokens,
+            java.time.Duration ttl) {
+        failIfBroken("slot");
+        events.add("SLOT:" + slotAnswer);
+        if (slotAnswer.granted()) {
+            openSlots.add(callId);
+        }
+        return slotAnswer;
+    }
+
+    @Override
+    public synchronized void release(UUID callId) {
+        openSlots.remove(callId);
+    }
+
+    @Override
+    public synchronized void pause(String provider, String model, java.time.Duration retryAfter, String reason) {
+        pauses.add(provider + "/" + model + ":" + retryAfter + ":" + reason);
     }
 }

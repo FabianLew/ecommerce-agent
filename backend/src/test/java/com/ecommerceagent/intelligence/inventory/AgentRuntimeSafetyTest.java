@@ -95,7 +95,7 @@ class AgentRuntimeSafetyTest {
                     if (accessRevoked) {
                         throw new StoreAccessDeniedException(checked.storeId(), StorePermission.STORE_READ);
                     }
-                }, clock), registry, runs, hooks, settings, clock);
+                }, governance, clock), registry, runs, hooks, settings, clock);
     }
 
     InventoryAgentProposer proposer() {
@@ -413,7 +413,7 @@ class AgentRuntimeSafetyTest {
         model.then(request -> {
             assertThat(governance.events()).as("admitted, reserved and marked sent before the request")
                     .containsExactly("ADMISSION:GRANTED:1", "RESERVED:" + governance.reservations().getFirst().key,
-                            "SENT:" + governance.reservations().getFirst().key);
+                            "SLOT:GRANTED", "SENT:" + governance.reservations().getFirst().key);
             return new ModelTurn("", List.of(call("t1", InventoryReadTools.FORECAST,
                     "{\"productVariantId\":\"" + VARIANT + "\"}")), ModelTurn.FinishReason.TOOL_USE,
                     FakeModelGateway.usage(), "r1", null);
@@ -716,6 +716,36 @@ class AgentRuntimeSafetyTest {
         assertThat(decision.fallback()).isEqualTo("AI_GOVERNANCE:BUDGET_EXHAUSTED:STORE:MONTHLY");
         assertThat(model.requests()).hasSize(1);
         assertThat(runs.only().status()).isEqualTo(AgentRunStatus.LIMIT_EXCEEDED);
+    }
+
+    /** ADR-0027 section 6.2 (E-54.3): a call over the provider's rate limits is never sent and frees its budget. */
+    @Test
+    void aCallOverTheProviderRateLimitIsNotSent() {
+        governance.slot(com.ecommerceagent.aigovernance.AiProviderLimiter.Slot.REQUEST_LIMIT);
+
+        AgentRunResult result = run();
+
+        assertThat(result.status()).isEqualTo(AgentRunStatus.LIMIT_EXCEEDED);
+        assertThat(result.stopReason()).isEqualTo("AI_GOVERNANCE:PROVIDER_LIMIT:REQUEST_LIMIT");
+        assertThat(model.requests()).isEmpty();
+        assertThat(governance.reservations()).singleElement()
+                .satisfies(reservation -> assertThat(reservation.state).isEqualTo("RELEASED"));
+    }
+
+    /** A rate-limited answer pauses the model with the provider's retry-after; the slot is always given back. */
+    @Test
+    void aRateLimitedAnswerPausesTheModelAndEverySlotIsReleased() {
+        model.then(request -> {
+            throw new ModelFailure(ModelFailure.Type.RATE_LIMITED, "RateLimitException", Duration.ofSeconds(7), "r",
+                    true, null);
+        });
+
+        AgentRunResult result = run();
+
+        assertThat(result.status()).isEqualTo(AgentRunStatus.MODEL_FAILED);
+        assertThat(governance.pauses()).containsExactly(PRIMARY.provider() + "/" + PRIMARY.name()
+                + ":PT7S:RATE_LIMITED");
+        assertThat(governance.openSlots()).isEmpty();
     }
 
     /** ADR-0027 section 7: a new snapshot inside the cooldown is analysed again only after a material change. */
