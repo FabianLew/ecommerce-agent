@@ -78,13 +78,13 @@ locals {
   backend_containers = {
     for role in ["api", "worker"] : role => jsonencode([
       {
-        name         = role
-        image        = local.backend_image
-        essential    = true
-        portMappings = [for port in (role == "api" ? [8080] : []) : { containerPort = port, protocol = "tcp" }]
-        environment  = concat(local.backend_environment, [{ name = "SPRING_PROFILES_ACTIVE", value = "cloud,${role}" }])
-        secrets      = local.backend_secrets
-        dependsOn    = [{ containerName = "otel-collector", condition = "START" }]
+        name             = role
+        image            = local.backend_image
+        essential        = true
+        portMappings     = [for port in(role == "api" ? [8080] : []) : { containerPort = port, protocol = "tcp" }]
+        environment      = concat(local.backend_environment, [{ name = "SPRING_PROFILES_ACTIVE", value = "cloud,${role}" }])
+        secrets          = local.backend_secrets
+        dependsOn        = [{ containerName = "otel-collector", condition = "START" }]
         logConfiguration = local.log_options[role]
       },
       merge(local.collector, { logConfiguration = local.log_options[role] }),
@@ -151,10 +151,10 @@ locals {
     }])
     # Administration only (bootstrapping the roles, logical dumps); run by hand with a command override.
     db-admin = jsonencode([{
-      name        = "db-admin"
-      image       = "public.ecr.aws/docker/library/postgres:17"
-      essential   = true
-      command     = ["psql", "--version"]
+      name      = "db-admin"
+      image     = "public.ecr.aws/docker/library/postgres:17"
+      essential = true
+      command   = ["psql", "--version"]
       environment = [
         { name = "PGHOST", value = local.db_host },
         { name = "PGDATABASE", value = "operator" },

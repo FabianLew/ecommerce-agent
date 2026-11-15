@@ -266,7 +266,10 @@ function blockedTitle(code: string, t: Messages["decisions"], messages: Messages
   if (code === "PROPOSAL_EXPIRED") {
     return t.proposalStatus.EXPIRED;
   }
-  return messages.mutationStop.stopped;
+  if (code === "MUTATIONS_STOPPED") {
+    return messages.mutationStop.stopped;
+  }
+  return t.blockedTitle;
 }
 
 function blockedText(code: string, t: Messages["decisions"], messages: Messages): string {
