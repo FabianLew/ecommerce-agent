@@ -107,7 +107,7 @@ final class QualityHarness {
                     ContextSnapshot snapshot, InMemoryAgentRuns runs) {
                 InMemoryAiGovernance governance = new InMemoryAiGovernance();
                 AgentRuntime runtime = new AgentRuntime(new GovernedModelGateway(gateways, governance, governance,
-                        governance, clock), registry, runs, List.of(), settings, clock);
+                        governance, checked -> { }, clock), registry, runs, List.of(), settings, clock);
                 return new InventoryAgentProposer(runtime, runs, settings, InventoryAgentRunPolicy.defaults(), knowledge,
                         registry, clock)
                         .propose(scope, snapshot.opportunityId(), snapshot);

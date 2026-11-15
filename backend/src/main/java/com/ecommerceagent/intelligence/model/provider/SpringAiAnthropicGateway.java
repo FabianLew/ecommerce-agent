@@ -18,12 +18,8 @@ import com.ecommerceagent.intelligence.model.ToolCall;
 import com.ecommerceagent.intelligence.model.ToolSpec;
 import com.anthropic.errors.AnthropicIoException;
 import com.anthropic.errors.AnthropicServiceException;
-import com.anthropic.errors.BadRequestException;
-import com.anthropic.errors.InternalServerException;
-import com.anthropic.errors.NotFoundException;
-import com.anthropic.errors.PermissionDeniedException;
-import com.anthropic.errors.RateLimitException;
-import com.anthropic.errors.UnauthorizedException;
+import com.anthropic.errors.SseException;
+import com.anthropic.models.ErrorType;
 import com.anthropic.models.messages.OutputConfig;
 import org.springframework.ai.anthropic.AnthropicChatOptions;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -75,12 +71,14 @@ class SpringAiAnthropicGateway implements ModelGateway {
         requireProvider(request.model());
         ChatModel model = chatModel.getIfAvailable();
         if (model == null) {
+            // Nothing was sent, so nothing can be charged.
             throw new ModelFailure(ModelFailure.Type.UNAVAILABLE, "No Anthropic chat model is configured", null, null,
-                    null);
+                    true, null);
         }
         Duration timeout = Duration.between(Instant.now(), request.deadline());
         if (timeout.isNegative() || timeout.isZero()) {
-            throw new ModelFailure(ModelFailure.Type.TIMEOUT, "Deadline passed before the call", null, null, null);
+            throw new ModelFailure(ModelFailure.Type.TIMEOUT, "Deadline passed before the call", null, null, true,
+                    null);
         }
         AnthropicChatOptions.Builder options = AnthropicChatOptions.builder();
         options.model(request.model().name());
@@ -170,40 +168,55 @@ class SpringAiAnthropicGateway implements ModelGateway {
 
     static ModelFailure failure(RuntimeException error) {
         for (Throwable cause = error; cause != null; cause = cause.getCause()) {
-            String requestId = null;
             if (cause instanceof AnthropicServiceException service) {
-                requestId = service.headers().values("request-id").stream().findFirst().orElse(null);
-            }
-            int status = cause instanceof AnthropicServiceException service ? service.statusCode() : 0;
-            if (status == 408 || status == 504) {
-                // A timeout reported as a response (by the API or a gateway in between): the request may have been
-                // processed and billed, so it is possibly charged (ADR-0027 section 4.5).
-                return new ModelFailure(ModelFailure.Type.TIMEOUT, cause.getClass().getSimpleName(), null, requestId,
-                        false, null);
+                return serviceFailure(service);
             }
             ModelFailure.Type type = switch (cause) {
-                case RateLimitException ignored -> ModelFailure.Type.RATE_LIMITED;
-                case InternalServerException ignored -> ModelFailure.Type.UNAVAILABLE;
-                case BadRequestException ignored -> ModelFailure.Type.REJECTED;
-                case UnauthorizedException ignored -> ModelFailure.Type.REJECTED;
-                case PermissionDeniedException ignored -> ModelFailure.Type.REJECTED;
-                case NotFoundException ignored -> ModelFailure.Type.REJECTED;
-                case AnthropicServiceException service -> service.statusCode() >= 500 ? ModelFailure.Type.UNAVAILABLE
-                        : ModelFailure.Type.REJECTED;
                 case AnthropicIoException ignored -> ModelFailure.Type.TIMEOUT;
                 case java.net.http.HttpTimeoutException ignored -> ModelFailure.Type.TIMEOUT;
                 case java.io.InterruptedIOException ignored -> ModelFailure.Type.TIMEOUT;
                 default -> null;
             };
             if (type != null) {
-                // Only a response that says the request was refused before processing is known not to be billed:
-                // a client error (4xx), rate limiting (429) or overload (529). Any other server error, a broken
-                // connection or a timeout may have been processed, so it stays possibly charged (UNKNOWN).
-                boolean notCharged = status >= 400 && status < 500 || status == 529;
-                return new ModelFailure(type, cause.getClass().getSimpleName(), null, requestId, notCharged, null);
+                // No response: the request may have reached the provider and been processed.
+                return new ModelFailure(type, cause.getClass().getSimpleName(), null, null,
+                        AnthropicChargeRules.confirmedNotCharged(AnthropicChargeRules.Stage.NO_RESPONSE, 0, null),
+                        null);
             }
         }
         return new ModelFailure(ModelFailure.Type.UNKNOWN, error.getClass().getSimpleName(), null, null, null);
+    }
+
+    private static ModelFailure serviceFailure(AnthropicServiceException service) {
+        String requestId = service.headers().values("request-id").stream().findFirst().orElse(null);
+        int status = service.statusCode();
+        String errorType = errorType(service);
+        // An error event inside a stream arrives as an SseException: the response had started, so output may have
+        // been generated and billed.
+        AnthropicChargeRules.Stage stage = service instanceof SseException ? AnthropicChargeRules.Stage.STREAM_STARTED
+                : AnthropicChargeRules.Stage.ERROR_RESPONSE;
+        boolean notCharged = AnthropicChargeRules.confirmedNotCharged(stage, status, errorType);
+        ModelFailure.Type type;
+        if (status == 408 || status == 504 || "timeout_error".equals(errorType)) {
+            // A timeout reported as a response, by the API or a gateway in between.
+            type = ModelFailure.Type.TIMEOUT;
+        } else if (status == 429 || "rate_limit_error".equals(errorType)) {
+            type = ModelFailure.Type.RATE_LIMITED;
+        } else if (status >= 500 || "overloaded_error".equals(errorType) || "api_error".equals(errorType)
+                || service instanceof SseException) {
+            type = ModelFailure.Type.UNAVAILABLE;
+        } else {
+            type = ModelFailure.Type.REJECTED;
+        }
+        return new ModelFailure(type, service.getClass().getSimpleName(), null, requestId, notCharged, null);
+    }
+
+    private static String errorType(AnthropicServiceException service) {
+        try {
+            return service.errorType().map(ErrorType::asString).orElse(null);
+        } catch (RuntimeException unreadable) {
+            return null;
+        }
     }
 
     /** Sends the definition to the model; refuses to run, because tools run only in the runtime (ADR-0002). */

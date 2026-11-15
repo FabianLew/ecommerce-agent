@@ -1,6 +1,6 @@
 # ADR-0027: AI cost governance, budget enforcement and abuse protection
 
-- Status: Proposed
+- Status: Accepted (2026-11-15, after amendments A1 to A5 of the stage 1 review; see section 23)
 - Date: 2026-11-15
 - Related: ADR-0016 (agent runtime, ModelGateway, tools, knowledge), ADR-0004 (tenancy), ADR-0020 (approval and
   execution), ADR-0021 (notifications and outcomes), ADR-0022 (row-level security and retention), ADR-0024 (metrics
@@ -92,8 +92,10 @@ lose billing history.
 
 ### 3.2 Currency and precision
 
-Provider costs are stored in their original currency as `NUMERIC`, never `double` or `float`. In the MVP the technical
-currency of AI cost accounting is USD. When a plan budget is in PLN, conversion uses a versioned exchange rate with a
+Provider costs are stored in their original currency as `NUMERIC`, never `double` or `float`. USD is the technical
+currency of AI cost accounting: prices, reservations, settlements and platform budgets are in USD. The user interface
+does not assume one display currency: every amount it shows carries its currency code, and a converted amount is
+labelled as converted, so PLN is one display currency among others, not a special case. When a plan budget is in PLN, conversion uses a versioned exchange rate with a
 named source and validity period. The rate used at reservation and at settlement is recorded. Budgets keep a safety
 margin for price and exchange rate changes.
 
@@ -187,6 +189,25 @@ Reservation states:
 For `UNKNOWN` the reservation is kept until it is reconciled with provider data or settled conservatively. An
 ambiguous call is never retried automatically without a new budget evaluation.
 
+A failed call is settled at zero (confirmed not charged) only when an explicit, versioned rule of its provider adapter
+says so. The rule depends on the provider, the stage the request reached, the HTTP status and the provider's error
+type together; a status code alone is never enough, and anything the rule does not list stays possibly charged:
+
+| Stage | Outcome |
+|---|---|
+| Not sent (the adapter refused before sending: no model configured, deadline already passed) | Not charged |
+| Error response before any output, with a status and error type the rule lists | Not charged |
+| Error response with any other status, an unexpected error type or no readable error type | `UNKNOWN` |
+| Error after a streaming response started (an error event after `message_start`) | `UNKNOWN` |
+| No response (timeout, dropped connection, I/O error) | `UNKNOWN` |
+
+Rule set `anthropic-charge/1` lists these pairs for the Anthropic Messages API: 400 `invalid_request_error`, 401
+`authentication_error`, 403 `permission_error`, 404 `not_found_error`, 413 `request_too_large`, 429
+`rate_limit_error`, 529 `overloaded_error`. Everything else, including 402 `billing_error`, 408, 409, 422, every other
+5xx and `timeout_error`, stays `UNKNOWN`. Changing the list is a new rule set version with its regression test. A
+provider without its own rule set (for example Bedrock until its adapter has one) treats every failure after the
+request left as `UNKNOWN`.
+
 Reconciliation tells apart: confirmed not charged, confirmed charged, still unknown. We do not assume every provider
 can report the cost of a single request. Reconciliation jobs have a time limit and an operational escalation. An
 uncertain reservation is never deleted without a trace.
@@ -224,8 +245,18 @@ Rules:
 - exceeding a limit ends the analysis in a controlled state;
 - a run records its policy version for audit and reproducibility.
 
-Tightening an active safety or budget policy also applies to running runs, at the latest before their next model call.
-A reservation already granted does not allow a call after a later global AI stop.
+The versioned run policy with the ordinary run limits above (calls, tokens, wall time, cost per run, concurrency,
+cooldown) is read when the run starts and applies until the run ends; the run records the version it used, and a new
+version applies from the next run. The following always apply to a running run before every next paid call,
+whatever its policy version says:
+
+- the current budgets at every level (each call needs its own reservation against them);
+- the AI kill switches (global, per store, per automation; section 12);
+- a revoked authorization: the actor of the run is checked against the database before each call, so a removed
+  membership or store stops the run;
+- the safety blocks of governance itself: a missing or stale price, and a failure of governance, send nothing.
+
+A reservation already granted does not allow a call after a later AI stop.
 
 ## 6. Rate limiting and concurrency
 
@@ -334,6 +365,15 @@ ai-governance/
 
 This is a logical split; it does not mean separate services or deployment artifacts.
 
+### Platform independence
+
+The product direction is a platform-independent Commerce Operator. AI governance therefore knows nothing about
+commerce or advertising platforms (WooCommerce, Shopify, Meta Ads, Google Ads or any other). Its only dimensions are
+the trusted organization and store context (`TrustedStoreScope`, the store as a tenant, not as a platform
+connection), the automation type, the provider and the model. A new commerce or ad integration never changes the
+governance module. The module depends only on `identity`; an architecture test fails the build when it depends on an
+integration module or names a platform.
+
 ### Integration with the agent runtime
 
 ```text
@@ -411,8 +451,12 @@ model links to the existing `organization`, `store` and `agent_run` tables.
 - **Agent runtime:** bounded execution, tool allowlist, tool result size limits, a limit on re-analyses, no
   unauthorized model choice, limits that prompt injection cannot change, protection against delegation loops between
   agents.
-- **Platform AI kill switch:** a global way to stop new paid model calls. It works independently of the kill switch
-  for external business mutations (ADR-0020), and it does not stop deterministic store monitoring.
+- **AI kill switches:** a global, a per-store and a per-automation stop of new paid model calls. They are independent
+  safeguards: any one of them on stops the call, and turning one off never turns another off. They work independently
+  of the kill switch for external business mutations (ADR-0020), and they do not stop deterministic store monitoring.
+  Changing a stop is an explicit, audited action; the runtime cannot change it. Hard budget limits are not a kill
+  switch and do not depend on one: an exhausted budget always refuses the call (fail closed). The MVP has no automatic
+  latching of a kill switch on cost; it may be added later for anomaly detection.
 
 ## 13. Budget exhaustion and graceful degradation
 
@@ -442,7 +486,8 @@ Metrics: `ai_cost_total`, `ai_cost_per_store`, `ai_cost_per_automation`, `ai_cos
 the project's convention (`operator_` prefix, ADR-0024). Store ids are never high-cardinality Prometheus labels; per
 store detail comes from the usage ledger.
 
-Alerts: 70% and 90% of a budget, an exhausted budget, an unusual cost increase, too many retries, a growing number of
+Alerts: by default 70%, 90% and 100% (exhausted) of a budget, as a versioned and configurable parameter set; each
+threshold notifies once per budget period, an unusual cost increase, too many retries, a growing number of
 uncertain settlements, price list read errors, provider overload, a malfunctioning budget governor.
 
 A basic AI cost view for the platform administrator. Store users never see the platform's detailed economics.
@@ -562,15 +607,20 @@ provider billing.
 - O-08: retention of the financial ledger and usage data.
 - O-09: policy for `UNKNOWN` reservations that stay unsettled for a long time.
 
-These do not block contracts and tests, but must be closed before paid AI operations run for customers. (They are
+None of them blocks this decision or stage 2 implementation. O-05 is answered: USD is the technical currency and the
+interface is multi-currency (section 3.2). O-01, O-02, O-04, O-06 are product settings answered before customers;
+O-03, O-07, O-08 and O-09 must be closed before paid AI operations run for customers. (They are
 numbered within this ADR; they are not the plan's O-xx questions.)
 
 ## 21. Implementation plan
 
 - **Stage 1, cost safety foundation:** platform and store budgets, pricing catalog, atomic reservations, usage
   ledger, `GovernedModelGateway`, run limits, concurrency and failure tests.
-- **Stage 2, runtime protection:** admission control, concurrency limits, rate limiting, deduplication, `UNKNOWN`
-  reconciliation, AI kill switch, cost alerts.
+- **Stage 2, runtime protection:** provider rate limits (RPM, TPM, parallel calls), admission priorities with reserved
+  slots and bounded waiting, API and trigger rate limits with idempotency and event deduplication, `UNKNOWN`
+  reconciliation, per-store and per-automation kill switches, cost alerts, a single price source and the platform
+  independence guard. The basic admission control, the per-store and global concurrency limits, the global AI kill
+  switch and the analysis cooldown were delivered with stage 1 (E-53 step 5).
 - **Stage 3, cost optimization:** model routing, context optimization, prompt caching, cost monitoring per
   automation, basic administrative cost view.
 
@@ -792,3 +842,22 @@ are built.
 **Final decision:** AI cost governance is a mandatory part of the safety and economics infrastructure of Autonomous
 E-commerce Operator. It must protect the platform against excessive spending regardless of the model provider, user
 actions and autonomous workflows.
+
+## 23. Review against the stage 1 implementation (2026-11-15)
+
+After E-53 the decisions were reviewed against the code and amended before acceptance:
+
+- **A1.** Section 5: ordinary run limits hold until the run ends; budgets, kill switches, revoked authorization and
+  governance safety blocks apply before every next paid call. Implemented: `GovernedModelGateway` re-checks the
+  actor's access before each call (`AUTHORIZATION_REVOKED`, the run ends `STOPPED`); budgets are reserved per call;
+  the global stop is checked when the call is marked sent. The per-store and per-automation stops follow in E-54.8.
+- **A2.** Section 9: the pricing catalog `ai_price` becomes the only price source; the run cost estimate moves from
+  configuration to the catalog in E-54.2. Until then the reservation, which always uses the catalog, is what decides.
+- **A3.** Section 21: stage boundaries updated to what stage 1 delivered.
+- **A4.** Section 10: platform independence.
+- **A5.** Section 20: which open questions block what.
+
+Also in this review: the failure classification of section 4.5 replaced the earlier "any 4xx or 529 is not charged"
+rule with the explicit rule set `anthropic-charge/1`, with regression tests per status and error type, for errors
+after a stream started and for calls that were never sent.
+
