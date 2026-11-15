@@ -22,7 +22,42 @@ cat > wp-content/mu-plugins/operator-local-webhooks.php <<'PHP'
 add_filter('http_request_host_is_external', '__return_true');
 PHP
 
+# Version 2: the Inventory Guardian scenario product (document 03 §2, plan section F). Order dates are relative
+# to the day the seed runs, so after a few days the scenario needs a fresh store (`down -v`).
+seed_scenario() {
+  SERUM_ID=$(wp wc product create --user=admin --porcelain \
+    --name="Serum nawilżające" --type=variable --sku=SERUM --status=publish \
+    --attributes='[{"name":"Pojemność","options":["30 ml"],"variation":true,"visible":true}]')
+  SERUM_VARIATION_ID=$(wp wc product_variation create "$SERUM_ID" --user=admin --porcelain \
+    --sku=SERUM-30 --regular_price=129.00 --manage_stock=true --stock_quantity=60 \
+    --attributes='[{"name":"Pojemność","option":"30 ml"}]')
+  # 49 one-unit orders over the last 7 full days in Europe/Warsaw (the time zone of the demo stores): 7 a day.
+  # Stock is set to 60 afterwards, so completing the orders does not change the scenario's starting stock.
+  SERUM_VARIATION_ID="$SERUM_VARIATION_ID" wp eval '
+$variation = wc_get_product((int) getenv("SERUM_VARIATION_ID"));
+$zone = new DateTimeZone("Europe/Warsaw");
+$today = new DateTimeImmutable("today", $zone);
+for ($day = 1; $day <= 7; $day++) {
+  for ($n = 0; $n < 7; $n++) {
+    $order = wc_create_order();
+    $order->add_product($variation, 1);
+    $order->set_date_created($today->modify("-$day days")->setTime(9 + $n, 15)->getTimestamp());
+    $order->calculate_totals();
+    $order->set_status("completed");
+    $order->save();
+  }
+}
+wc_update_product_stock($variation, 60, "set");
+'
+  echo "Scenario seeded: SERUM-30 (product $SERUM_ID, variation $SERUM_VARIATION_ID), stock 60, 49 orders."
+}
+
 if wp option get operator_seed_version >/dev/null 2>&1; then
+  version=$(wp option get operator_seed_version)
+  if [ "$version" = "1" ]; then
+    seed_scenario
+    wp option update operator_seed_version 2
+  fi
   echo "Store already seeded (operator_seed_version=$(wp option get operator_seed_version))."
   exit 0
 fi
@@ -75,5 +110,7 @@ $wpdb->insert($wpdb->prefix . "woocommerce_api_keys", array(
 ));
 '
 
-wp option add operator_seed_version 1
-echo "Seed complete: product $PRODUCT_ID with 3 variants + 1 simple product."
+seed_scenario
+
+wp option add operator_seed_version 2
+echo "Seed complete: product $PRODUCT_ID with 3 variants, 1 simple product and the SERUM-30 scenario."

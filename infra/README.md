@@ -45,6 +45,13 @@ Changing the realm: edit the JSON and run `down -v` (the import only works for a
 | --- | --- | --- |
 | Koszulka Basic (variable, attribute Rozmiar/size) | `TSHIRT-BASIC-S` / `-M` / `-L` | 18 / 3 / 0 |
 | Kubek Logo (simple) | `MUG-LOGO` | 49 |
+| Serum nawilżające (variable, attribute Pojemność/volume) | `SERUM-30` | 60 |
+
+`SERUM-30` is the Inventory Guardian scenario (document 03 §2, seed version 2): 49 completed one-unit orders, 7 a
+day over the 7 full days before the seed ran (Europe/Warsaw, the demo stores' time zone). Lowering its stock to 18
+gives 2.6 days of cover. The dates are relative to the seed run, so for the scenario after a few days reset the
+store with `down -v`. A store seeded with version 1 gets the product on the next `up` (with orders from that day).
+The ad fixture of store B maps the dedicated ad `ad-9001` (verified) and the catalog ad `ad-9002` to it.
 
 Currency PLN, country PL, timezone UTC, stock management enabled. Product names are Polish on purpose: the test
 store mirrors a Polish shop.

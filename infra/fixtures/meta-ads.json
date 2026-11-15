@@ -40,26 +40,27 @@
     "ads": [
       {
         "externalId": "ad-9001",
-        "accountExternalId": "act-local-01",
-        "name": "Koszulka Basic S – reklama dedykowana",
+        "accountExternalId": "act-700",
+        "name": "Serum 30 ml – reklama dedykowana",
         "ownStatus": "ACTIVE",
         "effectiveStatus": "ACTIVE",
-        "creativeFingerprint": "fp-creative-44",
+        "creativeFingerprint": "fp-serum-30",
         "scope": "SINGLE_VARIANT",
         "skus": [
-          "TSHIRT-BASIC-S"
+          "SERUM-30"
         ],
         "verified": true
       },
       {
         "externalId": "ad-9002",
-        "accountExternalId": "act-local-01",
+        "accountExternalId": "act-700",
         "name": "Katalog – wszystkie produkty",
         "ownStatus": "ACTIVE",
         "effectiveStatus": "ACTIVE",
         "creativeFingerprint": "fp-catalog-07",
         "scope": "MULTI_PRODUCT",
         "skus": [
+          "SERUM-30",
           "TSHIRT-BASIC-S",
           "TSHIRT-BASIC-M",
           "TSHIRT-BASIC-L",
