@@ -29,3 +29,8 @@ export function switchStorePath(currentPathname: string, targetStoreId: string):
   const section = segments[0] === "stores" ? segments[2] : undefined;
   return storePath(targetStoreId, section && isSection(section) ? section : "dashboard");
 }
+
+/** Decision Detail of one proposal revision (04 §2: `/decisions/:proposalId`). */
+export function decisionPath(storeId: string, proposalId: string): string {
+  return `${storePath(storeId, "decisions")}/${encodeURIComponent(proposalId)}`;
+}
