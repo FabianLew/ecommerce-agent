@@ -2,7 +2,8 @@
 
 - Status: Proposed
 - Date: 2026-11-15
-- Revised: 2026-11-15 (review: separate migration and runtime roles, fail-closed scope, system operations)
+- Revised: 2026-11-15 (review: separate migration and runtime roles, fail-closed scope, system operations; O-03
+  retention decisions: periods from the end of processing, exceptions, holds, backups)
 - Related: ADR-0004 points 8 and 9, ADR-0005 point 5, ADR-0007 (`key_id`), ADR-0009 (inbox and outbox growth),
   ADR-0016 (agent run steps), ADR-0021 (notifications), ADR-0023 (migration step), document 01 O-03, document 02
   §Security, epic E-45
@@ -104,21 +105,48 @@ metrics); it must keep working without a general way around the policies.
    period from `operator.retention.periods`. `RetentionRunner` (worker profile) runs them every
    `operator.retention.interval` in batches of `operator.retention.batch-size`, per store under the system actor
    `SYSTEM:retention` (point 4), and records one `RETENTION_APPLIED` audit entry per task and store with the count.
-   The pilot defaults, to be confirmed with O-03:
+   The periods approved by the project owner on 2026-11-15 (O-03). Each period runs from the end of processing,
+   never from arrival:
 
-   | Data | Period | Action |
+   | Data | Period, from | Action |
    |---|---|---|
-   | `webhook_inbox` rows no longer `RECEIVED` | 30 days | delete |
-   | `outbox_event` rows already dispatched | 30 days | delete |
-   | `agent_run_step.payload` (prompts, responses, tool results) | 90 days | replaced by `{"redacted": true}`; hashes, tokens and cost stay on `agent_run` |
-   | `operator_notification` with its read marks and finished deliveries | 180 days | delete |
+   | `webhook_inbox` rows `PROCESSED` or `IGNORED` | 30 days from `processed_at` | delete |
+   | `outbox_event` rows already dispatched | 30 days from `dispatched_at` | delete |
+   | `agent_run_step.payload` (prompts, responses, tool results) | 90 days from the step | replaced by `{"redacted": true}` |
+   | `operator_notification` with its read marks, deliveries and provider events | 180 days from creation, once no delivery is open | delete |
    | `audit_event` | 400 days | delete, through `apply_audit_retention` only |
 
-   The runner is **off by default** (`operator.retention.enabled=false`) until the periods are approved.
+   The runner is **off by default** (`operator.retention.enabled=false`). It is switched on in staging first, then
+   in production after the GDPR review of point 7.
    The audit trigger allows a `DELETE` only inside a transaction that set `operator.audit_retention = 'on'`, and
    only for rows older than 365 days, so neither a bug nor a short misconfigured period can remove recent audit.
-   Decisions, evidence, snapshots, approvals, authorized actions, the execution ledger and outcomes are kept:
-   they are the record of why an action happened.
+7. **What retention never removes, and why.**
+   - *Active processes and data still to reconcile* are excluded by every task, whatever their age: an inbox item
+     still `RECEIVED` or `FAILED` (a failed item stays for diagnosis until the store's data was reconciled and an
+     operator closes it), an outbox event not dispatched, a notification with a delivery `PENDING`, `SENDING`,
+     `FAILED` or `UNKNOWN` (ADR-0021), and anything of an episode that is not `CLOSED` or `RESOLVED`.
+   - *LLM content is separate from decision metadata.* The raw model exchange (prompts, responses, tool results in
+     `agent_run_step.payload`) is redacted after 90 days. The run's metadata stays: model, versions, hashes of the
+     prompt, knowledge and tools, token counts, cost, stop reason and step kinds. The decision record stays too:
+     proposals with their rationale, evidence, snapshots, policy evaluations, approvals, authorized actions, the
+     execution ledger and outcomes. It is the record of why an action happened, and it holds no raw prompt.
+   - *Legal hold.* An operator can put a store on hold (`store_retention_hold`, with a reason and who set it, audited
+     as `RETENTION_HOLD_SET` and `RETENTION_HOLD_RELEASED`). While a hold exists no task runs for that store, and the
+     runner records `RETENTION_SKIPPED_HOLD` instead of the counts. A hold has no end date; it is released
+     explicitly.
+   - *Minimisation.* Notifications store a kind and structured parameters, never rendered text or e-mail bodies.
+     E-mails are rendered at sending and not stored. Snapshots and prompts hold aggregates of orders (units,
+     revenue per variant), never a customer's name, address or e-mail. Logs never contain message bodies, recipients'
+     addresses or tokens.
+   - *Backups.* Deleted rows remain in the backups until those expire (ADR-0023 point 7): point-in-time recovery
+     keeps 14 days, the daily logical dumps 30 days, and a snapshot taken by hand is deleted within 30 days. So a
+     deleted row is gone from every copy at most 30 days after its deletion. A restored database runs the retention
+     tasks before it is used again, so data past its period does not return. This is stated in the privacy
+     information for the pilot store.
+   - *GDPR review before real data.* Before the pilot store's data is imported: the data processing agreement with
+     the store, the records of processing, the list of subprocessors (AWS, Temporal Cloud, the model provider of
+     ADR-0016), the transfer basis for each, and whether a DPIA is needed. Until then only test stores and synthetic
+     data are processed.
 
 ## Alternatives considered
 

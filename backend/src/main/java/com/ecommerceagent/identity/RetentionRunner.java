@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 /**
  * Runs every {@link RetentionTask} store by store under the retention system scope (ADR-0022 points 4 and 6), in
  * batches, and records one {@code RETENTION_APPLIED} audit entry per task and store that changed rows. Audit entries
- * without a store are handled once more unbound. {@link RetentionSchedule} calls it in the worker profile when
+ * without a store are handled once more unbound. A store on legal hold is skipped. {@link RetentionSchedule} calls it in the worker profile when
  * {@code operator.retention.enabled=true}.
  */
 @Component
@@ -29,11 +29,13 @@ public class RetentionRunner {
     private final RetentionSettings settings;
     private final SystemStoreRunner stores;
     private final AuditRetention auditRetention;
+    private final RetentionHolds holds;
     private final AuditTrail audit;
     private final Clock clock;
 
     RetentionRunner(List<RetentionTask> tasks, RetentionSettings settings, SystemStoreRunner stores,
-            AuditRetention auditRetention, AuditTrail audit, Clock clock) {
+            AuditRetention auditRetention, RetentionHolds holds, AuditTrail audit, Clock clock) {
+        this.holds = holds;
         this.tasks = tasks;
         this.settings = settings;
         this.stores = stores;
@@ -47,6 +49,12 @@ public class RetentionRunner {
         Map<String, Integer> changed = new LinkedHashMap<>();
         Instant now = clock.instant();
         stores.forEachStore(SERVICE, scope -> {
+            // A legal hold stops every task for the store (ADR-0022 point 7).
+            if (holds.hold(scope).isPresent()) {
+                audit.record(AuditEntry.inScope(scope, "RETENTION_SKIPPED_HOLD", "store_retention_hold",
+                        scope.storeId().toString(), Map.of()));
+                return;
+            }
             for (RetentionTask task : tasks) {
                 Duration period = settings.periods().get(task.name());
                 if (period == null) {

@@ -10,9 +10,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
- * Retention of this module's transport rows (ADR-0022 point 5, ADR-0009): webhook inbox rows once handled and
- * outbox events once dispatched. The read models they produced stay; a payload delivered again after the period is
- * judged by the read model's own version checks.
+ * Retention of this module's transport rows (ADR-0022 points 6 and 7, ADR-0009): webhook inbox rows 30 days after
+ * they were processed or ignored, and outbox events after they were dispatched. A {@code FAILED} item stays for
+ * diagnosis, a {@code RECEIVED} one is still to be processed. The read models they produced stay; a payload
+ * delivered again after the period is judged by the read model's own version checks.
  */
 @Configuration(proxyBeanMethods = false)
 class IntegrationRetention {
@@ -23,7 +24,8 @@ class IntegrationRetention {
                 DELETE FROM webhook_inbox
                 WHERE id IN (SELECT id FROM webhook_inbox
                              WHERE organization_id = :organizationId AND store_id = :storeId
-                               AND status <> 'RECEIVED' AND received_at < :cutoff LIMIT :batch)
+                               AND status IN ('PROCESSED', 'IGNORED') AND processed_at < :cutoff
+                             LIMIT :batch)
                 """);
     }
 

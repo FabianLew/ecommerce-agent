@@ -2200,6 +2200,39 @@
         "required" : [ "revision" ],
         "type" : "object"
       },
+      "RetentionHoldRequest" : {
+        "properties" : {
+          "reason" : {
+            "description" : "1 to 500 characters",
+            "type" : "string"
+          }
+        },
+        "required" : [ "reason" ],
+        "type" : "object"
+      },
+      "RetentionHoldResponse" : {
+        "properties" : {
+          "canChange" : {
+            "type" : "boolean"
+          },
+          "held" : {
+            "type" : "boolean"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "setAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "setBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "canChange", "held" ],
+        "type" : "object"
+      },
       "RevisionRef" : {
         "properties" : {
           "createdAt" : {
@@ -5449,6 +5482,183 @@
           }
         },
         "tags" : [ "business-profile-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/retention-hold" : {
+      "delete" : {
+        "operationId" : "releaseRetentionHold",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RetentionHoldResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "retention-hold-controller" ]
+      },
+      "get" : {
+        "operationId" : "retentionHold",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RetentionHoldResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "retention-hold-controller" ]
+      },
+      "put" : {
+        "operationId" : "setRetentionHold",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RetentionHoldRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "retention-hold-controller" ]
       }
     },
     "/api/v1/stores/{storeId}/variants" : {

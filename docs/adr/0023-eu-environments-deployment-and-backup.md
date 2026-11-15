@@ -2,7 +2,8 @@
 
 - Status: Proposed
 - Date: 2026-11-15
-- Revised: 2026-11-15 (review: a separate migration step under the migration role)
+- Revised: 2026-11-15 (review: a separate migration step under the migration role; hosting chosen by the project
+  owner: AWS eu-central-1 and Temporal Cloud in AWS Frankfurt)
 - Related: plan decision I4 (Docker Compose locally, EU production, Temporal Cloud preferred), I2 (EU data
   residency of the model provider), I5 (OIDC, Keycloak), document 01 O-03, ADR-0022, epic E-46
 
@@ -10,9 +11,10 @@
 
 Everything so far runs on a developer machine (`infra/docker-compose.yml`) and in CI. The pilot needs a staging and
 a production environment in the EU, with the same code and only configuration in between. The hosting provider,
-the Temporal Cloud account and the KMS are not chosen yet, and no credentials exist for them. This ADR fixes what
-does not depend on that choice: the artifacts, the process roles, the configuration contract, the start-up guard
-and the backup and restore procedure, so that choosing a provider is a matter of filling in values.
+the Temporal Cloud account and the KMS were open when this ADR was first written. This ADR fixes the artifacts, the
+process roles, the configuration contract, the start-up guard and the backup and restore procedure. On 2026-11-15
+the project owner chose AWS in `eu-central-1` and Temporal Cloud in AWS Frankfurt (point 9). No paid resource is
+created before the owner approves the plan and the cost estimate.
 
 ## Decision
 
@@ -61,7 +63,9 @@ and the backup and restore procedure, so that choosing a provider is a matter of
    requires it, an encrypting codec is added before production.
 6. **Data in the EU.** PostgreSQL 17 managed in an EU region with encryption at rest, Keycloak in the same region
    with its own database, object storage for backups in the EU. The model provider's EU processing is verified
-   separately (I2) and is a precondition for turning the agent on in production.
+   separately (I2) and is a precondition for turning the agent on in production: real store data reaches Claude
+   only through Amazon Bedrock with EU processing confirmed in its terms, and the direct Anthropic API is used only
+   locally with synthetic data (the project owner's decision of 2026-11-15).
 7. **Backups.** The managed database's point-in-time recovery (at least 14 days) is the primary backup.
    `infra/backup/backup.sh` makes an independent daily logical dump (custom format with grants, plus its SHA-256)
    kept 30 days in EU object storage. `infra/backup/restore-check.sh` restores a dump into a scratch database and
@@ -71,21 +75,51 @@ and the backup and restore procedure, so that choosing a provider is a matter of
    ADR-0022 point 4. Envelope encryption with the provider's KMS replaces where the key bytes come from when the
    provider is chosen; the stored format does not change.
 
+9. **Hosting: AWS `eu-central-1`.** Infrastructure as code in `infra/terraform` (Terraform), one root per
+   environment over shared modules. It is planned and reviewed, and applied only after the owner approves the plan
+   and the estimate in `docs/operations/aws-cost-estimate.md`.
+   - *Compute:* ECS on Fargate, one cluster per environment. Services `api`, `worker`, `frontend` and `keycloak`; the
+     migration step of point 3 is a one-off ECS task with its own task role and the migration secret only. Images in
+     ECR.
+   - *Network:* a VPC per environment over two availability zones. An application load balancer with an ACM
+     certificate is the only entry point. For the pilot the tasks run in public subnets with a public IP and a
+     security group that accepts traffic only from the load balancer, instead of a NAT gateway (they need outbound
+     access to WooCommerce, Meta, Temporal Cloud and the model provider). The database is in private subnets and
+     reachable only from the tasks' security group.
+   - *Database:* RDS for PostgreSQL 17, encrypted with a customer-managed KMS key, point-in-time recovery of 14 days,
+     deletion protection, no public access. The operator's database and Keycloak's database are separate databases
+     on the same instance in the pilot. Single-AZ in staging; production starts single-AZ and moves to Multi-AZ
+     before the pilot leaves L1 shadow (a cost decision of the owner).
+   - *Secrets and keys:* Secrets Manager for every secret of point 4, injected into the task definitions by ARN.
+     KMS keys per environment for RDS, S3, Secrets Manager and, with E-46, the envelope key of point 8.
+   - *Storage:* an S3 bucket per environment for the logical dumps of point 7, SSE-KMS, public access blocked,
+     versioning, and a lifecycle rule that deletes after 30 days.
+   - *Observability:* CloudWatch Logs for the containers (30 days), and an OpenTelemetry collector (ADOT) in each
+     task sending metrics and traces to CloudWatch and X-Ray. The alerts of ADR-0024 are CloudWatch alarms.
+   - *Mail:* Amazon SES in `eu-central-1` for notifications (a verified domain with DKIM, a configuration set whose
+     events go to SNS and back to the delivery events of ADR-0021). The customer support mailbox gets its own
+     `MailProvider` adapter later; SES sending is not used for it.
+   - *Temporal Cloud:* AWS `eu-central-1` (Frankfurt), one namespace for staging and one for production, API keys
+     per namespace in Secrets Manager.
+   - *State:* Terraform state in an S3 bucket with a DynamoDB lock table, created once by hand (documented in
+     `infra/terraform/README.md`).
+
 ## Alternatives considered
 
+- **A NAT gateway per environment.** Private subnets for the tasks are the usual shape, but a NAT gateway costs
+  more per month than the pilot's compute. The security group gives the same inbound protection; the NAT gateway
+  can be added later without changing the services.
 - **Self-hosted Temporal.** Possible with the same configuration, but it adds a database and upgrades to run; I4
   prefers Temporal Cloud.
-- **Infrastructure as code for one provider now.** It would encode a provider choice that has not been made; the
-  configuration contract above is what any provider's IaC fills in.
 - **Flyway on application start (the first draft of this ADR).** No extra job, but the runtime would need the
   owner's rights to run DDL, which contradicts ADR-0022, and every replica would race for the migration lock.
 - **Separate images for API and worker.** Same code and dependencies; one image keeps the versions in lockstep.
 
 ## Consequences
 
-- Choosing the hosting provider, the KMS and the Temporal Cloud account (with their EU regions) is still open and
-  blocks staging; nothing in the code needs to change for it.
-- CI builds both images on every change (without pushing); publishing to a registry comes with the provider.
+- Staging waits for the owner's approval of the Terraform plan and the cost estimate, and for the Temporal Cloud
+  namespaces and the Meta test account, which the owner prepares.
+- CI builds both images on every change (without pushing); publishing to ECR comes with the first apply.
 - The deployment pipeline of the chosen provider must support a one-off job that gates the rollout (a Kubernetes Job,
   a Cloud Run job, an ECS task, or a release command).
 - The restore drill is an operational duty with an owner (E-47 runbooks).

@@ -103,6 +103,19 @@ public class Opportunities {
                 .optional();
     }
 
+    /** The ids of the store's episodes that are not finished; retention keeps their data (ADR-0022 point 7). */
+    public java.util.List<UUID> unfinishedIds(TrustedStoreScope scope) {
+        return jdbc.sql("""
+                        SELECT id FROM opportunity
+                        WHERE organization_id = :organizationId AND store_id = :storeId
+                          AND status NOT IN ('RESOLVED', 'CLOSED')
+                        """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .query(UUID.class)
+                .list();
+    }
+
     /**
      * Moves an episode to {@code next} when the state machine allows it from its current status. The update is
      * a compare-and-set on the version, so two concurrent changes cannot both win.

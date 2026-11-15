@@ -20,7 +20,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessException;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** ADR-0022 point 5: each task removes or redacts only what is past its period; recent audit is untouchable. */
+/** ADR-0022 points 6 and 7: each task removes or redacts only what is past its period; recent audit is untouchable. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @Import(TestcontainersConfiguration.class)
 class RetentionTest {
@@ -36,6 +36,12 @@ class RetentionTest {
 
     @Autowired
     TransactionTemplate transactions;
+
+    @Autowired
+    RetentionHolds holds;
+
+    @Autowired
+    StoreAccess storeAccess;
 
     UUID organization;
     UUID store;
@@ -86,6 +92,54 @@ class RetentionTest {
                         SELECT count(*) FROM audit_event
                         WHERE action = 'RETENTION_APPLIED' AND actor_service = 'retention' AND resource_id = 'outbox'
                         """).query(Long.class).single()).isPositive();
+    }
+
+    /** ADR-0022 point 7: periods run from the end of processing, and unfinished work is never removed. */
+    @Test
+    void periodsRunFromTheEndOfProcessingAndUnfinishedWorkStays() {
+        UUID processedLongAgo = inbox("PROCESSED", days(60), days(40));
+        UUID processedRecently = inbox("PROCESSED", days(60), days(5));
+        UUID failed = inbox("FAILED", days(60), days(40));
+        UUID received = inbox("RECEIVED", days(60), null);
+        UUID closedEpisodeRun = agentRun(days(100), "CLOSED");
+        UUID openEpisodeRun = agentRun(days(100), "AWAITING_DECISION");
+
+        runner.runAll();
+
+        assertThat(exists("webhook_inbox", processedLongAgo)).isFalse();
+        assertThat(exists("webhook_inbox", processedRecently)).as("30 days from processing, not from arrival")
+                .isTrue();
+        assertThat(exists("webhook_inbox", failed)).as("kept for diagnosis").isTrue();
+        assertThat(exists("webhook_inbox", received)).isTrue();
+        assertThat(payload(closedEpisodeRun)).isEqualTo("{\"redacted\": true}");
+        assertThat(payload(openEpisodeRun)).as("the episode is not finished").contains("prompt");
+    }
+
+    /** ADR-0022 point 7: a legal hold stops every task for the store, and setting and releasing it is audited. */
+    @Test
+    void aLegalHoldStopsRetentionForTheStore() {
+        UUID owner = UUID.randomUUID();
+        jdbc.sql("INSERT INTO app_user (id, issuer, subject) VALUES (?, 'iss', ?)").params(owner, owner.toString())
+                .update();
+        jdbc.sql("INSERT INTO store_membership (organization_id, store_id, user_id, role) VALUES (?, ?, ?, 'OWNER')")
+                .params(organization, store, owner).update();
+        TrustedStoreScope person = storeAccess.scopeFor(owner, store).orElseThrow();
+        UUID oldOutbox = outbox(days(40), days(40));
+        holds.set(person, "Dispute with a customer, keep everything");
+
+        runner.runAll();
+        assertThat(exists("outbox_event", oldOutbox)).isTrue();
+        assertThat(jdbc.sql("SELECT count(*) FROM audit_event WHERE store_id = ? AND action = 'RETENTION_SKIPPED_HOLD'")
+                .param(store).query(Long.class).single()).isEqualTo(1);
+
+        assertThat(holds.release(person)).isTrue();
+        runner.runAll();
+        assertThat(exists("outbox_event", oldOutbox)).isFalse();
+        assertThat(jdbc.sql("""
+                        SELECT action FROM audit_event WHERE store_id = ? AND resource_type = 'store_retention_hold'
+                          AND action LIKE 'RETENTION_HOLD_%' ORDER BY occurred_at
+                        """).param(store).query(String.class).list())
+                .containsExactly("RETENTION_HOLD_SET", "RETENTION_HOLD_RELEASED");
     }
 
     @Test
@@ -188,6 +242,55 @@ class RetentionTest {
                         """).params(UUID.randomUUID(), id, organization, store, user, deliveryStatus,
                         Timestamp.from(createdAt), Timestamp.from(createdAt)).update();
         return id;
+    }
+
+    private UUID inbox(String status, Instant receivedAt, Instant processedAt) {
+        UUID id = UUID.randomUUID();
+        jdbc.inTransaction(tx -> {
+            tx.sql("SET LOCAL session_replication_role = replica").update();
+            tx.sql("""
+                            INSERT INTO webhook_inbox (id, organization_id, store_id, connection_id, topic,
+                                                       payload_sha256, payload, status, next_attempt_at, received_at,
+                                                       processed_at)
+                            VALUES (?, ?, ?, ?, 'product.updated', ?, '{}'::jsonb, ?, ?, ?, ?)
+                            """).params(id, organization, store, UUID.randomUUID(),
+                            "0".repeat(48) + id.toString().replace("-", "").substring(0, 16), status,
+                            Timestamp.from(receivedAt), Timestamp.from(receivedAt),
+                            processedAt == null ? null : Timestamp.from(processedAt)).update();
+        });
+        return id;
+    }
+
+    /** A run of an episode in the given status with one old step; foreign keys are off for these inserts only. */
+    private UUID agentRun(Instant createdAt, String episodeStatus) {
+        UUID runId = UUID.randomUUID();
+        UUID opportunity = UUID.randomUUID();
+        boolean finished = episodeStatus.equals("CLOSED") || episodeStatus.equals("RESOLVED");
+        jdbc.inTransaction(tx -> {
+            tx.sql("SET LOCAL session_replication_role = replica").update();
+            tx.sql("""
+                            INSERT INTO opportunity (id, organization_id, store_id, category, subject_type, subject_id,
+                                                     status, opened_at, updated_at, closed_at)
+                            VALUES (?, ?, ?, 'INVENTORY_RISK', 'PRODUCT_VARIANT', ?, ?, ?, ?, ?)
+                            """).params(opportunity, organization, store, UUID.randomUUID(), episodeStatus,
+                            Timestamp.from(createdAt), Timestamp.from(createdAt),
+                            finished ? Timestamp.from(createdAt) : null).update();
+            tx.sql("""
+                            INSERT INTO agent_run (id, organization_id, store_id, analysis_key, attempt, opportunity_id,
+                                                   context_snapshot_id, agent_name, agent_version, skill_ref,
+                                                   knowledge_hash, prompt_hash, tools_hash, output_schema_version,
+                                                   model_policy, provider, model, price_list, status, started_at)
+                            VALUES (?, ?, ?, ?, 1, ?, ?, 'a', '1', 's', 'k', 'p', 't', 'v1', 'm', 'fake', 'm', 'p',
+                                    'SUCCEEDED', ?)
+                            """).params(runId, organization, store, runId.toString(), opportunity, UUID.randomUUID(),
+                            Timestamp.from(createdAt)).update();
+            tx.sql("""
+                            INSERT INTO agent_run_step (run_id, organization_id, store_id, seq, kind, name, status,
+                                                        payload, created_at)
+                            VALUES (?, ?, ?, 1, 'MODEL_CALL', 'model', 'OK', '{"prompt": "text"}'::jsonb, ?)
+                            """).params(runId, organization, store, Timestamp.from(createdAt)).update();
+        });
+        return runId;
     }
 
     /** A step without its run: foreign keys are switched off for this insert only (test database superuser). */
