@@ -87,7 +87,7 @@ public class AgentRuntime {
 
         Run(AgentRunRequest request) {
             this.request = request;
-            this.limits = request.agent().limits();
+            this.limits = request.limits();
             this.tools = registry.forRun(request.agent(), request.skill().requiredReadTools());
             this.context = new AgentRunContext(id, request.scope(), request.opportunityId(), request.snapshot(),
                     request.agent(), request.model(), request.attempt());
@@ -99,7 +99,7 @@ public class AgentRuntime {
             runs.start(request.scope(), new AgentRuns.Start(id, request.analysisKey(), request.attempt(),
                     request.opportunityId(), request.snapshot().id(), request.agent(), request.skill().reference(),
                     request.skill().hash(), request.prompts().hash(), tools.hash(), request.model().provider(),
-                    request.model().name(), prices.version(), started));
+                    request.model().name(), prices.version(), limits, started));
             try {
                 return loop(started);
             } catch (AgentHook.HookVeto veto) {
@@ -130,7 +130,7 @@ public class AgentRuntime {
                 if (!clock.instant().isBefore(deadline)) {
                     return finish(AgentRunStatus.LIMIT_EXCEEDED, "MAX_WALL_TIME", null);
                 }
-                int outputCap = Math.min(settings.maxOutputTokensPerCall(), limits.maxOutputTokensTotal() - outputTokens);
+                int outputCap = Math.min(limits.maxOutputTokensPerCall(), limits.maxOutputTokensTotal() - outputTokens);
                 if (outputCap <= 0) {
                     return finish(AgentRunStatus.LIMIT_EXCEEDED, "MAX_OUTPUT_TOKENS", null);
                 }

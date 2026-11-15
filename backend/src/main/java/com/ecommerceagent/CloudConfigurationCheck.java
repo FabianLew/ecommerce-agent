@@ -7,6 +7,7 @@ import java.util.Map;
 
 import com.ecommerceagent.automation.guardian.InventoryProtectionPolicy;
 import com.ecommerceagent.decisions.RiskDetectorSettings;
+import com.ecommerceagent.intelligence.inventory.InventoryAgentRunPolicy;
 import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.context.ApplicationListener;
@@ -72,6 +73,12 @@ public class CloudConfigurationCheck implements ApplicationListener<ApplicationE
         if ("true".equalsIgnoreCase(value(environment, InventoryProtectionPolicy.PREFIX + ".l2-enabled"))) {
             problems.add(InventoryProtectionPolicy.PREFIX + ".l2-enabled cannot be switched on (L2 is not available)");
         }
+        // ADR-0027 section 5: the output limit of a call moved into the run policy; the old key would be ignored.
+        String movedKey = value(environment, "operator.agent.max-output-tokens-per-call");
+        if (movedKey != null) {
+            problems.add("operator.agent.max-output-tokens-per-call is no longer read; set "
+                    + InventoryAgentRunPolicy.PREFIX + ".max-output-tokens-per-call with its own version");
+        }
         problems.addAll(parameterSetProblems(environment));
         return problems;
     }
@@ -102,8 +109,16 @@ public class CloudConfigurationCheck implements ApplicationListener<ApplicationE
                 problems.add(InventoryProtectionPolicy.PREFIX + " differs from the defaults of "
                         + policyDefaults.ref() + "; set its own version");
             }
+            InventoryAgentRunPolicy run = binder.bindOrCreate(InventoryAgentRunPolicy.PREFIX,
+                    InventoryAgentRunPolicy.class);
+            InventoryAgentRunPolicy runDefaults = defaults.bindOrCreate(InventoryAgentRunPolicy.PREFIX,
+                    InventoryAgentRunPolicy.class);
+            if (overridden(run.parameters(), runDefaults.parameters()) && run.version().equals(runDefaults.version())) {
+                problems.add(InventoryAgentRunPolicy.PREFIX + " differs from the defaults of " + runDefaults.version()
+                        + "; set its own version");
+            }
         } catch (RuntimeException e) {
-            problems.add("the inventory parameter sets cannot be read: " + e.getMessage());
+            problems.add("the parameter sets cannot be read: " + e.getMessage());
         }
         return problems;
     }

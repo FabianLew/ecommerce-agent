@@ -78,6 +78,25 @@ class CloudConfigurationCheckTest {
         assertThat(CloudConfigurationCheck.problems(versioned)).isEmpty();
     }
 
+    /** ADR-0027 section 5: the run policy of the agent follows the same rule, and the moved key is refused. */
+    @Test
+    void anUnversionedRunPolicyOverrideAndTheMovedOutputKeyAreRefused() {
+        MockEnvironment environment = cloud()
+                .withProperty("operator.agent.run-policies.inventory-agent.max-run-cost-usd", "0.50")
+                .withProperty("operator.agent.max-output-tokens-per-call", "3000");
+
+        assertThat(CloudConfigurationCheck.problems(environment)).containsExactly(
+                "operator.agent.max-output-tokens-per-call is no longer read; set"
+                        + " operator.agent.run-policies.inventory-agent.max-output-tokens-per-call with its own version",
+                "operator.agent.run-policies.inventory-agent differs from the defaults of inventory-agent-run/1;"
+                        + " set its own version");
+
+        MockEnvironment versioned = cloud()
+                .withProperty("operator.agent.run-policies.inventory-agent.max-run-cost-usd", "0.05")
+                .withProperty("operator.agent.run-policies.inventory-agent.version", "inventory-agent-run/2");
+        assertThat(CloudConfigurationCheck.problems(versioned)).isEmpty();
+    }
+
     private static MockEnvironment cloud() {
         MockEnvironment environment = new MockEnvironment()
                 .withProperty("spring.datasource.url", "jdbc:postgresql://db.internal.example:5432/operator")

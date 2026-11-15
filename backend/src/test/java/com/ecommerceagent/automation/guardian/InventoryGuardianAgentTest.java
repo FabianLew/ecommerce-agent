@@ -229,6 +229,10 @@ class InventoryGuardianAgentTest {
         assertThat(run.model()).isEqualTo("claude-opus-5-5");
         assertThat(run.skillRef()).isEqualTo("inventory-guardian@1.0.0");
         assertThat(run.estimatedCostUsd()).isPositive();
+        // The run records the versioned run policy and the limits it applied (ADR-0027 section 5).
+        assertThat(run.runPolicy()).isEqualTo("inventory-agent-run/1");
+        assertThat(jdbc.sql("SELECT run_limits ->> 'maxEstimatedCostUsd' || ':' || (run_limits ->> 'maxModelCalls')"
+                + " FROM agent_run WHERE id = ?").param(run.id()).query(String.class).single()).isEqualTo("0.1:5");
         // Each of the three model calls was reserved, sent once and settled with the provider's usage.
         assertThat(jdbc.sql("""
                         SELECT r.state || ':' || e.outcome || ':' || e.input_tokens FROM ai_budget_reservation r

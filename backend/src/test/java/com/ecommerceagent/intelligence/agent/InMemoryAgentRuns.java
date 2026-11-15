@@ -60,6 +60,7 @@ public final class InMemoryAgentRuns extends AgentRuns {
                 start.contextSnapshotId(), start.agent().name(), start.agent().version(), start.skillRef(),
                 start.knowledgeHash(), start.promptHash(), start.toolsHash(), start.agent().outputSchemaVersion(),
                 start.agent().modelPolicy(), start.provider(), start.model(), start.priceList(),
+                start.limits().policy(),
                 done == null ? AgentRunStatus.RUNNING : done.status(), done == null ? null : done.stopReason(),
                 done == null ? 0 : done.modelCalls(), done == null ? 0 : done.toolCalls(),
                 done == null ? 0 : done.repairCalls(), done == null ? 0 : done.inputTokens(),

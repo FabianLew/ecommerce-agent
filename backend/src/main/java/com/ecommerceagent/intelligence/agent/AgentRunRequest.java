@@ -12,10 +12,10 @@ import com.ecommerceagent.intelligence.model.ModelId;
 
 /**
  * One attempt of one analysis. Everything here is set by the backend: the scope, the episode, the snapshot, the
- * pinned agent, skill and prompts, the model and the cost already spent by earlier attempts of the same analysis.
+ * pinned agent, its run limits, skill and prompts, the model and the cost already spent by earlier attempts of the same analysis.
  */
 public record AgentRunRequest(TrustedStoreScope scope, UUID opportunityId, ContextSnapshot snapshot,
-        AgentDefinition agent, SkillPackage skill, PromptPackage prompts, String system, String task, ModelId model,
+        AgentDefinition agent, RunLimits limits, SkillPackage skill, PromptPackage prompts, String system, String task, ModelId model,
         String analysisKey, int attempt, BigDecimal costSpentBefore) {
 
     public AgentRunRequest {
@@ -23,6 +23,7 @@ public record AgentRunRequest(TrustedStoreScope scope, UUID opportunityId, Conte
         Objects.requireNonNull(opportunityId, "opportunityId");
         Objects.requireNonNull(snapshot, "snapshot");
         Objects.requireNonNull(agent, "agent");
+        Objects.requireNonNull(limits, "limits");
         Objects.requireNonNull(skill, "skill");
         Objects.requireNonNull(prompts, "prompts");
         Objects.requireNonNull(system, "system");
