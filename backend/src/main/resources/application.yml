@@ -16,6 +16,18 @@ spring:
           audiences: ${OIDC_AUDIENCE:operator-api}
   jackson:
     time-zone: UTC
+  ai:
+    anthropic:
+      # The key comes only from the environment; the placeholder keeps the context starting without one.
+      api-key: ${ANTHROPIC_API_KEY:not-configured}
+      base-url: ${OPERATOR_ANTHROPIC_BASE_URL:https://api.anthropic.com}
+      # Retries and fallback belong to the agent runtime (ADR-0016).
+      max-retries: 0
+    chat:
+      client:
+        tool-calling:
+          # ADR-0002: tool calls are returned to our runtime, never executed by Spring AI.
+          enabled: false
   temporal:
     connection:
       target: ${TEMPORAL_ADDRESS:localhost:7233}
@@ -90,6 +102,26 @@ operator:
       max-verification-age: 24h
       autonomy: L1
       l2-enabled: false
+
+  agent:
+    # The agent proposer (ADR-0016). Off: the deterministic baseline is the only proposer.
+    enabled: ${OPERATOR_AGENT_ENABLED:false}
+    # Model policy INVENTORY_BALANCED: attempts in order on the same snapshot, sharing the run limits' cost.
+    models:
+      - anthropic/claude-opus-5-5
+      - anthropic/claude-sonnet-5-5
+    effort: low
+    max-output-tokens-per-call: 1500
+    # USD per million tokens. Check against the provider before switching the agent on; change the version with it.
+    price-list:
+      version: anthropic-2026-11
+      models:
+        "[anthropic/claude-opus-5-5]":
+          input: "4.00"
+          output: "20.00"
+        "[anthropic/claude-sonnet-5-5]":
+          input: "2.00"
+          output: "10.00"
 
 springdoc:
   api-docs:
