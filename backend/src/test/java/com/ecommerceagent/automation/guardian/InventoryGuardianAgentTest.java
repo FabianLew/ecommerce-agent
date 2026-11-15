@@ -60,7 +60,7 @@ import com.ecommerceagent.intelligence.agent.AgentRunStatus;
 import com.ecommerceagent.intelligence.agent.AgentRunStep;
 import com.ecommerceagent.intelligence.agent.AgentRuns;
 import com.ecommerceagent.intelligence.agent.FakeModelGateway;
-import com.ecommerceagent.intelligence.agent.ModelGatewayRouter;
+import com.ecommerceagent.intelligence.model.provider.ProviderGateways;
 import com.ecommerceagent.intelligence.inventory.InventoryReadTools;
 import com.ecommerceagent.intelligence.model.ModelFailure;
 import com.ecommerceagent.intelligence.model.ModelMessage;
@@ -100,8 +100,8 @@ class InventoryGuardianAgentTest {
 
         @Bean
         @Primary
-        ModelGatewayRouter fakeModelRouter() {
-            return ModelGatewayRouter.of(MODEL, "anthropic");
+        ProviderGateways fakeModelProvider() {
+            return ProviderGateways.of(MODEL, "anthropic");
         }
     }
 
@@ -154,6 +154,21 @@ class InventoryGuardianAgentTest {
         jdbc.sql("INSERT INTO store (id, organization_id, name, currency, timezone) VALUES (?, ?, 'S', 'PLN', 'UTC')")
                 .params(STORE, ORG).update();
         scope = storeAccess.systemScope(EventDispatch.SYNC_SERVICE, ORG, STORE).orElseThrow();
+        // Every model call is governed (ADR-0027): verified prices and the required platform and store budgets.
+        for (String model : List.of("claude-opus-5-5", "claude-sonnet-5-5")) {
+            jdbc.sql("""
+                            INSERT INTO ai_price (id, provider, model, region, price_version, currency, input_per_mtok,
+                                                  output_per_mtok, effective_from, source, verified_at)
+                            VALUES (gen_random_uuid(), 'anthropic', ?, 'global', ?, 'USD', 4.00, 20.00,
+                                    now() - interval '1 hour', 'test fixture', now())
+                            """).params(model, "test-" + UUID.randomUUID()).update();
+        }
+        jdbc.sql("""
+                        INSERT INTO ai_budget_policy (id, level, organization_id, store_id, period_type, amount_limit,
+                                                      currency, policy_version, reason, created_by)
+                        VALUES (gen_random_uuid(), 'PLATFORM', NULL, NULL, 'MONTHLY', 1000, 'USD', 1, 'test', 'test'),
+                               (gen_random_uuid(), 'STORE', ?, ?, 'MONTHLY', 50, 'USD', 1, 'test', 'test')
+                        """).params(ORG, STORE).update();
         Instant now = clock.instant();
 
         catalog.upsertProduct(scope, CommerceSource.WOOCOMMERCE, new ProductData("812", "Serum", null, "variable",
@@ -214,6 +229,13 @@ class InventoryGuardianAgentTest {
         assertThat(run.model()).isEqualTo("claude-opus-5-5");
         assertThat(run.skillRef()).isEqualTo("inventory-guardian@1.0.0");
         assertThat(run.estimatedCostUsd()).isPositive();
+        // Each of the three model calls was reserved, sent once and settled with the provider's usage.
+        assertThat(jdbc.sql("""
+                        SELECT r.state || ':' || e.outcome || ':' || e.input_tokens FROM ai_budget_reservation r
+                        JOIN ai_usage_event e ON e.reservation_id = r.id
+                        WHERE r.agent_run_id = ? ORDER BY r.created_at
+                        """).param(run.id()).query(String.class).list())
+                .containsExactly("SETTLED:SETTLED:500", "SETTLED:SETTLED:500", "SETTLED:SETTLED:500");
         List<AgentRunStep> steps = agentRuns.steps(scope, run.id());
         assertThat(steps).extracting(AgentRunStep::kind).containsExactly(AgentRunStep.Kind.MODEL_CALL,
                 AgentRunStep.Kind.TOOL_CALL, AgentRunStep.Kind.TOOL_CALL, AgentRunStep.Kind.MODEL_CALL,
@@ -235,7 +257,8 @@ class InventoryGuardianAgentTest {
 
     @Test
     void ig28FailingModelsFallBackToTheBaselineAndEveryAttemptIsRecorded() {
-        MODEL.thenFailure(ModelFailure.Type.UNAVAILABLE).thenFailure(ModelFailure.Type.RATE_LIMITED);
+        // A broken connection may have been charged; a rate-limit response is not billed.
+        MODEL.thenFailure(ModelFailure.Type.UNAVAILABLE).thenFailure(ModelFailure.Type.RATE_LIMITED, true);
         Opportunity episode = opportunities.open(scope, OpportunityCategory.INVENTORY_RISK,
                 Opportunity.PRODUCT_VARIANT, serum).opportunity();
         InventoryGuardianWorkflow workflow = start(episode);
@@ -253,6 +276,12 @@ class InventoryGuardianAgentTest {
                                 "UNAVAILABLE"),
                         org.assertj.core.groups.Tuple.tuple(2, "claude-sonnet-5-5", AgentRunStatus.MODEL_FAILED,
                                 "RATE_LIMITED"));
+        assertThat(jdbc.sql("""
+                        SELECT r.state || ':' || coalesce(r.state_reason, '-') || ':' || coalesce(r.settled_amount::text, '-')
+                        FROM ai_budget_reservation r JOIN agent_run a ON a.id = r.agent_run_id
+                        WHERE a.opportunity_id = ? ORDER BY a.attempt
+                        """).param(episode.id()).query(String.class).list())
+                .containsExactly("UNKNOWN:MODEL_FAILURE:UNAVAILABLE:-", "SETTLED:-:0.00000000");
     }
 
     @Test

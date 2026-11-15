@@ -44,8 +44,13 @@ public final class FakeModelGateway implements ModelGateway {
     }
 
     public FakeModelGateway thenFailure(ModelFailure.Type type) {
+        return thenFailure(type, false);
+    }
+
+    /** {@code confirmedNotCharged}: an error response the provider does not bill, as an adapter would report it. */
+    public FakeModelGateway thenFailure(ModelFailure.Type type, boolean confirmedNotCharged) {
         return then(request -> {
-            throw new ModelFailure(type, "scripted", null, "req-failed", null);
+            throw new ModelFailure(type, "scripted", null, "req-failed", confirmedNotCharged, null);
         });
     }
 

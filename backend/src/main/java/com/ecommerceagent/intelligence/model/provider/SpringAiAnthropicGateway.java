@@ -1,4 +1,4 @@
-package com.ecommerceagent.intelligence.model;
+package com.ecommerceagent.intelligence.model.provider;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -6,6 +6,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import com.ecommerceagent.intelligence.model.ModelCapabilities;
+import com.ecommerceagent.intelligence.model.ModelFailure;
+import com.ecommerceagent.intelligence.model.ModelGateway;
+import com.ecommerceagent.intelligence.model.ModelId;
+import com.ecommerceagent.intelligence.model.ModelMessage;
+import com.ecommerceagent.intelligence.model.ModelRequest;
+import com.ecommerceagent.intelligence.model.ModelTurn;
+import com.ecommerceagent.intelligence.model.ModelUsage;
+import com.ecommerceagent.intelligence.model.ToolCall;
+import com.ecommerceagent.intelligence.model.ToolSpec;
 import com.anthropic.errors.AnthropicIoException;
 import com.anthropic.errors.AnthropicServiceException;
 import com.anthropic.errors.BadRequestException;
@@ -38,9 +48,9 @@ import org.springframework.stereotype.Component;
  * the runtime's, so Spring AI's are off in the configuration.
  */
 @Component
-public class SpringAiAnthropicGateway implements ModelGateway {
+class SpringAiAnthropicGateway implements ModelGateway {
 
-    public static final String PROVIDER = "anthropic";
+    static final String PROVIDER = "anthropic";
 
     private final ObjectProvider<ChatModel> chatModel;
 
@@ -52,6 +62,12 @@ public class SpringAiAnthropicGateway implements ModelGateway {
     public ModelCapabilities capabilities(ModelId model) {
         requireProvider(model);
         return new ModelCapabilities(true, true, 1_000_000, 128_000);
+    }
+
+    @Override
+    public boolean available(ModelId model) {
+        requireProvider(model);
+        return chatModel.getIfAvailable() != null;
     }
 
     @Override
@@ -173,7 +189,9 @@ public class SpringAiAnthropicGateway implements ModelGateway {
                 default -> null;
             };
             if (type != null) {
-                return new ModelFailure(type, cause.getClass().getSimpleName(), null, requestId, null);
+                // An HTTP error response from the API is not billed; a broken connection or timeout may have been.
+                boolean errorResponse = cause instanceof AnthropicServiceException;
+                return new ModelFailure(type, cause.getClass().getSimpleName(), null, requestId, errorResponse, null);
             }
         }
         return new ModelFailure(ModelFailure.Type.UNKNOWN, error.getClass().getSimpleName(), null, null, null);

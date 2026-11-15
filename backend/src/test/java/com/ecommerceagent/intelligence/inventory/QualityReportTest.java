@@ -14,10 +14,10 @@ import com.ecommerceagent.identity.TestScopes;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.intelligence.agent.AgentSettings;
 import com.ecommerceagent.intelligence.agent.FakeModelGateway;
-import com.ecommerceagent.intelligence.agent.ModelGatewayRouter;
 import com.ecommerceagent.intelligence.agent.MutableClock;
 import com.ecommerceagent.intelligence.knowledge.KnowledgeRegistry;
 import com.ecommerceagent.metrics.CanonicalJson;
+import com.ecommerceagent.intelligence.model.provider.ProviderGateways;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.node.ObjectNode;
@@ -69,7 +69,7 @@ class QualityReportTest {
                         new AgentSettings.PriceSettings(new BigDecimal("4"), new BigDecimal("20")))));
 
         QualityHarness.Report report = harness.run(scope, QualityHarness.agent("SCRIPTED",
-                ModelGatewayRouter.of(model, "fake"), settings, knowledge, clock));
+                ProviderGateways.of(model, "fake"), settings, knowledge, clock));
 
         assertThat(report.agentAgreements()).isEqualTo(7);
         QualityHarness.Row wrong = report.rows().stream().filter(row -> row.expected().id().equals("IG-Q-02"))
