@@ -12,10 +12,13 @@ class WebMvcConfiguration implements WebMvcConfigurer {
 
     private final CurrentUserArgumentResolver currentUser;
     private final StoreScopeArgumentResolver storeScope;
+    private final ApiRateLimitInterceptor rateLimits;
 
-    WebMvcConfiguration(CurrentUserArgumentResolver currentUser, StoreScopeArgumentResolver storeScope) {
+    WebMvcConfiguration(CurrentUserArgumentResolver currentUser, StoreScopeArgumentResolver storeScope,
+            ApiRateLimitInterceptor rateLimits) {
         this.currentUser = currentUser;
         this.storeScope = storeScope;
+        this.rateLimits = rateLimits;
     }
 
     @Override
@@ -27,5 +30,6 @@ class WebMvcConfiguration implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new StoreRowGuardInterceptor());
+        registry.addInterceptor(rateLimits);
     }
 }

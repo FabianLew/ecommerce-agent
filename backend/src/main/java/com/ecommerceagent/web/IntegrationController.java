@@ -89,6 +89,7 @@ class IntegrationController {
         return response(webhooks.saveSecret(scope, id(connectionId), request.secret()), scope);
     }
 
+    @RateLimited(value = RateLimited.Group.WORK, idempotent = true)
     @PostMapping("/integrations/{integrationId}/checks")
     CheckResponse check(@RequiresPermission(StorePermission.STORE_MANAGE) TrustedStoreScope scope,
             @PathVariable String integrationId) {
@@ -99,6 +100,7 @@ class IntegrationController {
     }
 
     /** Starts the initial import (14 days, ADR-0008); the job runs in the background. */
+    @RateLimited(value = RateLimited.Group.WORK, idempotent = true)
     @PostMapping("/integrations/{integrationId}/sync-jobs")
     @ResponseStatus(HttpStatus.ACCEPTED)
     SyncJobResponse startSync(@RequiresPermission(StorePermission.STORE_MANAGE) TrustedStoreScope scope,

@@ -107,6 +107,20 @@ class CloudConfigurationCheckTest {
                 .containsExactly("operator.agent.price-list is no longer read; prices come from the catalog ai_price");
     }
 
+    /** ADR-0027 section 6.1: the API rate limits are a versioned parameter set too. */
+    @Test
+    void anUnversionedApiRateLimitOverrideIsRefused() {
+        MockEnvironment environment = cloud().withProperty("operator.api-rate-limits.work-per-user-per-minute", "200");
+
+        assertThat(CloudConfigurationCheck.problems(environment)).containsExactly(
+                "operator.api-rate-limits differs from the defaults of api-rate-limits/1; set its own version");
+
+        MockEnvironment versioned = cloud()
+                .withProperty("operator.api-rate-limits.work-per-user-per-minute", "200")
+                .withProperty("operator.api-rate-limits.version", "api-rate-limits/2");
+        assertThat(CloudConfigurationCheck.problems(versioned)).isEmpty();
+    }
+
     private static MockEnvironment cloud() {
         MockEnvironment environment = new MockEnvironment()
                 .withProperty("spring.datasource.url", "jdbc:postgresql://db.internal.example:5432/operator")

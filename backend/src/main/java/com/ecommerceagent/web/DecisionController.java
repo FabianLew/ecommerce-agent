@@ -174,6 +174,7 @@ class DecisionController {
         return ResponseEntity.ok().eTag(etag).body(presentation);
     }
 
+    @RateLimited(RateLimited.Group.WORK)
     @PostMapping("/{proposalId}/approvals")
     ResponseEntity<DecisionCommandResponse> approve(
             @RequiresPermission(StorePermission.DECISION_APPROVE) TrustedStoreScope scope,
@@ -185,6 +186,7 @@ class DecisionController {
         return accepted(scope, approvals.approve(scope, id, body.revision(), idempotencyKey));
     }
 
+    @RateLimited(RateLimited.Group.WORK)
     @PostMapping("/{proposalId}/rejections")
     ResponseEntity<DecisionCommandResponse> reject(
             @RequiresPermission(StorePermission.DECISION_APPROVE) TrustedStoreScope scope,

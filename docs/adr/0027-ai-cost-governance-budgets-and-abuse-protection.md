@@ -885,3 +885,14 @@ after a stream started and for calls that were never sent.
   `retry-after` (default 30 seconds, at most 10 minutes; a pause is only extended) and later calls answer
   `PROVIDER_PAUSED`. The slot is released when the call ends, and expires on its own after a lost worker. Metrics
   `operator_ai_provider_slots_total` and `operator_ai_provider_throttled_total`, alert `AiProviderThrottled`.
+- **E-54.5, API rate limits and idempotent commands.** Endpoints that start work (sync jobs, connection checks,
+  monitoring start, approvals and rejections) are limited per user, per store and per endpoint in fixed minute
+  windows (`api_rate_window`, V36), and WooCommerce deliveries per webhook endpoint key, from the versioned parameter
+  set `api-rate-limits/1` (`operator.api-rate-limits`). The store stands in for the organization, since every such
+  endpoint is store-scoped. A refused request gets `429 RATE_LIMITED` with `Retry-After` and starts nothing; the
+  mutation stop is never limited. Sync jobs and connection checks accept an `Idempotency-Key`: a repeat answers the
+  first answer (`Idempotent-Replayed: true`), a repeat while the first runs gets `409 COMMAND_IN_PROGRESS`, the same
+  key for another request gets `422 IDEMPOTENCY_KEY_REUSED`; keys are kept 24 hours (`api_idempotency`). A repeated
+  start of the same inventory episode is rejected by its workflow id, so a duplicated delivery never starts a second
+  paid analysis (`InventoryGuardianAgentTest`). Metrics `operator_api_rate_limited_total` and
+  `operator_api_idempotent_replays_total`, alert `ApiRateLimited`.

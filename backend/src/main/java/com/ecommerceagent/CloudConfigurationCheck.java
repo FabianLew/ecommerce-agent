@@ -134,6 +134,12 @@ public class CloudConfigurationCheck implements ApplicationListener<ApplicationE
                 problems.add(ProviderRateLimits.PREFIX + " differs from the defaults of " + providerDefaults.version()
                         + "; set its own version");
             }
+            ApiRateLimits api = binder.bindOrCreate(ApiRateLimits.PREFIX, ApiRateLimits.class);
+            ApiRateLimits apiDefaults = ApiRateLimits.defaults();
+            if (overridden(api.parameters(), apiDefaults.parameters()) && api.version().equals(apiDefaults.version())) {
+                problems.add(ApiRateLimits.PREFIX + " differs from the defaults of " + apiDefaults.version()
+                        + "; set its own version");
+            }
         } catch (RuntimeException e) {
             problems.add("the parameter sets cannot be read: " + e.getMessage());
         }
