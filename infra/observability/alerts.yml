@@ -125,6 +125,12 @@ groups:
         annotations:
           summary: "More than 10 agent runs in an hour were not admitted because of the concurrency limits"
           runbook: docs/operations/runbooks.md#ai-admission-denied
+      - alert: AiAdmissionWaitExhausted
+        expr: sum(increase(operator_ai_admission_waits_total{outcome="GAVE_UP"}[1h])) > 5
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 5 analyses in an hour waited the longest allowed for an AI slot and used the baseline"
+          runbook: docs/operations/runbooks.md#ai-admission-denied
       - alert: AiProviderThrottled
         expr: >
           sum(increase(operator_ai_provider_throttled_total[15m])) > 0

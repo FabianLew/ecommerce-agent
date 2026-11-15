@@ -35,7 +35,9 @@ class ParameterSetVersionTest {
             "api-rate-limits/1",
             "bbeacae5147b24c626c1bc120e011197223e06f89ff5eb600ce7249e76a4393d",
             "ai-budget-alerts/1",
-            "42ea7d86c80823187409caa575306741189513be258dab56659f4448769a2740");
+            "42ea7d86c80823187409caa575306741189513be258dab56659f4448769a2740",
+            "ai-admission/1",
+            "606379f30510740a2d9b684d9bfee7b00239e793d28ca3946f113a6a81a9cae7");
 
     @Test
     void theDefaultsOfTheDetectorMatchTheirVersion() {
@@ -86,6 +88,15 @@ class ParameterSetVersionTest {
                 com.ecommerceagent.aigovernance.AiBudgetAlertSettings.defaults();
         assertThat(defaults.version()).isEqualTo(com.ecommerceagent.aigovernance.AiBudgetAlertSettings.DEFAULT_VERSION);
         assertThat(defaults.thresholdPercents()).containsExactly(70, 90, 100);
+        assertThat(hash(defaults.parameters())).as("hash of %s", defaults.version())
+                .isEqualTo(PINNED.get(defaults.version()));
+    }
+
+    @Test
+    void theDefaultsOfTheAdmissionMatchTheirVersion() {
+        com.ecommerceagent.aigovernance.AiAdmissionSettings defaults =
+                com.ecommerceagent.aigovernance.AiAdmissionSettings.defaults();
+        assertThat(defaults.version()).isEqualTo(com.ecommerceagent.aigovernance.AiAdmissionSettings.DEFAULT_VERSION);
         assertThat(hash(defaults.parameters())).as("hash of %s", defaults.version())
                 .isEqualTo(PINNED.get(defaults.version()));
     }

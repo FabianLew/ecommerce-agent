@@ -290,6 +290,60 @@ class InventoryGuardianAgentTest {
                         """).param(episode.id()).query(Long.class).single()).isEqualTo(3L);
     }
 
+    /**
+     * ADR-0027 section 6.2 (E-54.4): an agent refused a slot waits in its workflow on a durable timer and asks the
+     * same model again; nothing is stored while it waits, and the refused run cost nothing.
+     */
+    @Test
+    void anAgentRefusedASlotWaitsAndAsksTheSameModelAgain() throws Exception {
+        jdbc.sql("""
+                        INSERT INTO ai_provider_cooldown (provider, model, paused_until, reason, set_at)
+                        VALUES ('anthropic', 'claude-opus-5-5', now() + interval '1 hour', 'test', now())
+                        ON CONFLICT (provider, model) DO UPDATE SET paused_until = excluded.paused_until
+                        """).update();
+        try {
+            MODEL.thenTools(call("t1", InventoryReadTools.FORECAST, "productVariantId", serum),
+                            call("t2", InventoryReadTools.MAPPINGS, "productVariantId", serum))
+                    .thenTools(call("t3", InventoryReadTools.DELIVERY, "adId", dedicatedAd))
+                    .then(request -> FakeModelGateway.text(pauseFrom(request, dedicatedAd)));
+            Opportunity episode = opportunities.open(scope, OpportunityCategory.INVENTORY_RISK,
+                    Opportunity.PRODUCT_VARIANT, serum).opportunity();
+            InventoryGuardianWorkflow workflow = start(episode);
+
+            await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> assertThat(workflow.status().agentFallback())
+                    .isEqualTo("AI_GOVERNANCE:PROVIDER_LIMIT:PROVIDER_PAUSED"));
+            assertThat(proposals.ofOpportunity(scope, episode.id())).as("nothing is stored while waiting").isEmpty();
+            assertThat(MODEL.requests()).isEmpty();
+            jdbc.sql("DELETE FROM ai_provider_cooldown WHERE model = 'claude-opus-5-5'").update();
+
+            await().atMost(Duration.ofSeconds(60)).untilAsserted(() ->
+                    assertThat(workflow.status().opportunityStatus()).isEqualTo("AWAITING_DECISION"));
+            assertThat(workflow.status().proposerKind()).isEqualTo("AGENT");
+            assertThat(workflow.status().agentFallback()).isNull();
+            List<AgentRun> runs = agentRuns.ofOpportunity(scope, episode.id());
+            assertThat(runs).extracting(AgentRun::model).containsOnly("claude-opus-5-5");
+            assertThat(runs.getLast().status()).isEqualTo(AgentRunStatus.SUCCEEDED);
+            assertThat(runs.getLast().attempt()).isEqualTo(runs.size());
+            assertThat(runs.subList(0, runs.size() - 1)).isNotEmpty().allSatisfy(refused -> {
+                assertThat(refused.status()).isEqualTo(AgentRunStatus.LIMIT_EXCEEDED);
+                assertThat(refused.stopReason()).isEqualTo("AI_GOVERNANCE:PROVIDER_LIMIT:PROVIDER_PAUSED");
+                assertThat(refused.estimatedCostUsd()).isZero();
+            });
+            assertThat(proposals.ofOpportunity(scope, episode.id())).singleElement()
+                    .satisfies(stored -> assertThat(stored.proposal().proposer().kind()).isEqualTo(ProposerKind.AGENT));
+            // Version 2 of the proposer change (the wait) replays from its history.
+            WorkflowExecutionHistory history = client.fetchHistory(
+                    InventoryGuardianWorkflow.workflowId(STORE, serum.toString(), episode.id().toString()));
+            WorkflowReplayer.replayWorkflowExecution(history, InventoryGuardianWorkflowImpl.class);
+            if (Boolean.getBoolean("recordTemporalFixtures")) {
+                Files.writeString(Path.of("src/test/resources/temporal/inventory-guardian-v3-wait.json"),
+                        history.toJson(true));
+            }
+        } finally {
+            jdbc.sql("DELETE FROM ai_provider_cooldown WHERE model = 'claude-opus-5-5'").update();
+        }
+    }
+
     @Test
     void ig28FailingModelsFallBackToTheBaselineAndEveryAttemptIsRecorded() {
         // A broken connection may have been charged; a rate-limit response is not billed.

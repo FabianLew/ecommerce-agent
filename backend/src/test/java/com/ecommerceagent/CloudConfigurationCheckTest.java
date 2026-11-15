@@ -135,6 +135,20 @@ class CloudConfigurationCheckTest {
         assertThat(CloudConfigurationCheck.problems(versioned)).isEmpty();
     }
 
+    @Test
+    void anUnversionedAdmissionOverrideIsRefused() {
+        MockEnvironment environment = cloud().withProperty("operator.ai-admission.priorities.inventory-agent",
+                "STANDARD");
+
+        assertThat(CloudConfigurationCheck.problems(environment)).containsExactly(
+                "operator.ai-admission differs from the defaults of ai-admission/1; set its own version");
+
+        MockEnvironment versioned = cloud()
+                .withProperty("operator.ai-admission.priorities.inventory-agent", "STANDARD")
+                .withProperty("operator.ai-admission.version", "ai-admission/2");
+        assertThat(CloudConfigurationCheck.problems(versioned)).isEmpty();
+    }
+
     private static MockEnvironment cloud() {
         MockEnvironment environment = new MockEnvironment()
                 .withProperty("spring.datasource.url", "jdbc:postgresql://db.internal.example:5432/operator")

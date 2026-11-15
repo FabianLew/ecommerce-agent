@@ -165,10 +165,20 @@ never resumes another, and none is switched on automatically.
 ### AI admission denied
 
 Agent runs were not admitted because the store or the platform reached its limit of active runs
-(`STORE_LIMIT`, `GLOBAL_LIMIT` on `operator_ai_admissions_total`). The analysis falls back to the baseline. A few
-are normal during a burst. Many point to runs that do not end (check "Agent failing") or to limits that are too low:
-the store limit is `max-concurrent-runs-per-store` of the agent's run policy (a new policy version), the platform limit
-`operator.ai-governance.max-concurrent-runs`. A lease of a lost worker expires one minute after the run's wall time.
+(`STORE_LIMIT`, `GLOBAL_LIMIT` on `operator_ai_admissions_total`, tagged with the automation's `priority`). A run
+refused a slot before anything was sent (also by a provider limit) uses no model attempt: its episode waits on a
+Temporal timer and asks the same model again, at most `operator.ai-admission.max-wait` (2 minutes) in total
+(`operator_ai_admission_waits_total`, outcome `WAITING`). Only when the wait is used up (outcome `GAVE_UP`, alert
+`AiAdmissionWaitExhausted`) does the analysis fall back to the baseline. A few are normal during a burst. Many point
+to runs that do not end (check "Agent failing") or to limits that are too low: the store limit is
+`max-concurrent-runs-per-store` of the agent's run policy (a new policy version), the platform limit
+`operator.ai-governance.max-concurrent-runs`. A `STANDARD` run is admitted only while all active runs of the
+platform, of every priority, are below `operator.ai-admission.standard-capacity-percent` (75) of the platform limit,
+and a `BACKGROUND` run below `background-capacity-percent` (50), rounded down and at least one; the rest is kept for
+`CRITICAL` work (the Inventory Guardian by default). At a platform limit of 1 nothing is reserved. If
+critical work itself hits `GLOBAL_LIMIT`, raise the platform limit; to change priorities or shares, set a new
+version of the parameter set (`ai-admission/N`). A lease of a lost worker expires one minute after the run's wall
+time.
 
 ### AI provider throttled
 

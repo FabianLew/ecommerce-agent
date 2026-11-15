@@ -5,12 +5,14 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeSet;
 import java.util.UUID;
 
+import com.ecommerceagent.aigovernance.AiAdmissionSettings;
 import com.ecommerceagent.decisions.ContextSnapshot;
 import com.ecommerceagent.decisions.ProposalRules;
 import com.ecommerceagent.decisions.ProposalSchema;
@@ -46,17 +48,20 @@ public class InventoryAgentProposer {
     private final AgentRuns runs;
     private final AgentSettings settings;
     private final InventoryAgentRunPolicy policy;
+    private final AiAdmissionSettings admission;
     private final Clock clock;
     private final SkillPackage skill;
     private final PromptPackage prompts;
     private final String outputSchema;
 
     InventoryAgentProposer(AgentRuntime runtime, AgentRuns runs, AgentSettings settings,
-            InventoryAgentRunPolicy policy, KnowledgeRegistry knowledge, ToolRegistry tools, Clock clock) {
+            InventoryAgentRunPolicy policy, AiAdmissionSettings admission, KnowledgeRegistry knowledge,
+            ToolRegistry tools, Clock clock) {
         this.runtime = runtime;
         this.runs = runs;
         this.settings = settings;
         this.policy = policy;
+        this.admission = admission;
         this.clock = clock;
         this.skill = knowledge.skill(InventoryAgent.SKILL)
                 .orElseThrow(() -> new IllegalStateException("Missing skill " + InventoryAgent.SKILL));
@@ -90,17 +95,40 @@ public class InventoryAgentProposer {
     /**
      * The outcome of asking the agent: its proposal, or why there is none ({@code fallback}, recorded by the caller
      * when it uses the baseline): {@code AGENT_DISABLED}, {@code AGENT_COOLDOWN}, {@code AGENT_FAILED},
-     * {@code AGENT_OUTPUT_REJECTED} or the governance reason {@code AI_GOVERNANCE:<reason>}.
+     * {@code AGENT_OUTPUT_REJECTED} or the governance reason {@code AI_GOVERNANCE:<reason>}. {@code waitable} is
+     * true when the last run was refused a slot (a full store, a full platform or a provider limit) before anything
+     * was sent: asking again later may succeed, and that run used no model attempt ({@link #nextWait}).
      */
-    public record AgentDecision(Optional<AgentProposal> proposal, String fallback) {
+    public record AgentDecision(Optional<AgentProposal> proposal, String fallback, boolean waitable) {
 
         static AgentDecision of(AgentProposal proposal) {
-            return new AgentDecision(Optional.of(proposal), null);
+            return new AgentDecision(Optional.of(proposal), null, false);
         }
 
         static AgentDecision none(String fallback) {
-            return new AgentDecision(Optional.empty(), fallback);
+            return new AgentDecision(Optional.empty(), fallback, false);
         }
+
+        static AgentDecision waiting(String fallback) {
+            return new AgentDecision(Optional.empty(), fallback, true);
+        }
+    }
+
+    /**
+     * How long to wait before asking the agent again, after {@code waited} in total (ADR-0027 section 6.2, parameter
+     * set {@code ai-admission}); empty when the decision is final or the wait would pass the bound, and the caller
+     * then degrades to the baseline.
+     */
+    public Optional<Duration> nextWait(AgentDecision decision, Duration waited) {
+        if (!decision.waitable() || decision.proposal().isPresent()) {
+            return Optional.empty();
+        }
+        return admission.nextWait(waited, java.util.concurrent.ThreadLocalRandom.current());
+    }
+
+    /** The parameter version that bounds the waiting, recorded with each wait. */
+    public String admissionVersion() {
+        return admission.version();
     }
 
     public Optional<AgentProposal> propose(TrustedStoreScope scope, UUID opportunityId, ContextSnapshot snapshot) {
@@ -123,6 +151,9 @@ public class InventoryAgentProposer {
         }
         InventoryContext context = InventoryContext.of(snapshot);
         String situation = context.situation();
+        // A run refused a slot before anything was sent uses no model attempt: after a wait the same model is asked.
+        int used = (int) earlier.stream().filter(run -> !refusedBeforeSending(run)).count();
+        // The cooldown keeps a new snapshot from a new analysis; a run after a wait continues this one.
         if (earlier.isEmpty() && inCooldown(scope, opportunityId, situation)) {
             return AgentDecision.none("AGENT_COOLDOWN");
         }
@@ -133,10 +164,13 @@ public class InventoryAgentProposer {
         String system = PromptPackage.fill(prompts.system(), Map.of("skill", skill.instructions()));
         String task = task(context);
         String fallback = "AGENT_FAILED";
-        // A run left RUNNING by a lost worker counts as a used attempt; its cost stays in the shared limit.
-        for (int attempt = earlier.size() + 1; attempt <= attempts; attempt++) {
+        // A run left RUNNING by a lost worker counts as a used attempt; its cost stays in the shared limit. Every run
+        // has its own attempt number, so a run after a wait follows the refused one.
+        int attempt = earlier.size();
+        for (int modelIndex = used; modelIndex < attempts; modelIndex++) {
+            attempt++;
             AgentRunResult result = runtime.run(new AgentRunRequest(scope, opportunityId, snapshot,
-                    InventoryAgent.DEFINITION, limits, skill, prompts, system, task, models.get(attempt - 1), key,
+                    InventoryAgent.DEFINITION, limits, skill, prompts, system, task, models.get(modelIndex), key,
                     attempt, spent, situation));
             if (result.succeeded()) {
                 return AgentDecision.of(new AgentProposal(result.runId(), InventoryAgent.PROPOSER, result.output()));
@@ -147,11 +181,26 @@ public class InventoryAgentProposer {
             }
             if (result.stopReason() != null && result.stopReason().startsWith("AI_GOVERNANCE:")) {
                 // A stop, a budget or a concurrency limit applies to the fallback model as well.
+                if (waitable(result.stopReason()) && result.estimatedCostUsd().signum() == 0) {
+                    return AgentDecision.waiting(result.stopReason());
+                }
                 fallback = result.stopReason();
                 break;
             }
         }
         return AgentDecision.none(fallback);
+    }
+
+    /** A slot refusal that may clear on its own: a full store or platform, or a provider's rate limit. */
+    private static boolean waitable(String stopReason) {
+        return stopReason != null && (stopReason.equals("AI_GOVERNANCE:STORE_LIMIT")
+                || stopReason.equals("AI_GOVERNANCE:GLOBAL_LIMIT")
+                || stopReason.startsWith("AI_GOVERNANCE:PROVIDER_LIMIT:"));
+    }
+
+    private static boolean refusedBeforeSending(AgentRun run) {
+        return run.status() == AgentRunStatus.LIMIT_EXCEEDED && waitable(run.stopReason())
+                && run.estimatedCostUsd().signum() == 0 && run.inputTokens() == 0 && run.outputTokens() == 0;
     }
 
     /**

@@ -31,13 +31,18 @@ import com.ecommerceagent.intelligence.inventory.InventoryAgentProposer;
 import com.ecommerceagent.intelligence.inventory.InventoryContext;
 import com.ecommerceagent.intelligence.inventory.InventoryContextBuilder;
 import com.ecommerceagent.metrics.CanonicalJson;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.temporal.spring.boot.ActivityImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
 @ActivityImpl(taskQueues = TaskQueues.MAIN)
 public class GuardianActivitiesImpl implements GuardianActivities {
+
+    private static final Logger log = LoggerFactory.getLogger(GuardianActivitiesImpl.class);
 
     private final Opportunities opportunities;
     private final InventoryContextBuilder contexts;
@@ -56,13 +61,14 @@ public class GuardianActivitiesImpl implements GuardianActivities {
     private final GuardianNotifications notifications;
     private final TransactionTemplate transactions;
     private final Clock clock;
+    private final MeterRegistry meters;
 
     GuardianActivitiesImpl(Opportunities opportunities, InventoryContextBuilder contexts, ContextSnapshots snapshots,
             BaselineProposer baseline, InventoryAgentProposer agent, DecisionProposals proposals,
             PolicyEvaluations policies, GuardianSettings settings, ActionPermissions permissions,
             DecisionApprovals approvals, ExecutionAuthority authority, AdPauseExecutor executor, ExecutionLedger ledger,
             ActionOutcomes outcomes, GuardianNotifications notifications, TransactionTemplate transactions,
-            Clock clock) {
+            Clock clock, MeterRegistry meters) {
         this.opportunities = opportunities;
         this.contexts = contexts;
         this.snapshots = snapshots;
@@ -80,6 +86,7 @@ public class GuardianActivitiesImpl implements GuardianActivities {
         this.notifications = notifications;
         this.transactions = transactions;
         this.clock = clock;
+        this.meters = meters;
     }
 
     @Override
@@ -115,6 +122,19 @@ public class GuardianActivitiesImpl implements GuardianActivities {
 
     @Override
     public ProposalOutcome proposeAndPersist(String opportunityId, String snapshotId) {
+        return proposeAndPersist(opportunityId, snapshotId, null);
+    }
+
+    @Override
+    public ProposalOutcome proposeAndPersistOrWait(String opportunityId, String snapshotId, long waitedSeconds) {
+        if (waitedSeconds < 0) {
+            throw new IllegalArgumentException("waitedSeconds must not be negative");
+        }
+        return proposeAndPersist(opportunityId, snapshotId, Duration.ofSeconds(waitedSeconds));
+    }
+
+    /** {@code waited} is null when the caller never waits. */
+    private ProposalOutcome proposeAndPersist(String opportunityId, String snapshotId, Duration waited) {
         TrustedStoreScope scope = ActivityStoreScope.current();
         UUID opportunity = UUID.fromString(opportunityId);
         UUID snapshotKey = UUID.fromString(snapshotId);
@@ -128,6 +148,16 @@ public class GuardianActivitiesImpl implements GuardianActivities {
         ContextSnapshot snapshot = snapshots.find(scope, snapshotKey).orElseThrow();
         InventoryAgentProposer.AgentDecision decision = agent.decide(scope, opportunity, snapshot);
         String fallback = decision.fallback();
+        if (waited != null && decision.waitable()) {
+            Optional<Duration> wait = agent.nextWait(decision, waited);
+            meters.counter("operator.ai.admission.waits", "reason", waitReason(fallback), "outcome",
+                    wait.isPresent() ? "WAITING" : "GAVE_UP").increment();
+            if (wait.isPresent()) {
+                return ProposalOutcome.waiting(wait.get().toSeconds(), fallback);
+            }
+            log.info("Episode {} stops waiting for an AI slot after {} ({}, {}); the baseline answers", opportunityId,
+                    waited, fallback, agent.admissionVersion());
+        }
         Optional<InventoryAgentProposer.AgentProposal> proposal = decision.proposal();
         if (proposal.isPresent()) {
             ProposalSubmission submission = proposals.submit(scope, opportunity, snapshotKey,
@@ -147,6 +177,12 @@ public class GuardianActivitiesImpl implements GuardianActivities {
                     proposer.kind().name(), fallback);
         }
         return outcome(submission.proposal(), fallback);
+    }
+
+    /** The metric tag of a slot refusal, without the provider's details. */
+    private static String waitReason(String fallback) {
+        String reason = fallback.substring(fallback.indexOf(':') + 1);
+        return reason.startsWith("PROVIDER_LIMIT") ? "PROVIDER_LIMIT" : reason;
     }
 
     private ProposalOutcome outcome(StoredProposal stored, String fallback) {

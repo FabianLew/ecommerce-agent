@@ -20,6 +20,13 @@ public interface GuardianActivities {
      */
     ProposalOutcome proposeAndPersist(String opportunityId, String snapshotId);
 
+    /**
+     * As {@link #proposeAndPersist}, except when the agent was refused a slot before anything was sent and the
+     * analysis has waited {@code waitedSeconds} so far: while the bound of the parameter set {@code ai-admission}
+     * allows, nothing is stored and the outcome says how long to wait before asking again (ADR-0027 section 6.2).
+     */
+    ProposalOutcome proposeAndPersistOrWait(String opportunityId, String snapshotId, long waitedSeconds);
+
     /** Evaluates and records the policy for the proposal's action; returns the outcome. */
     String evaluatePolicy(String proposalId);
 
