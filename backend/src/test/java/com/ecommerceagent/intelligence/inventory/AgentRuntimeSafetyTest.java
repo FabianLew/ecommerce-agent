@@ -1,9 +1,6 @@
 package com.ecommerceagent.intelligence.inventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -12,7 +9,6 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.ecommerceagent.decisions.ContextSnapshot;
-import com.ecommerceagent.decisions.DecisionProposals;
 import com.ecommerceagent.decisions.RiskDetectorSettings;
 import com.ecommerceagent.identity.TestScopes;
 import com.ecommerceagent.identity.TrustedStoreScope;
@@ -30,6 +26,7 @@ import com.ecommerceagent.intelligence.agent.FakeModelGateway;
 import com.ecommerceagent.intelligence.agent.InMemoryAgentRuns;
 import com.ecommerceagent.intelligence.agent.ModelGatewayRouter;
 import com.ecommerceagent.intelligence.agent.MutableClock;
+import com.ecommerceagent.intelligence.agent.ToolExecutionContext;
 import com.ecommerceagent.intelligence.agent.ToolRegistry;
 import com.ecommerceagent.intelligence.knowledge.KnowledgeRegistry;
 import com.ecommerceagent.intelligence.model.ModelFailure;
@@ -69,13 +66,11 @@ class AgentRuntimeSafetyTest {
 
     @BeforeEach
     void tools() {
-        DecisionProposals proposals = mock(DecisionProposals.class);
-        when(proposals.ofOpportunity(any(), any())).thenReturn(List.of());
         InventoryReadTools tools = new InventoryReadTools();
         RiskDetectorSettings risk = new RiskDetectorSettings(new BigDecimal("3"), 2, Duration.ofMinutes(5),
                 Duration.ofSeconds(120));
         List<AgentTool> all = List.of(tools.inventoryForecastTool(risk), tools.replenishmentPlanTool(),
-                tools.productAdMappingsTool(), tools.adDeliveryStateTool(), tools.recentActionsTool(proposals));
+                tools.productAdMappingsTool(), tools.adDeliveryStateTool(), tools.recentActionsTool());
         registry = new ToolRegistry(all);
     }
 
@@ -166,6 +161,31 @@ class AgentRuntimeSafetyTest {
         assertThat(run.usageComplete()).isTrue();
         // 1500 × 4 / 1M + 300 × 20 / 1M
         assertThat(run.estimatedCostUsd()).isEqualByComparingTo("0.012");
+    }
+
+    /** ADR-0016 point 4: the history comes from the snapshot only, so a later decision cannot change a replay. */
+    @Test
+    void recentActionsAreReadFromTheSnapshotAndALegacySnapshotSaysSo() {
+        AgentTool tool = new InventoryReadTools().recentActionsTool();
+        JsonNode args = CanonicalJson.read("{\"resourceId\":\"" + VARIANT + "\"}");
+
+        JsonNode legacy = tool.execute(new ToolExecutionContext(scope, UUID.randomUUID(), snapshot), args)
+                .body();
+        assertThat(legacy.get("proposals")).isEmpty();
+        assertThat(legacy.get("limitations").get(0).asString()).isEqualTo("RECENT_ACTIONS_NOT_IN_SNAPSHOT");
+
+        tools.jackson.databind.node.ObjectNode content = (tools.jackson.databind.node.ObjectNode) snapshot.content()
+                .deepCopy();
+        tools.jackson.databind.node.ObjectNode section = content.putObject("recentActions");
+        section.putArray("proposals").addObject().put("revision", 1).put("status", "REJECTED");
+        section.putArray("executedActions").addObject().put("status", "VERIFIED");
+        ContextSnapshot frozen = new ContextSnapshot(snapshot.id(), snapshot.opportunityId(), snapshot.contentSchema(),
+                snapshot.asOf(), content, CanonicalJson.hash(content), snapshot.evidenceIds(), snapshot.createdAt());
+        JsonNode result = tool.execute(new ToolExecutionContext(scope, UUID.randomUUID(), frozen), args)
+                .body();
+        assertThat(result.get("proposals").get(0).get("status").asString()).isEqualTo("REJECTED");
+        assertThat(result.get("executedActions").get(0).get("status").asString()).isEqualTo("VERIFIED");
+        assertThat(result.get("limitations")).isEmpty();
     }
 
     @Test

@@ -14,7 +14,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.ecommerceagent.decisions.ContextSnapshot;
-import com.ecommerceagent.decisions.DecisionProposals;
 import com.ecommerceagent.decisions.PauseAd;
 import com.ecommerceagent.decisions.Recommendation;
 import com.ecommerceagent.decisions.RiskDetectorSettings;
@@ -27,7 +26,6 @@ import com.ecommerceagent.intelligence.agent.ModelGatewayRouter;
 import com.ecommerceagent.intelligence.agent.ToolRegistry;
 import com.ecommerceagent.intelligence.knowledge.KnowledgeRegistry;
 import com.ecommerceagent.metrics.CanonicalJson;
-import org.mockito.Mockito;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -88,12 +86,10 @@ final class QualityHarness {
     /** The real runtime, dispatcher, read tools and knowledge on the given model; runs are kept in memory. */
     static Agent agent(String mode, ModelGatewayRouter gateways, AgentSettings settings, KnowledgeRegistry knowledge,
             Clock clock) {
-        DecisionProposals proposals = Mockito.mock(DecisionProposals.class);
-        Mockito.when(proposals.ofOpportunity(Mockito.any(), Mockito.any())).thenReturn(List.of());
         InventoryReadTools tools = new InventoryReadTools();
         ToolRegistry registry = new ToolRegistry(List.of(tools.inventoryForecastTool(RISK),
                 tools.replenishmentPlanTool(), tools.productAdMappingsTool(), tools.adDeliveryStateTool(),
-                tools.recentActionsTool(proposals)));
+                tools.recentActionsTool()));
         return new Agent() {
             @Override
             public String mode() {

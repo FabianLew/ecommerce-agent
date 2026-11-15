@@ -117,6 +117,12 @@ class ExecutionAuthorityTest extends DecisionScenario {
         ActionExecution planned = ledger.plan(scope, action);
         assertThat(ledger.plan(scope, action).id()).isEqualTo(planned.id());
         assertThat(planned.status()).isEqualTo(ExecutionStatus.PLANNED);
+        // ADR-0016 point 4: a new snapshot freezes the episode's history as it stands now.
+        var history = contexts.build(scope, opportunities.find(scope, episode.id()).orElseThrow()).content()
+                .get("recentActions");
+        assertThat(history.get("proposals").get(0).get("status").asString()).isEqualTo("APPROVED");
+        assertThat(history.get("executedActions").get(0).get("status").asString()).isEqualTo("PLANNED");
+        assertThat(history.get("executedActions").get(0).get("targetExternalId").asString()).isEqualTo("ad-9001");
 
         assertThat(ledger.takeLease(scope, "META_AD", dedicatedAd, "worker-1")).isTrue();
         assertThat(ledger.takeLease(scope, "META_AD", dedicatedAd, "worker-2")).isFalse();

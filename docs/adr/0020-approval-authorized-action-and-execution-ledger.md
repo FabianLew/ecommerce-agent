@@ -38,7 +38,7 @@ The model must stay outside it: it proposes, and only trusted backend code appro
    workflow also looks up a stored approval when it wakes.
 
    **Three different clocks.** They are kept apart on purpose:
-   - *Proposal TTL* (`operator.guardian.proposal-ttl`, default 24 h from the proposal's creation) bounds when a
+   - *Proposal TTL* (`operator.inventory-guardian.workflow.proposal-ttl`, default 24 h from the proposal's creation) bounds when a
      decision can be made. After it the proposal is `EXPIRED`, approvals and rejections are refused, and the
      workflow stops waiting.
    - *Approval validity* is the 24 h of plan decision I1, but as an upper bound only:
@@ -50,8 +50,8 @@ The model must stay outside it: it proposes, and only trusted backend code appro
      and the executor reads the ad again right before the write (point 6). An approval that is still valid but
      whose facts are stale, or no longer lead to the same action hash, is refused at authorization
      (`ACTION_CHANGED` or the policy's freshness code). A new proposal revision is then needed.
-   The current code matches this (`DecisionApprovals` computes the minimum); a start-up check that the TTL is
-   positive is the only addition.
+   `DecisionApprovals` computes the minimum, and the application refuses to start with a proposal TTL or an
+   authorization TTL that is not positive.
 3. **AuthorizedAction (B-38).** Only `ExecutionAuthority.authorize(scope, approvalId)` creates one, after a new policy
    evaluation on a fresh context that must again be `REQUIRE_APPROVAL` with the same action hash. The record holds
    the proposal id/revision/hash, the approval and policy evaluation ids, the action type, the target (ad id and

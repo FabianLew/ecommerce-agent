@@ -15,4 +15,11 @@ public record ExecutionSettings(
         @DefaultValue("24h") Duration cooldownPerAd) {
 
     public static final Duration LIMIT_WINDOW = Duration.ofHours(24);
+
+    public ExecutionSettings {
+        if (authorizationTtl == null || authorizationTtl.isNegative() || authorizationTtl.isZero()) {
+            throw new IllegalArgumentException(
+                    "operator.execution.authorization-ttl must be positive, was " + authorizationTtl);
+        }
+    }
 }

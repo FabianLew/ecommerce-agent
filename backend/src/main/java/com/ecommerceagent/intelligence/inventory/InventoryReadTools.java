@@ -2,12 +2,9 @@ package com.ecommerceagent.intelligence.inventory;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.UUID;
 
 import com.ecommerceagent.decisions.ContextSnapshot;
-import com.ecommerceagent.decisions.DecisionProposals;
 import com.ecommerceagent.decisions.RiskDetectorSettings;
-import com.ecommerceagent.decisions.StoredProposal;
 import com.ecommerceagent.intelligence.agent.AgentTool;
 import com.ecommerceagent.intelligence.agent.ToolDefinition;
 import com.ecommerceagent.intelligence.agent.ToolEffect;
@@ -122,9 +119,9 @@ public class InventoryReadTools {
     }
 
     @Bean
-    AgentTool recentActionsTool(DecisionProposals proposals) {
+    AgentTool recentActionsTool() {
         return tool(RECENT_ACTIONS, "Earlier proposals and actions of this episode for the variant or one of its "
-                + "mapped ads, up to the snapshot time, and the last risk outcome.",
+                + "mapped ads, as they stood at the snapshot time, and the last risk outcome.",
                 schema("resourceId", "The episode's product variant id or an adId of a mapped ad."),
                 (context, args) -> {
                     JsonNode content = context.snapshot().content();
@@ -134,22 +131,17 @@ public class InventoryReadTools {
                     }
                     ObjectNode result = envelope(context.snapshot());
                     result.put("lastRiskOutcome", content.get("risk").path("lastOutcome").asString(null));
-                    ArrayNode earlier = result.putArray("proposals");
-                    UUID opportunityId = context.snapshot().opportunityId();
-                    for (StoredProposal stored : proposals.ofOpportunity(context.scope(), opportunityId)) {
-                        if (stored.proposal().createdAt().isAfter(context.snapshot().asOf())) {
-                            continue;
-                        }
-                        ObjectNode item = earlier.addObject();
-                        item.put("revision", stored.proposal().revision());
-                        item.put("disposition", stored.proposal().recommendation().disposition().name());
-                        item.put("status", stored.status().name());
-                        item.put("createdAt", stored.proposal().createdAt().toString());
-                        item.set("action", stored.proposal().recommendation().action() == null ? NODES.nullNode()
-                                : com.ecommerceagent.decisions.ProposalJson.write(stored.proposal().recommendation())
-                                        .get("action"));
+                    JsonNode section = content.get("recentActions");
+                    if (section == null || section.isNull()) {
+                        // A snapshot built before the section existed: say so rather than read live data.
+                        result.putArray("proposals");
+                        result.putArray("executedActions");
+                        result.putArray("limitations").add("RECENT_ACTIONS_NOT_IN_SNAPSHOT");
+                    } else {
+                        result.set("proposals", section.get("proposals").deepCopy());
+                        result.set("executedActions", section.get("executedActions").deepCopy());
+                        result.putArray("limitations");
                     }
-                    result.putArray("executedActions");
                     result.putArray("activeLocks");
                     return ToolOutcome.ok(result);
                 });

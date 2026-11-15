@@ -119,10 +119,10 @@ enters the existing episode workflow without weakening it.
 
 ## Implementation status
 
-On the pilot branch `get_recent_actions` reads the episode's proposals from the live table at call time. It keeps
-those created before the snapshot time, but it shows their *current* status, so a replay after a later decision can
-see different data. After this revision is approved, a follow-up moves the history into the snapshot builder and the
-tool to that section.
+Implemented on the pilot branch: `InventoryContextBuilder` writes the `recentActions` section (the episode's
+proposals with their status at the snapshot time, the executions with their ledger state through
+`EpisodeActionHistory`, and the last risk outcome), and `get_recent_actions` reads only that section. A snapshot
+without it returns an empty history with `RECENT_ACTIONS_NOT_IN_SNAPSHOT`.
 
 ## Verification
 
