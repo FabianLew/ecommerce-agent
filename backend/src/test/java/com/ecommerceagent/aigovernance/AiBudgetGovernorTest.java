@@ -60,6 +60,7 @@ class AiBudgetGovernorTest {
 
     @BeforeEach
     void setUp() {
+        fixtures.registerAutomations("inventory", "marketing-diagnosis");
         organization = UUID.randomUUID();
         storeA = UUID.randomUUID();
         storeB = UUID.randomUUID();

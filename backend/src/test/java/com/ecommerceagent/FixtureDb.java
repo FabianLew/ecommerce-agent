@@ -26,6 +26,16 @@ public final class FixtureDb {
         return jdbc.sql(sql);
     }
 
+    /** Registers automation identifiers used by a test (ADR-0027 section 10); registering twice changes nothing. */
+    public void registerAutomations(String... automationTypes) {
+        for (String automationType : automationTypes) {
+            sql("""
+                    INSERT INTO ai_automation_type (automation_type, description) VALUES (?, 'test')
+                    ON CONFLICT (automation_type) DO NOTHING
+                    """).param(automationType).update();
+        }
+    }
+
     public JdbcClient client() {
         return jdbc;
     }

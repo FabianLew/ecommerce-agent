@@ -65,6 +65,7 @@ class AiAdmissionTest {
 
     @BeforeEach
     void setUp() {
+        fixtures.registerAutomations("inventory");
         organization = UUID.randomUUID();
         storeA = UUID.randomUUID();
         storeB = UUID.randomUUID();
@@ -84,6 +85,20 @@ class AiAdmissionTest {
             asAdministrator("INSERT INTO ai_platform_stop_change (stopped, reason, changed_by)"
                     + " VALUES (false, 'test end', 'test')");
         }
+    }
+
+    /** ADR-0027 section 10: an automation that is not registered is never admitted, and the runtime cannot add one. */
+    @Test
+    void anUnregisteredAutomationIsRefused() {
+        UUID first = run(storeA, opportunityA);
+
+        assertThat(inScope(storeA, () -> admission.admit(scope(storeA), first, "not-registered", 1, TTL)))
+                .isEqualTo(Admission.UNKNOWN_AUTOMATION);
+        assertThat(inScope(storeA, () -> jdbc.sql("SELECT count(*) FROM ai_run_lease").query(Integer.class).single()))
+                .isZero();
+        assertThatThrownBy(() -> jdbc.sql("INSERT INTO ai_automation_type (automation_type, description)"
+                + " VALUES ('runtime-made', 'x')").update()).as("the runtime cannot register an automation")
+                .isInstanceOf(org.springframework.dao.DataAccessException.class);
     }
 
     @Test
