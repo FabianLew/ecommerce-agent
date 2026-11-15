@@ -26,3 +26,15 @@ export async function updateOnboarding(
   redirectIfUnauthenticated(updated.response.status, path);
   revalidatePath(path);
 }
+
+/** Starts monitoring (ADR-0025); the backend refuses it until every earlier step is complete. */
+export async function startMonitoring(storeId: string, expectedVersion: number): Promise<void> {
+  const path = `/stores/${encodeURIComponent(storeId)}/onboarding`;
+  const api = await backend(path);
+  const started = await api.POST("/api/v1/stores/{storeId}/onboarding/monitoring-start", {
+    params: { path: { storeId } },
+    body: { expectedVersion },
+  });
+  redirectIfUnauthenticated(started.response.status, path);
+  revalidatePath(path);
+}

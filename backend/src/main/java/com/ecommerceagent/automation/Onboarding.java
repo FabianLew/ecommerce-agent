@@ -2,17 +2,22 @@ package com.ecommerceagent.automation;
 
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.ecommerceagent.automation.guardian.InventoryProtectionPolicy;
 import com.ecommerceagent.businessprofile.BusinessProfiles;
 import com.ecommerceagent.commerce.AdMappingScope;
 import com.ecommerceagent.commerce.AdMappings;
+import com.ecommerceagent.identity.AuditEntry;
+import com.ecommerceagent.identity.AuditTrail;
 import com.ecommerceagent.identity.StorePermission;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.integration.ConnectionStatus;
@@ -70,9 +75,22 @@ public class Onboarding {
     public record DomainState(Domain domain, Readiness readiness, String detail) {
     }
 
-    public record OnboardingState(Step currentStep, Step nextStep, List<StepState> steps, List<DomainState> domains,
-            Set<Acknowledgement> acknowledgements, int version) {
+    /** What monitoring covers now (ADR-0025 point 2); computed from the mode and the connections, never stored. */
+    public enum AdsScope {
+        NONE,
+        PROPOSALS_ONLY,
+        APPROVAL_REQUIRED
     }
+
+    public record Monitoring(Instant startedAt, java.util.UUID startedBy, AdsScope ads) {
+    }
+
+    public record OnboardingState(Step currentStep, Step nextStep, List<StepState> steps, List<DomainState> domains,
+            Set<Acknowledgement> acknowledgements, int version, Monitoring monitoring) {
+    }
+
+    /** The refusal code while a store has not started monitoring (ADR-0025 point 3). */
+    public static final String MONITORING_NOT_STARTED = "MONITORING_NOT_STARTED";
 
     private final JdbcClient jdbc;
     private final IntegrationConnections connections;
@@ -80,10 +98,15 @@ public class Onboarding {
     private final MetaConnections meta;
     private final AdMappings mappings;
     private final BusinessProfiles profiles;
+    private final InventoryProtectionPolicy policy;
+    private final AuditTrail audit;
     private final Clock clock;
 
     Onboarding(JdbcClient jdbc, IntegrationConnections connections, WooCommerceImport imports, MetaConnections meta,
-            AdMappings mappings, BusinessProfiles profiles, Clock clock) {
+            AdMappings mappings, BusinessProfiles profiles, InventoryProtectionPolicy policy, AuditTrail audit,
+            Clock clock) {
+        this.policy = policy;
+        this.audit = audit;
         this.jdbc = jdbc;
         this.connections = connections;
         this.imports = imports;
@@ -131,12 +154,86 @@ public class Onboarding {
             dataBlockers.add("NO_VERIFIED_MAPPING");
         }
         steps.add(new StepState(Step.BUSINESS_DATA, dataBlockers.isEmpty(), List.copyOf(dataBlockers)));
-        // Starting monitoring is a later step (B-35/F4): it is never complete here.
-        steps.add(new StepState(Step.START_MONITORING, false, List.of("NOT_AVAILABLE_YET")));
+        boolean earlierDone = steps.stream().allMatch(StepState::complete);
+        boolean started = progress.monitoringStartedAt() != null;
+        steps.add(new StepState(Step.START_MONITORING, started, started ? List.of()
+                : List.of(earlierDone ? "MONITORING_NOT_STARTED" : "EARLIER_STEPS_INCOMPLETE")));
         Step next = steps.stream().filter(s -> !s.complete()).map(StepState::step).findFirst()
                 .orElse(Step.START_MONITORING);
+        Monitoring monitoring = new Monitoring(progress.monitoringStartedAt(), progress.monitoringStartedBy(),
+                adsScope(metaConnection, skipMeta));
         return new OnboardingState(progress.currentStep(), next, List.copyOf(steps), List.copyOf(domains),
-                progress.acknowledgements(), progress.version());
+                progress.acknowledgements(), progress.version(), monitoring);
+    }
+
+    /** Whether the store's owner started monitoring; execution is refused until then (ADR-0025 point 3). */
+    public boolean monitoringStarted(TrustedStoreScope scope) {
+        return progress(scope).monitoringStartedAt() != null;
+    }
+
+    /**
+     * Records the start of monitoring once every earlier step is complete (ADR-0025 point 1). A store that already
+     * started gets its state back unchanged.
+     */
+    @Transactional
+    public OnboardingState startMonitoring(TrustedStoreScope scope, int expectedVersion) {
+        scope.require(StorePermission.STORE_MANAGE);
+        OnboardingState state = state(scope);
+        if (state.monitoring().startedAt() != null) {
+            return state;
+        }
+        List<String> blockers = state.steps().stream()
+                .filter(step -> step.step() != Step.START_MONITORING && !step.complete())
+                .map(step -> step.step().name()).toList();
+        if (!blockers.isEmpty()) {
+            throw new OnboardingConflictException("Complete these steps first: " + String.join(", ", blockers),
+                    false);
+        }
+        Timestamp now = Timestamp.from(clock.instant());
+        int written;
+        if (expectedVersion == 0) {
+            written = jdbc.sql("""
+                            INSERT INTO onboarding_progress (store_id, organization_id, current_step, version,
+                                                             updated_by, updated_at, monitoring_started_at,
+                                                             monitoring_started_by)
+                            VALUES (:storeId, :organizationId, 'START_MONITORING', 1, :user, :now, :now, :user)
+                            ON CONFLICT (store_id) DO NOTHING
+                            """)
+                    .param("storeId", scope.storeId())
+                    .param("organizationId", scope.organizationId())
+                    .param("user", scope.userId().orElse(null), java.sql.Types.OTHER)
+                    .param("now", now)
+                    .update();
+        } else {
+            written = jdbc.sql("""
+                            UPDATE onboarding_progress
+                            SET current_step = 'START_MONITORING', version = version + 1, updated_by = :user,
+                                updated_at = :now, monitoring_started_at = :now, monitoring_started_by = :user
+                            WHERE store_id = :storeId AND organization_id = :organizationId AND version = :version
+                              AND monitoring_started_at IS NULL
+                            """)
+                    .param("user", scope.userId().orElse(null), java.sql.Types.OTHER)
+                    .param("now", now)
+                    .param("storeId", scope.storeId())
+                    .param("organizationId", scope.organizationId())
+                    .param("version", expectedVersion)
+                    .update();
+        }
+        if (written != 1) {
+            throw new OnboardingConflictException("The onboarding progress changed since it was loaded", true);
+        }
+        OnboardingState started = state(scope);
+        audit.record(AuditEntry.inScope(scope, "MONITORING_STARTED", "onboarding_progress",
+                scope.storeId().toString(), Map.of("ads", started.monitoring().ads().name())));
+        return started;
+    }
+
+    private AdsScope adsScope(Optional<MetaConnection> connection, boolean skipped) {
+        if (skipped || connection.isEmpty() || connection.get().status() != MetaConnectionStatus.CONNECTED) {
+            return AdsScope.NONE;
+        }
+        return policy.mode() == InventoryProtectionPolicy.Mode.EXECUTE_ON_APPROVAL && connection.get().canWrite()
+                ? AdsScope.APPROVAL_REQUIRED : AdsScope.PROPOSALS_ONLY;
     }
 
     /** Stores the user's position and acknowledgements; readiness stays computed (ADR-0018). */
@@ -221,12 +318,14 @@ public class Onboarding {
         };
     }
 
-    private record Progress(Step currentStep, Set<Acknowledgement> acknowledgements, int version) {
+    private record Progress(Step currentStep, Set<Acknowledgement> acknowledgements, int version,
+            Instant monitoringStartedAt, java.util.UUID monitoringStartedBy) {
     }
 
     private Progress progress(TrustedStoreScope scope) {
         return jdbc.sql("""
-                        SELECT current_step, acknowledgements, version FROM onboarding_progress
+                        SELECT current_step, acknowledgements, version, monitoring_started_at, monitoring_started_by
+                        FROM onboarding_progress
                         WHERE store_id = :storeId AND organization_id = :organizationId
                         """)
                 .param("storeId", scope.storeId())
@@ -235,8 +334,11 @@ public class Onboarding {
                         Arrays.stream((String[]) rs.getArray("acknowledgements").getArray())
                                 .map(Acknowledgement::valueOf)
                                 .collect(Collectors.toCollection(() -> EnumSet.noneOf(Acknowledgement.class))),
-                        rs.getInt("version")))
+                        rs.getInt("version"),
+                        rs.getTimestamp("monitoring_started_at") == null ? null
+                                : rs.getTimestamp("monitoring_started_at").toInstant(),
+                        rs.getObject("monitoring_started_by", java.util.UUID.class)))
                 .optional()
-                .orElse(new Progress(Step.CONNECT_STORE, Set.of(), 0));
+                .orElse(new Progress(Step.CONNECT_STORE, Set.of(), 0, null, null));
     }
 }

@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.ecommerceagent.automation.Onboarding;
 import com.ecommerceagent.automation.guardian.DecisionApprovals;
 import com.ecommerceagent.automation.guardian.PolicyEvaluation;
 import com.ecommerceagent.automation.guardian.PolicyEvaluations;
@@ -73,11 +74,13 @@ public class ExecutionAuthority {
     private final AuditTrail audit;
     private final JdbcClient jdbc;
     private final Clock clock;
+    private final Onboarding onboarding;
 
     ExecutionAuthority(DecisionApprovals approvals, DecisionProposals proposals, Opportunities opportunities,
             InventoryContextBuilder contexts, PolicyEvaluations evaluations, StoreAccess storeAccess,
             MetaConnections meta, AdRepository ads, MutationStops stops, ExecutionSettings settings,
-            AuditTrail audit, JdbcClient jdbc, Clock clock) {
+            AuditTrail audit, JdbcClient jdbc, Clock clock, Onboarding onboarding) {
+        this.onboarding = onboarding;
         this.approvals = approvals;
         this.proposals = proposals;
         this.opportunities = opportunities;
@@ -110,6 +113,9 @@ public class ExecutionAuthority {
         Optional<String> stopped = stops.blocker(scope);
         if (stopped.isPresent()) {
             return Authorization.refused(stopped.get());
+        }
+        if (!onboarding.monitoringStarted(scope)) {
+            return Authorization.refused(Onboarding.MONITORING_NOT_STARTED);
         }
         // The approval is the person's: it holds only while they may still approve in this store (ADR-0004).
         boolean stillAllowed = storeAccess.scopeFor(approval.decidedBy(), scope.storeId())

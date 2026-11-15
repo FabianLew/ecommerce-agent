@@ -107,6 +107,12 @@ class ExecutionAuthorityTest extends DecisionScenario {
                 .params(OWNER, store).update();
         assertThat(authority.authorize(scope, approvalId).refusal()).isEqualTo("APPROVER_ACCESS_REVOKED");
         assertThat(authority.authorize(scope, UUID.randomUUID()).refusal()).isEqualTo("APPROVAL_NOT_FOUND");
+
+        jdbc.sql("UPDATE store_membership SET role = 'OWNER' WHERE user_id = ? AND store_id = ?")
+                .params(OWNER, store).update();
+        jdbc.sql("UPDATE onboarding_progress SET monitoring_started_at = NULL WHERE store_id = ?").param(store)
+                .update();
+        assertThat(authority.authorize(scope, approvalId).refusal()).isEqualTo("MONITORING_NOT_STARTED");
         assertThat(jdbc.sql("SELECT count(*) FROM authorized_action").query(Long.class).single()).isZero();
     }
 

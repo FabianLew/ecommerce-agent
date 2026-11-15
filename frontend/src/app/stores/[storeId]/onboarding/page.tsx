@@ -3,11 +3,12 @@ import { notFound } from "next/navigation";
 import { Fragment } from "react";
 
 import { PageHeading } from "@/components/PageHeading";
-import { getMessages } from "@/i18n/server";
+import { formatInstant } from "@/i18n/format";
+import { getLocale, getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { storePath } from "@/lib/store-path";
 
-import { updateOnboarding } from "./actions";
+import { startMonitoring, updateOnboarding } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -16,17 +17,21 @@ export default async function OnboardingPage({ params }: { params: Promise<{ sto
   const { storeId } = await params;
   const path = `/stores/${encodeURIComponent(storeId)}/onboarding`;
   const api = await backend(path);
-  const [state, messages] = await Promise.all([
+  const [state, store, locale, messages] = await Promise.all([
     api.GET("/api/v1/stores/{storeId}/onboarding", { params: { path: { storeId } } }),
+    api.GET("/api/v1/stores/{storeId}", { params: { path: { storeId } } }),
+    getLocale(),
     getMessages(),
   ]);
   redirectIfUnauthenticated(state.response.status, path);
-  if (!state.data) {
+  if (!state.data || !store.data) {
     notFound();
   }
   const t = messages.onboarding;
   const data = state.data;
   const acks = data.acknowledgements;
+  const monitoring = data.monitoring;
+  const earlierDone = data.steps.filter((step) => step.step !== "START_MONITORING").every((step) => step.complete);
   const links: Record<string, string> = {
     CONNECT_STORE: storePath(storeId, "integrations"),
     CONNECT_TOOLS: storePath(storeId, "integrations"),
@@ -54,6 +59,22 @@ export default async function OnboardingPage({ params }: { params: Promise<{ sto
                 {step.complete ? t.done : step.step === data.nextStep ? t.next : t.todo}
               </span>
             </div>
+            {step.step === "START_MONITORING" ? (
+              <>
+                {monitoring.startedAt ? (
+                  <p data-testid="monitoring-started">
+                    {t.monitoringStarted(formatInstant(monitoring.startedAt, store.data.timezone, locale))}
+                  </p>
+                ) : null}
+                <h3>{t.scopeTitle}</h3>
+                <dl className="details" data-testid="monitoring-scope">
+                  <dt>{t.scopeStore}</dt>
+                  <dd>{t.readiness.READY}</dd>
+                  <dt>{t.scopeAds}</dt>
+                  <dd data-testid="monitoring-ads">{t.adsScope[monitoring.ads]}</dd>
+                </dl>
+              </>
+            ) : null}
             {step.blockers.map((blocker) => (
               <p key={blocker} className="form-message warning">{t.blockers[blocker] ?? blocker}</p>
             ))}
@@ -71,6 +92,11 @@ export default async function OnboardingPage({ params }: { params: Promise<{ sto
                   <button type="submit" className="button secondary" data-testid="skip-meta">
                     {acks.includes("SKIP_META") ? t.undoSkipMeta : t.skipMeta}
                   </button>
+                </form>
+              ) : null}
+              {data.canEdit && step.step === "START_MONITORING" && !monitoring.startedAt && earlierDone ? (
+                <form action={startMonitoring.bind(null, storeId, data.version)}>
+                  <button type="submit" className="button" data-testid="start-monitoring">{t.startMonitoring}</button>
                 </form>
               ) : null}
               {data.canEdit && step.step === "BUSINESS_DATA" && !acks.includes("MAPPINGS_LATER") ? (

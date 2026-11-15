@@ -173,4 +173,53 @@ class BusinessProfileApiTest {
                 .andExpect(jsonPath("$.version").value(0))
                 .andExpect(jsonPath("$.domains[3].readiness").value("NOT_STARTED"));
     }
+
+    /** ADR-0025: monitoring starts only after the earlier steps, once, with the scope in force now. */
+    @Test
+    void monitoringStartsOnceAfterTheEarlierSteps() throws Exception {
+        draft("owner", STORE_A, "\"goal\":\"BALANCED\",\"planningHorizonDays\":30,\"riskPreference\":\"LOW\"", 0);
+        approve("owner", STORE_A, 1);
+        mvc.perform(get("/api/v1/stores/{storeId}/onboarding", STORE_A).with(user("owner")))
+                .andExpect(jsonPath("$.steps[3].blockers[0]").value("EARLIER_STEPS_INCOMPLETE"))
+                .andExpect(jsonPath("$.monitoring.ads").value("NONE"));
+        startMonitoring("owner", STORE_A, 0).andExpect(status().isUnprocessableContent());
+
+        UUID connection = UUID.randomUUID();
+        jdbc.sql("""
+                        INSERT INTO integration_connection (id, organization_id, store_id, provider, store_url, status,
+                                                            created_at, updated_at, webhook_endpoint_key)
+                        VALUES (?, ?, ?, 'WOOCOMMERCE', 'https://shop.example', 'CONNECTED', now(), now(), ?)
+                        """).params(connection, ORG, STORE_A, UUID.randomUUID().toString().replace("-", "")).update();
+        jdbc.sql("""
+                        INSERT INTO sync_run (id, organization_id, store_id, connection_id, kind, status, window_from,
+                                              window_until, started_at, finished_at, workflow_started_at)
+                        VALUES (?, ?, ?, ?, 'INITIAL_IMPORT', 'SUCCEEDED', now() - interval '14 days', now(), now(),
+                                now(), now())
+                        """).params(UUID.randomUUID(), ORG, STORE_A, connection).update();
+        mvc.perform(patch("/api/v1/stores/{storeId}/onboarding", STORE_A).with(user("owner"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentStep\":\"START_MONITORING\",\"acknowledgements\":[\"SKIP_META\"],"
+                                + "\"expectedVersion\":0}"))
+                .andExpect(jsonPath("$.steps[3].blockers[0]").value("MONITORING_NOT_STARTED"));
+
+        startMonitoring("analyst", STORE_A, 1).andExpect(status().isForbidden());
+        startMonitoring("owner", STORE_A, 1)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.steps[3].complete").value(true))
+                .andExpect(jsonPath("$.monitoring.startedBy").value(OWNER.toString()))
+                .andExpect(jsonPath("$.monitoring.ads").value("NONE"))
+                .andExpect(jsonPath("$.version").value(2));
+        startMonitoring("owner", STORE_A, 1).andExpect(status().isOk()).andExpect(jsonPath("$.version").value(2));
+        org.assertj.core.api.Assertions.assertThat(jdbc.sql(
+                        "SELECT count(*) FROM audit_event WHERE action = 'MONITORING_STARTED' AND store_id = ?")
+                .param(STORE_A).query(Long.class).single()).isEqualTo(1);
+        mvc.perform(get("/api/v1/stores/{storeId}/onboarding", STORE_B).with(user("owner-b")))
+                .andExpect(jsonPath("$.steps[3].complete").value(false));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions startMonitoring(String subject, UUID store,
+            int version) throws Exception {
+        return mvc.perform(post("/api/v1/stores/{storeId}/onboarding/monitoring-start", store).with(user(subject))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"expectedVersion\":" + version + "}"));
+    }
 }

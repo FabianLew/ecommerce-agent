@@ -596,6 +596,22 @@ export interface paths {
         patch: operations["updateOnboarding"];
         trace?: never;
     };
+    "/api/v1/stores/{storeId}/onboarding/monitoring-start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["startMonitoring"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stores/{storeId}/variants": {
         parameters: {
             query?: never;
@@ -1228,6 +1244,21 @@ export interface components {
             /** @description Decimal string; null when quality is UNAVAILABLE */
             value?: string;
         };
+        MonitoringResponse: {
+            /** @enum {string} */
+            ads: "NONE" | "PROPOSALS_ONLY" | "APPROVAL_REQUIRED";
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: uuid */
+            startedBy?: string;
+        };
+        MonitoringStartRequest: {
+            /**
+             * Format: int32
+             * @description Onboarding version seen; 0 if none
+             */
+            expectedVersion: number;
+        };
         MutationStopRequest: {
             /** @description Required when stopping, at most 500 characters */
             reason?: string;
@@ -1309,6 +1340,7 @@ export interface components {
             /** @enum {string} */
             currentStep: "CONNECT_STORE" | "CONNECT_TOOLS" | "BUSINESS_DATA" | "START_MONITORING";
             domains: components["schemas"]["DomainResponse"][];
+            monitoring: components["schemas"]["MonitoringResponse"];
             /** @enum {string} */
             nextStep: "CONNECT_STORE" | "CONNECT_TOOLS" | "BUSINESS_DATA" | "START_MONITORING";
             steps: components["schemas"]["StepResponse"][];
@@ -3573,6 +3605,59 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["OnboardingRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    startMonitoring: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MonitoringStartRequest"];
             };
         };
         responses: {

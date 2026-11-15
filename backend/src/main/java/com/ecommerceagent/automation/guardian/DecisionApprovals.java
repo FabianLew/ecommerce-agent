@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import com.ecommerceagent.automation.Onboarding;
 import com.ecommerceagent.automation.execution.MutationStops;
 import com.ecommerceagent.decisions.DecisionDisposition;
 import com.ecommerceagent.decisions.DecisionProposal;
@@ -67,11 +68,14 @@ public class DecisionApprovals {
     private final TransactionTemplate transactions;
     private final GuardianSignals signals;
     private final MutationStops stops;
+    private final Onboarding onboarding;
     private final Clock clock;
 
     DecisionApprovals(DecisionProposals proposals, Opportunities opportunities, PolicyEvaluations evaluations,
             InventoryProtectionPolicy policy, StoreAccess storeAccess, AuditTrail audit, JdbcClient jdbc,
-            TransactionTemplate transactions, GuardianSignals signals, MutationStops stops, Clock clock) {
+            TransactionTemplate transactions, GuardianSignals signals, MutationStops stops, Onboarding onboarding,
+            Clock clock) {
+        this.onboarding = onboarding;
         this.proposals = proposals;
         this.opportunities = opportunities;
         this.evaluations = evaluations;
@@ -96,6 +100,9 @@ public class DecisionApprovals {
         Optional<String> stopped = stops.blocker(scope);
         if (stopped.isPresent() && decision == Decision.APPROVED) {
             return stopped;
+        }
+        if (decision == Decision.APPROVED && !onboarding.monitoringStarted(scope)) {
+            return Optional.of(Onboarding.MONITORING_NOT_STARTED);
         }
         return precondition(scope, stored, decision, clock.instant());
     }
@@ -163,6 +170,10 @@ public class DecisionApprovals {
                 stops.blocker(fresh).ifPresent(code -> {
                     throw new ApprovalException(ApprovalException.Kind.CONFLICT, code);
                 });
+                // ADR-0025: nothing is approved for execution before the owner started monitoring.
+                if (!onboarding.monitoringStarted(fresh)) {
+                    throw new ApprovalException(ApprovalException.Kind.CONFLICT, Onboarding.MONITORING_NOT_STARTED);
+                }
             }
             if (ofProposal(fresh, proposalId).isPresent()) {
                 throw new ApprovalException(ApprovalException.Kind.CONFLICT, "ALREADY_DECIDED");

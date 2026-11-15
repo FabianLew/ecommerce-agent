@@ -56,6 +56,7 @@ class ActivityController {
             Map.entry("ACTION_OUTCOME_RECORDED", ActivityType.ACTION),
             Map.entry("MUTATIONS_STOPPED", ActivityType.SETTINGS),
             Map.entry("MUTATIONS_RESUMED", ActivityType.SETTINGS),
+            Map.entry("MONITORING_STARTED", ActivityType.SETTINGS),
             Map.entry("INTEGRATION_CONNECTION_CREATED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_CREDENTIALS_UPDATED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_CHECK_COMPLETED", ActivityType.INTEGRATION),

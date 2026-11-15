@@ -84,6 +84,24 @@ class BusinessProfileController {
                 request.expectedVersion()), scope);
     }
 
+    /** Records the owner's start of monitoring (ADR-0025); refused while an earlier step is incomplete. */
+    @PostMapping("/onboarding/monitoring-start")
+    OnboardingResponse startMonitoring(@RequiresPermission(StorePermission.STORE_MANAGE) TrustedStoreScope scope,
+            @RequestBody MonitoringStartRequest request) {
+        return OnboardingResponse.from(onboarding.startMonitoring(scope, request.expectedVersion()), scope);
+    }
+
+    record MonitoringStartRequest(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "Onboarding version seen; 0 if none")
+            int expectedVersion) {
+    }
+
+    record MonitoringResponse(
+            Instant startedAt,
+            UUID startedBy,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Onboarding.AdsScope ads) {
+    }
+
     record DraftRequest(Goal goal, Integer planningHorizonDays, RiskPreference riskPreference, TaxBasis taxBasis,
             List<Priority> priorities,
             @Schema(description = "Planned ad spend for the month, minor units of the store currency")
@@ -163,6 +181,7 @@ class BusinessProfileController {
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<DomainResponse> domains,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<Acknowledgement> acknowledgements,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int version,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) MonitoringResponse monitoring,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean canEdit) {
 
         static OnboardingResponse from(OnboardingState state, TrustedStoreScope scope) {
@@ -171,6 +190,8 @@ class BusinessProfileController {
                     state.domains().stream().map((DomainState d) -> new DomainResponse(d.domain(), d.readiness(),
                             d.detail())).toList(),
                     state.acknowledgements().stream().sorted().toList(), state.version(),
+                    new MonitoringResponse(state.monitoring().startedAt(), state.monitoring().startedBy(),
+                            state.monitoring().ads()),
                     scope.has(StorePermission.STORE_MANAGE));
         }
     }

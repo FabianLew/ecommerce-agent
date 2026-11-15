@@ -125,4 +125,24 @@ class MutationStopApiTest extends DecisionScenario {
         assertThat(approvals.reject(owner, proposalId, 1, "Not now", "stop-k2").approval().decision())
                 .isEqualTo(DecisionApprovals.Decision.REJECTED);
     }
+
+    /** ADR-0025: before the owner started monitoring, nothing is approved or authorized for execution. */
+    @Test
+    void withoutAMonitoringStartNothingIsApprovedForExecution() throws Exception {
+        UUID proposalId = awaitingDecision();
+        jdbc.sql("UPDATE onboarding_progress SET monitoring_started_at = NULL WHERE store_id = ?").param(store)
+                .update();
+
+        mvc.perform(get("/api/v1/stores/{id}/decisions/{p}", store, proposalId).with(user("owner")))
+                .andExpect(jsonPath("$.blockedReason").value("MONITORING_NOT_STARTED"))
+                .andExpect(jsonPath("$.allowedActions", not(hasItem("APPROVE"))))
+                .andExpect(jsonPath("$.allowedActions", hasItem("REJECT")));
+        var owner = storeAccess.scopeFor(OWNER, store).orElseThrow();
+        try {
+            approvals.approve(owner, proposalId, 1, "monitor-k1");
+            throw new AssertionError("approved before monitoring started");
+        } catch (com.ecommerceagent.automation.guardian.ApprovalException e) {
+            assertThat(e.code()).isEqualTo("MONITORING_NOT_STARTED");
+        }
+    }
 }

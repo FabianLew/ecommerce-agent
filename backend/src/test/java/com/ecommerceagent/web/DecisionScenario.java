@@ -141,6 +141,12 @@ abstract class DecisionScenario {
                 INSERT INTO store_membership (organization_id, store_id, user_id, role) VALUES
                   (?, ?, ?, 'OWNER'), (?, ?, ?, 'OWNER')
                 """).params(ORG, store, OWNER, ORG, otherStore, OUTSIDER).update();
+        // ADR-0025: execution needs the store's monitoring start; tests of the gate remove it.
+        jdbc.sql("""
+                INSERT INTO onboarding_progress (store_id, organization_id, current_step, updated_at,
+                                                 monitoring_started_at)
+                VALUES (?, ?, 'START_MONITORING', now(), now())
+                """).params(store, ORG).update();
         scope = storeAccess.systemScope(EventDispatch.SYNC_SERVICE, ORG, store).orElseThrow();
 
         Instant now = clock.instant();
