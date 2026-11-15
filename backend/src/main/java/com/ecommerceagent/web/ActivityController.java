@@ -29,7 +29,8 @@ class ActivityController {
         DETECTION,
         RECOMMENDATION,
         POLICY,
-        INTEGRATION
+        INTEGRATION,
+        SETTINGS
     }
 
     enum ActorType {
@@ -51,7 +52,15 @@ class ActivityController {
             Map.entry("INTEGRATION_SYNC_STARTED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_SYNC_FINISHED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_HISTORY_COMPLETED", ActivityType.INTEGRATION),
-            Map.entry("INTEGRATION_WEBHOOK_SECRET_UPDATED", ActivityType.INTEGRATION));
+            Map.entry("INTEGRATION_WEBHOOK_SECRET_UPDATED", ActivityType.INTEGRATION),
+            Map.entry("META_CONNECTION_CREATED", ActivityType.INTEGRATION),
+            Map.entry("META_TOKEN_UPDATED", ActivityType.INTEGRATION),
+            Map.entry("META_CHECK_COMPLETED", ActivityType.INTEGRATION),
+            Map.entry("AD_MAPPING_SAVED", ActivityType.SETTINGS),
+            Map.entry("AD_MAPPING_VERIFIED", ActivityType.SETTINGS),
+            Map.entry("AD_MAPPING_REVOKED", ActivityType.SETTINGS),
+            Map.entry("BUSINESS_PROFILE_DRAFT_SAVED", ActivityType.SETTINGS),
+            Map.entry("BUSINESS_PROFILE_APPROVED", ActivityType.SETTINGS));
 
     private final AuditTrail audit;
     private final StoreAccess storeAccess;
@@ -85,7 +94,7 @@ class ActivityController {
                         storeAccess.store(scope).timezone()));
     }
 
-    private static ActivitySummary summary(AuditRecord record) {
+    static ActivitySummary summary(AuditRecord record) {
         Actor actor = record.actorUserId() != null
                 ? new Actor(ActorType.USER, record.actorUserId(), record.actorDisplayName(), null)
                 : new Actor(ActorType.SYSTEM, null, null, record.actorService());

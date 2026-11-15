@@ -27,5 +27,9 @@ public enum MetricReason {
     /** Only part of the window is inside the imported order history. */
     SALES_HISTORY_PARTIAL,
     /** No qualifying orders in the window, so an average has no denominator. */
-    NO_ORDERS_IN_WINDOW
+    NO_ORDERS_IN_WINDOW,
+    /** Meta spend insights are not imported yet. */
+    META_INSIGHTS_NOT_IMPORTED,
+    /** Costs per product are not configured, so no margin can be computed. */
+    COSTS_MISSING
 }

@@ -159,6 +159,22 @@ public class SalesMetrics {
                 other);
     }
 
+    /** Meta spend v1 is not imported yet: always unavailable with its reason, never zero. */
+    public MetricValue metaSpend(LocalWindow window, Instant asOf) {
+        return MetricValue.unavailable(MetricDefinition.META_SPEND, period(window, asOf),
+                MetricReason.META_INSIGHTS_NOT_IMPORTED);
+    }
+
+    /** Contribution margin needs costs per product (F5): unavailable until then. */
+    public MetricValue contributionMargin(LocalWindow window, Instant asOf) {
+        return MetricValue.unavailable(MetricDefinition.CONTRIBUTION_MARGIN_KNOWN_COSTS, period(window, asOf),
+                MetricReason.COSTS_MISSING);
+    }
+
+    private static MetricPeriod period(LocalWindow window, Instant asOf) {
+        return new MetricPeriod(window.start(), window.endExclusive(), window.zone().getId(), asOf);
+    }
+
     /** Units and line net sales per variant over the covered part of the window. */
     public Map<UUID, VariantSales> variantSales(TrustedStoreScope scope, LocalWindow window) {
         Optional<Covered> covered = covered(scope, window);

@@ -27,7 +27,13 @@ public enum MetricDefinition {
     AOV("aov", 1, "currency"),
 
     /** Sum of a variant's line totals (after discounts, without tax) in qualifying orders (ADR-0019). */
-    VARIANT_NET_SALES("variant_net_sales", 1, "currency");
+    VARIANT_NET_SALES("variant_net_sales", 1, "currency"),
+
+    /** Spend reported by Meta for the store's ad account; unavailable until insights are imported. */
+    META_SPEND("meta_spend", 1, "currency"),
+
+    /** Contribution margin after known costs (01 §6 U-02); unavailable until costs per product exist (F5). */
+    CONTRIBUTION_MARGIN_KNOWN_COSTS("contribution_margin_known_costs", 1, "currency");
 
     /** Decimal places of amounts. */
     public static final int MONEY_SCALE = 2;

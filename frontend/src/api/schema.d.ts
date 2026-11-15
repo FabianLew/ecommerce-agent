@@ -244,6 +244,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stores/{storeId}/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stores/{storeId}/decisions": {
         parameters: {
             query?: never;
@@ -548,7 +564,7 @@ export interface components {
             resourceId?: string;
             resourceType?: string;
             /** @enum {string} */
-            type: "DETECTION" | "RECOMMENDATION" | "POLICY" | "INTEGRATION";
+            type: "DETECTION" | "RECOMMENDATION" | "POLICY" | "INTEGRATION" | "SETTINGS";
         };
         Actor: {
             displayName?: string;
@@ -603,6 +619,21 @@ export interface components {
             /** Format: int32 */
             expectedRevision: number;
         };
+        AttentionItem: {
+            /** Format: date-time */
+            at?: string;
+            /** @description A status, error code or onboarding step */
+            code?: string;
+            /** @enum {string} */
+            kind: "DECISION_TO_APPROVE" | "INTEGRATION_UNHEALTHY" | "META_ERROR" | "ONBOARDING_INCOMPLETE";
+            /**
+             * Format: uuid
+             * @description Proposal, connection or null for onboarding
+             */
+            resourceId?: string;
+            /** @description Business summary of a decision */
+            summary?: string;
+        };
         CheckRef: {
             code?: string;
             facts: {
@@ -639,6 +670,28 @@ export interface components {
         CreateMetaConnectionRequest: {
             /** @example act_1234567890 */
             accountId: string;
+        };
+        DashboardMeta: {
+            /** Format: date-time */
+            computedAt: string;
+            currency: string;
+            /** Format: date */
+            from: string;
+            timezone: string;
+            /** Format: date */
+            to: string;
+        };
+        DashboardResponse: {
+            attentionItems: components["schemas"]["AttentionItem"][];
+            /** Format: int64 */
+            decisionsToApprove: number;
+            integrationHealth: components["schemas"]["HealthItem"][];
+            meta: components["schemas"]["DashboardMeta"];
+            metrics: components["schemas"]["MetricDto"][];
+            /** @description The next unfinished setup step; null when setup is done */
+            onboardingNextStep?: string;
+            recentActivities: components["schemas"]["ActivitySummary"][];
+            salesTrend: components["schemas"]["SeriesPoint"][];
         };
         DecisionEvidenceResponse: {
             hasMore: boolean;
@@ -793,6 +846,19 @@ export interface components {
             monitoring: number;
             /** Format: int64 */
             toApprove: number;
+        };
+        HealthItem: {
+            /** Format: uuid */
+            connectionId: string;
+            /**
+             * Format: date-time
+             * @description Orders complete until (WooCommerce) or the last ad sync (Meta)
+             */
+            dataUntil?: string;
+            reasons: string[];
+            /** @enum {string} */
+            source: "WOOCOMMERCE" | "META";
+            status: string;
         };
         HealthResponse: {
             /** Format: date-time */
@@ -1002,7 +1068,7 @@ export interface components {
             definitionVersion: string;
             key: string;
             /** @description Why the value is missing or limited */
-            missingComponents: ("SALES_HISTORY_INCOMPLETE" | "NO_SALES_IN_WINDOW" | "STOCK_NOT_TRACKED" | "SHARED_STOCK_NOT_SUPPORTED" | "NO_STOCK_OBSERVATION" | "AVAILABLE_STOCK_UNKNOWN" | "STOCKOUT_IN_WINDOW" | "STOCK_HISTORY_UNVERIFIED" | "BACKORDERS_ALLOWED" | "REFUNDS_NOT_INCLUDED" | "OTHER_CURRENCY_EXCLUDED" | "SALES_HISTORY_PARTIAL" | "NO_ORDERS_IN_WINDOW")[];
+            missingComponents: ("SALES_HISTORY_INCOMPLETE" | "NO_SALES_IN_WINDOW" | "STOCK_NOT_TRACKED" | "SHARED_STOCK_NOT_SUPPORTED" | "NO_STOCK_OBSERVATION" | "AVAILABLE_STOCK_UNKNOWN" | "STOCKOUT_IN_WINDOW" | "STOCK_HISTORY_UNVERIFIED" | "BACKORDERS_ALLOWED" | "REFUNDS_NOT_INCLUDED" | "OTHER_CURRENCY_EXCLUDED" | "SALES_HISTORY_PARTIAL" | "NO_ORDERS_IN_WINDOW" | "META_INSIGHTS_NOT_IMPORTED" | "COSTS_MISSING")[];
             /** Format: date-time */
             observedAt: string;
             period: components["schemas"]["PeriodDto"];
@@ -1989,6 +2055,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ListResponseProfileResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    get_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardResponse"];
                 };
             };
             /** @description Missing or invalid access token */

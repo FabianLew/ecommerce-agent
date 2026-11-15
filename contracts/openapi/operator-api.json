@@ -76,7 +76,7 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "DETECTION", "RECOMMENDATION", "POLICY", "INTEGRATION" ],
+            "enum" : [ "DETECTION", "RECOMMENDATION", "POLICY", "INTEGRATION", "SETTINGS" ],
             "type" : "string"
           }
         },
@@ -222,6 +222,33 @@
         "required" : [ "expectedRevision" ],
         "type" : "object"
       },
+      "AttentionItem" : {
+        "properties" : {
+          "at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "code" : {
+            "description" : "A status, error code or onboarding step",
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "DECISION_TO_APPROVE", "INTEGRATION_UNHEALTHY", "META_ERROR", "ONBOARDING_INCOMPLETE" ],
+            "type" : "string"
+          },
+          "resourceId" : {
+            "description" : "Proposal, connection or null for onboarding",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "summary" : {
+            "description" : "Business summary of a decision",
+            "type" : "string"
+          }
+        },
+        "required" : [ "kind" ],
+        "type" : "object"
+      },
       "CheckRef" : {
         "properties" : {
           "code" : {
@@ -317,6 +344,77 @@
           }
         },
         "required" : [ "accountId" ],
+        "type" : "object"
+      },
+      "DashboardMeta" : {
+        "properties" : {
+          "computedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "from" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "timezone" : {
+            "type" : "string"
+          },
+          "to" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "required" : [ "computedAt", "currency", "from", "timezone", "to" ],
+        "type" : "object"
+      },
+      "DashboardResponse" : {
+        "properties" : {
+          "attentionItems" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AttentionItem"
+            },
+            "type" : "array"
+          },
+          "decisionsToApprove" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "integrationHealth" : {
+            "items" : {
+              "$ref" : "#/components/schemas/HealthItem"
+            },
+            "type" : "array"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/DashboardMeta"
+          },
+          "metrics" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MetricDto"
+            },
+            "type" : "array"
+          },
+          "onboardingNextStep" : {
+            "description" : "The next unfinished setup step; null when setup is done",
+            "type" : "string"
+          },
+          "recentActivities" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ActivitySummary"
+            },
+            "type" : "array"
+          },
+          "salesTrend" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SeriesPoint"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "attentionItems", "decisionsToApprove", "integrationHealth", "meta", "metrics", "recentActivities", "salesTrend" ],
         "type" : "object"
       },
       "DecisionEvidenceResponse" : {
@@ -718,6 +816,34 @@
           }
         },
         "required" : [ "completed", "monitoring", "toApprove" ],
+        "type" : "object"
+      },
+      "HealthItem" : {
+        "properties" : {
+          "connectionId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "dataUntil" : {
+            "description" : "Orders complete until (WooCommerce) or the last ad sync (Meta)",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "reasons" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "source" : {
+            "enum" : [ "WOOCOMMERCE", "META" ],
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "connectionId", "reasons", "source", "status" ],
         "type" : "object"
       },
       "HealthResponse" : {
@@ -1264,7 +1390,7 @@
           "missingComponents" : {
             "description" : "Why the value is missing or limited",
             "items" : {
-              "enum" : [ "SALES_HISTORY_INCOMPLETE", "NO_SALES_IN_WINDOW", "STOCK_NOT_TRACKED", "SHARED_STOCK_NOT_SUPPORTED", "NO_STOCK_OBSERVATION", "AVAILABLE_STOCK_UNKNOWN", "STOCKOUT_IN_WINDOW", "STOCK_HISTORY_UNVERIFIED", "BACKORDERS_ALLOWED", "REFUNDS_NOT_INCLUDED", "OTHER_CURRENCY_EXCLUDED", "SALES_HISTORY_PARTIAL", "NO_ORDERS_IN_WINDOW" ],
+              "enum" : [ "SALES_HISTORY_INCOMPLETE", "NO_SALES_IN_WINDOW", "STOCK_NOT_TRACKED", "SHARED_STOCK_NOT_SUPPORTED", "NO_STOCK_OBSERVATION", "AVAILABLE_STOCK_UNKNOWN", "STOCKOUT_IN_WINDOW", "STOCK_HISTORY_UNVERIFIED", "BACKORDERS_ALLOWED", "REFUNDS_NOT_INCLUDED", "OTHER_CURRENCY_EXCLUDED", "SALES_HISTORY_PARTIAL", "NO_ORDERS_IN_WINDOW", "META_INSIGHTS_NOT_IMPORTED", "COSTS_MISSING" ],
               "type" : "string"
             },
             "type" : "array"
@@ -2990,6 +3116,63 @@
           }
         },
         "tags" : [ "business-profile-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/dashboard" : {
+      "get" : {
+        "operationId" : "get_2",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DashboardResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "dashboard-controller" ]
       }
     },
     "/api/v1/stores/{storeId}/decisions" : {

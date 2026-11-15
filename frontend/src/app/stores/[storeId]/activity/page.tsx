@@ -10,14 +10,14 @@ import { getLocale, getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { decisionPath, storePath } from "@/lib/store-path";
 
-import { label } from "../decisions/labels";
+import { describe } from "./describe";
 
 export const dynamic = "force-dynamic";
 
 type Activity = components["schemas"]["ActivitySummary"];
 type ActivityType = Activity["type"];
 
-const TYPES: ActivityType[] = ["DETECTION", "RECOMMENDATION", "POLICY", "INTEGRATION"];
+const TYPES: ActivityType[] = ["DETECTION", "RECOMMENDATION", "POLICY", "INTEGRATION", "SETTINGS"];
 
 /** Activity History (04 §9): the store's operational history, newest first, with links to the decision. */
 export default async function ActivityPage({
@@ -102,26 +102,6 @@ export default async function ActivityPage({
       ) : null}
     </>
   );
-}
-
-/** A simple description from the action and its codes; unknown codes are shown as they are. */
-function describe(item: Activity, messages: Messages): string {
-  const t = messages.activity;
-  const base = label(t.actions, item.action);
-  const to = item.details.to;
-  if (item.action === "OPPORTUNITY_STATUS_CHANGED" && to) {
-    return `${base}: ${label(t.opportunityStatus, to)}`;
-  }
-  if (item.action === "PROPOSAL_STATUS_CHANGED" && to) {
-    return `${base}: ${label(messages.decisions.proposalStatus, to)}`;
-  }
-  if (item.action === "PROPOSAL_CREATED" && item.details.disposition) {
-    return `${base}: ${label(messages.decisions.disposition, item.details.disposition)}`;
-  }
-  if (item.action === "POLICY_EVALUATED" && item.details.outcome) {
-    return `${base}: ${label(messages.decisions.policyOutcome, item.details.outcome)}`;
-  }
-  return base;
 }
 
 function proposalLink(item: Activity): string | undefined {
