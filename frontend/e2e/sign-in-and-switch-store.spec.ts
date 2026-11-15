@@ -24,7 +24,7 @@ test("owner signs in, lands in their store and switches to another store", async
   const switcher = page.getByLabel("Store", { exact: true });
   await expect(switcher.locator("option")).toHaveText(["Sklep A · Demo", "Sklep C · Demo"]);
 
-  await page.getByRole("link", { name: "Activity" }).click();
+  await page.getByRole("link", { name: "Activity", exact: true }).click();
   await expect(page).toHaveURL(`/stores/${STORE_A}/activity`);
 
   await switcher.selectOption(STORE_C);
@@ -136,11 +136,11 @@ test("the interface is in English by default and the user can switch to Polish a
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
   await expect(page.getByRole("link", { name: "Overview" })).toBeVisible();
 
-  await page.getByRole("link", { name: "Activity" }).click();
+  await page.getByRole("link", { name: "Activity", exact: true }).click();
   await expect(page).toHaveURL(`/stores/${STORE_A}/activity`);
   await page.getByRole("button", { name: "Polski" }).click();
   // The page stays the same; only the language changes, and the choice survives a reload.
-  await expect(page.getByRole("link", { name: "Aktywność" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: "Aktywność", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page).toHaveURL(`/stores/${STORE_A}/activity`);
   await expect(page.locator("html")).toHaveAttribute("lang", "pl");
   await page.reload();
@@ -148,7 +148,7 @@ test("the interface is in English by default and the user can switch to Polish a
   expect((await context.cookies()).find((cookie) => cookie.name === "op_locale")?.value).toBe("pl");
 
   await page.getByRole("button", { name: "English" }).click();
-  await expect(page.getByRole("link", { name: "Activity" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("link", { name: "Activity", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 });
 
