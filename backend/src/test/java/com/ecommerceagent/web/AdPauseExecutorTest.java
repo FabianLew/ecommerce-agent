@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.ecommerceagent.TestcontainersConfiguration;
+import com.ecommerceagent.automation.execution.ActionOutcomes;
 import com.ecommerceagent.automation.execution.AdPauseExecutor;
 import com.ecommerceagent.automation.execution.AuthorizedAction;
 import com.ecommerceagent.automation.execution.ExecutionAuthority;
@@ -85,6 +86,8 @@ class AdPauseExecutorTest extends DecisionScenario {
     MetaConnections connections;
     @Autowired
     MutationStops mutationStops;
+    @Autowired
+    ActionOutcomes outcomes;
 
     TrustedStoreScope owner;
 
@@ -294,6 +297,109 @@ class AdPauseExecutorTest extends DecisionScenario {
         assertThat(outcome.code()).isEqualTo("TARGET_BUSY");
         assertThat(outcome.retryable()).isTrue();
         assertThat(GRAPH.requests).isEmpty();
+    }
+
+    AdPauseExecutor.Outcome pausedAndVerified(AuthorizedAction action) {
+        GRAPH.on("GET ad-9001", ad("ACTIVE"));
+        GRAPH.on("POST ad-9001", exchange -> {
+            GRAPH.on("GET ad-9001", ad("PAUSED"));
+            return Reply.ok("{\"success\":true}");
+        });
+        AdPauseExecutor.Outcome applied = executor.execute(scope, action.id());
+        return executor.verify(scope, applied.executionId(), false);
+    }
+
+    @Test
+    void aVerifiedPauseGetsAnOutcomeAndCheckpointsThatNeverClaimSuccess() {
+        AuthorizedAction action = authorized();
+        AdPauseExecutor.Outcome verified = pausedAndVerified(action);
+        assertThat(verified.status()).isEqualTo(ExecutionStatus.VERIFIED);
+
+        ActionOutcomes.Outcome outcome = outcomes.record(scope, verified.executionId());
+        assertThat(outcomes.record(scope, verified.executionId()).id()).isEqualTo(outcome.id());
+        assertThat(outcome.technicalResult()).isEqualTo(ExecutionStatus.VERIFIED);
+        assertThat(outcome.authorship()).isEqualTo(ActionOutcomes.Authorship.OPERATOR);
+        assertThat(outcome.preState().path("status").asString()).isEqualTo("ACTIVE");
+        assertThat(outcome.postState().path("status").asString()).isEqualTo("PAUSED");
+        assertThat(outcome.variantId()).isEqualTo(serum);
+        assertThat(outcome.observations()).extracting(ActionOutcomes.Observation::checkpoint)
+                .containsExactly(ActionOutcomes.Checkpoint.H24, ActionOutcomes.Checkpoint.D7);
+        assertThat(outcome.observations()).allMatch(o -> o.status() == ActionOutcomes.ObservationStatus.PENDING);
+
+        // Two hours later 6 units were sold and 12 are left; orders are synchronized through the checkpoint.
+        java.time.Instant at = outcome.verifiedAt();
+        inventory.record(scope, serum, new com.ecommerceagent.commerce.InventoryReading(12,
+                com.ecommerceagent.commerce.StockStatus.IN_STOCK,
+                com.ecommerceagent.commerce.ReservationSemantics.ALREADY_ACCOUNTED_FOR, null,
+                com.ecommerceagent.commerce.ObservationSource.WEBHOOK, at.plusSeconds(7200), at.plusSeconds(7200)));
+        java.time.Instant placed = at.plusSeconds(3600);
+        orders.upsert(scope, com.ecommerceagent.commerce.CommerceSource.WOOCOMMERCE,
+                new com.ecommerceagent.commerce.OrderData("o-after", "processing", "PLN", new java.math.BigDecimal(
+                        "600.00"), java.math.BigDecimal.ZERO, java.math.BigDecimal.ZERO, java.math.BigDecimal.ZERO,
+                        placed, placed, null, placed, List.of(new com.ecommerceagent.commerce.OrderLineData("l-after",
+                                "826", "812", "SERUM-30", 6, new java.math.BigDecimal("100.00"),
+                                java.math.BigDecimal.ZERO))));
+        orders.recordCoverage(scope, com.ecommerceagent.commerce.CommerceSource.WOOCOMMERCE,
+                at.minusSeconds(86_400), at.plusSeconds(2 * 86_400));
+        doReturn(at.plusSeconds(25 * 3600)).when(spiedClock).instant();
+
+        assertThat(outcomes.observeDue(10)).isEqualTo(1);
+
+        ActionOutcomes.Observation day = outcomes.ofExecution(scope, verified.executionId()).orElseThrow()
+                .observations().getFirst();
+        assertThat(day.status()).isEqualTo(ActionOutcomes.ObservationStatus.OBSERVED);
+        assertThat(day.values().path("stockAtVerification").asInt()).isEqualTo(18);
+        assertThat(day.values().path("stockAtCheckpoint").asInt()).isEqualTo(12);
+        assertThat(day.values().path("unitsSold").asLong()).isEqualTo(6);
+        assertThat(day.limitations()).containsExactly("ATTRIBUTION_NOT_CAUSAL", "SPEND_NOT_AVAILABLE");
+        // The seven-day checkpoint is not due yet.
+        assertThat(outcomes.ofExecution(scope, verified.executionId()).orElseThrow().observations().getLast()
+                .status()).isEqualTo(ActionOutcomes.ObservationStatus.PENDING);
+    }
+
+    @Test
+    void aDeliveryCensorsTheStockAndMissingOrdersMakeItInconclusive() {
+        AuthorizedAction action = authorized();
+        AdPauseExecutor.Outcome verified = pausedAndVerified(action);
+        java.time.Instant at = outcomes.record(scope, verified.executionId()).verifiedAt();
+        inventory.record(scope, serum, new com.ecommerceagent.commerce.InventoryReading(60,
+                com.ecommerceagent.commerce.StockStatus.IN_STOCK,
+                com.ecommerceagent.commerce.ReservationSemantics.ALREADY_ACCOUNTED_FOR, null,
+                com.ecommerceagent.commerce.ObservationSource.WEBHOOK, at.plusSeconds(3600), at.plusSeconds(3600)));
+        doReturn(at.plusSeconds(25 * 3600)).when(spiedClock).instant();
+
+        outcomes.observeDue(10);
+
+        ActionOutcomes.Observation day = outcomes.ofExecution(scope, verified.executionId()).orElseThrow()
+                .observations().getFirst();
+        assertThat(day.status()).isEqualTo(ActionOutcomes.ObservationStatus.INCONCLUSIVE);
+        assertThat(day.limitations()).contains("STOCK_INCREASED_IN_WINDOW", "ORDERS_NOT_COVERED");
+    }
+
+    @Test
+    void reconciledAndNoopOutcomesDoNotClaimTheOperatorChangedTheAd() {
+        AuthorizedAction action = authorized();
+        GRAPH.on("GET ad-9001", ad("ACTIVE"));
+        GRAPH.on("POST ad-9001", Reply.error(503, 2, 0));
+        executor.execute(scope, action.id());
+        GRAPH.on("GET ad-9001", ad("PAUSED"));
+        AdPauseExecutor.Outcome reconciled = executor.execute(scope, action.id());
+        executor.verify(scope, reconciled.executionId(), false);
+
+        ActionOutcomes.Outcome outcome = outcomes.record(scope, reconciled.executionId());
+        assertThat(outcome.authorship()).isEqualTo(ActionOutcomes.Authorship.UNCERTAIN);
+        assertThat(outcome.resultCode()).isEqualTo("EFFECT_FOUND_ON_RECONCILIATION");
+    }
+
+    @Test
+    void anAlreadyPausedAdHasNoAuthorAndNoObservationPlan() {
+        AuthorizedAction action = authorized();
+        GRAPH.on("GET ad-9001", ad("PAUSED"));
+        AdPauseExecutor.Outcome noop = executor.execute(scope, action.id());
+
+        ActionOutcomes.Outcome outcome = outcomes.record(scope, noop.executionId());
+        assertThat(outcome.authorship()).isEqualTo(ActionOutcomes.Authorship.NONE);
+        assertThat(outcome.observations()).isEmpty();
     }
 
     long openSlots() {

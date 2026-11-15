@@ -245,20 +245,24 @@ public class InventoryGuardianWorkflowImpl implements InventoryGuardianWorkflow 
                 executionCode = read.code();
             }
         }
+        // The technical outcome and its observation plan (ADR-0021), then the episode moves, then the approvers are
+        // told; the episode counts as finished only after all of it.
+        activities.recordOutcome(executionId);
+        boolean close = true;
         switch (executionStatus) {
-            case "VERIFIED" -> {
-                opportunityStatus = activities.moveTo(input.opportunityId(), "CLOSED", "ACTION_VERIFIED");
-                finished = true;
-            }
-            case "NOOP" -> {
-                opportunityStatus = activities.moveTo(input.opportunityId(), "CLOSED", "ALREADY_IN_STATE");
-                finished = true;
-            }
+            case "VERIFIED" ->
+                    opportunityStatus = activities.moveTo(input.opportunityId(), "CLOSED", "ACTION_VERIFIED");
+            case "NOOP" ->
+                    opportunityStatus = activities.moveTo(input.opportunityId(), "CLOSED", "ALREADY_IN_STATE");
             // UNKNOWN, FAILED, CONFLICT: nothing is undone automatically; a person decides (escalation).
-            default -> opportunityStatus = activities.moveTo(input.opportunityId(), "AWAITING_DECISION", null);
+            default -> {
+                opportunityStatus = activities.moveTo(input.opportunityId(), "AWAITING_DECISION", null);
+                close = false;
+            }
         }
         String reported = executionId;
         notifySafely(() -> notifying.notifyOutcome(reported));
+        finished = close;
         return null;
     }
 

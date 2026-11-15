@@ -42,10 +42,11 @@ never a success.
 5. **ObservationPlan.** A `VERIFIED` outcome gets two checkpoints, `H24` and `D7` (the pilot's mature window),
    each `PENDING` with a due time. When due, the observer (worker profile, `operator.outcomes.observe-interval`)
    stores what the read models say for the variant and the ad since the verification: stock now and at the start,
-   units sold, and Meta spend when insights exist. A delivery or a stock increase in the window censors the stock
-   comparison; missing spend data or missing sync coverage gives `INCONCLUSIVE`. A checkpoint is `OBSERVED` or
-   `INCONCLUSIVE` with limitation codes; there is no "success" value and no saving is computed from the paused
-   ad's spend.
+   units sold, and Meta spend when insights exist. A checkpoint is `OBSERVED` when stock and sales are known for
+   the window, otherwise `INCONCLUSIVE`; either way it lists limitation codes: always `ATTRIBUTION_NOT_CAUSAL`,
+   `STOCK_INCREASED_IN_WINDOW` when a delivery or correction censors the stock comparison, `ORDERS_NOT_COVERED`,
+   `STOCK_NOT_KNOWN`, and `SPEND_NOT_AVAILABLE` until insights exist. There is no "success" value and no saving is
+   computed from the paused ad's spend.
 6. **API.** `GET /notifications` (newest first, cursor, `unreadCount`), `POST /notifications/{id}/read`, and the
    decision detail gets an `execution` block (status, code, times, outcome and checkpoints) for the
    ExecutionTimeline (B-44). All of it is store-scoped and read-only except the read mark.

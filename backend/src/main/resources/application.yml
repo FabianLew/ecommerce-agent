@@ -121,6 +121,10 @@ operator:
     max-pauses-per-store-24h: 3
     cooldown-per-ad: 24h
 
+  outcomes:
+    # Observation checkpoints of verified outcomes (ADR-0021 point 5), observed in the worker profile.
+    observe-interval: 10m
+
   notifications:
     # Operator notifications (ADR-0021): stored first, e-mailed to everyone with DECISION_APPROVE. The pilot's
     # MailProvider only logs deliveries until a provider is chosen (O-11).

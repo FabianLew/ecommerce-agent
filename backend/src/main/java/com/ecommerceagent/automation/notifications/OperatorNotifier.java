@@ -85,7 +85,7 @@ public class OperatorNotifier {
                 .param("organizationId", scope.organizationId())
                 .param("storeId", scope.storeId())
                 .param("beforeAt", beforeAt == null ? null : Timestamp.from(beforeAt),
-                        java.sql.Types.TIMESTAMP_WITH_TIMEZONE)
+                        java.sql.Types.TIMESTAMP)
                 .param("beforeId", beforeId, java.sql.Types.OTHER)
                 .param("limit", limit)
                 .query((rs, n) -> map(rs, rs.getBoolean("read")))

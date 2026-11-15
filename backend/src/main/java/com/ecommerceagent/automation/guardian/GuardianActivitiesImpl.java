@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import com.ecommerceagent.automation.TaskQueues;
 import com.ecommerceagent.automation.temporal.ActivityStoreScope;
+import com.ecommerceagent.automation.execution.ActionOutcomes;
 import com.ecommerceagent.automation.execution.AdPauseExecutor;
 import com.ecommerceagent.automation.execution.ExecutionAuthority;
 import com.ecommerceagent.automation.execution.ExecutionLedger;
@@ -50,6 +51,7 @@ public class GuardianActivitiesImpl implements GuardianActivities {
     private final ExecutionAuthority authority;
     private final AdPauseExecutor executor;
     private final ExecutionLedger ledger;
+    private final ActionOutcomes outcomes;
     private final GuardianNotifications notifications;
     private final TransactionTemplate transactions;
     private final Clock clock;
@@ -58,7 +60,8 @@ public class GuardianActivitiesImpl implements GuardianActivities {
             BaselineProposer baseline, InventoryAgentProposer agent, DecisionProposals proposals,
             PolicyEvaluations policies, GuardianSettings settings, InventoryProtectionPolicy policy,
             DecisionApprovals approvals, ExecutionAuthority authority, AdPauseExecutor executor, ExecutionLedger ledger,
-            GuardianNotifications notifications, TransactionTemplate transactions, Clock clock) {
+            ActionOutcomes outcomes, GuardianNotifications notifications, TransactionTemplate transactions,
+            Clock clock) {
         this.opportunities = opportunities;
         this.contexts = contexts;
         this.snapshots = snapshots;
@@ -72,6 +75,7 @@ public class GuardianActivitiesImpl implements GuardianActivities {
         this.authority = authority;
         this.executor = executor;
         this.ledger = ledger;
+        this.outcomes = outcomes;
         this.notifications = notifications;
         this.transactions = transactions;
         this.clock = clock;
@@ -216,6 +220,11 @@ public class GuardianActivitiesImpl implements GuardianActivities {
         AdPauseExecutor.Outcome outcome = executor.verify(ActivityStoreScope.current(), UUID.fromString(executionId),
                 last);
         return new ExecutionRef(executionId, outcome.status().name(), outcome.code());
+    }
+
+    @Override
+    public void recordOutcome(String executionId) {
+        outcomes.record(ActivityStoreScope.current(), UUID.fromString(executionId));
     }
 
     @Override
