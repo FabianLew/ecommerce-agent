@@ -118,10 +118,31 @@ worker (`SPRING_PROFILES_ACTIVE=cloud,worker`). Workflows continue from their hi
 3. Values are resealed the next time they are used. The start-up log lists how many credentials still use an old
    key; when it shows none, remove the old key and deploy again.
 
+### Bootstrapping the database roles (ADR-0022 point 1)
+
+Once per environment, before the first migration, as the RDS master user (the `db-admin` task of
+`infra/terraform`, README step 2):
+
+1. Generate the passwords of `operator_migrator`, `operator_runtime` and `keycloak` and put them in Secrets Manager.
+2. On RDS the master user is not a superuser: start the session with `SET createrole_self_grant = 'set'`, so that
+   it may hand the database and the schema to `operator_migrator`.
+3. Run `infra/postgres/init/02-operator-roles.sql` with those passwords in place of the local ones (`psql -v
+   ON_ERROR_STOP=1`), then `CREATE ROLE keycloak LOGIN PASSWORD '…'` and `CREATE DATABASE keycloak OWNER keycloak`.
+4. Run the migration task; `SchemaVersionCheck` lets the services start only on the current schema.
+
+The master user is used for nothing else. Its password is rotated by RDS.
+
 ### Enabling retention (ADR-0022 point 6)
 
-Once the periods are approved (O-03), set `operator.retention.enabled=true` for the worker. Each run records
-`RETENTION_APPLIED` audit entries with the number of rows per task.
+Once the periods are approved (O-03), set `operator.retention.enabled=true` for the worker, in staging first. Each
+run records `RETENTION_APPLIED` audit entries with the number of rows per task, and `RETENTION_SKIPPED_HOLD` for a
+store under a legal hold.
+
+### Legal hold (ADR-0022 point 7)
+
+A member with `STORE_MANAGE` sets a hold with a reason (`PUT /api/v1/stores/{id}/retention-hold`); retention then
+skips the whole store until the hold is released (`DELETE`). Both are audited. A hold does not stop the backups'
+own lifetime: a dump older than 30 days is still deleted, so export what the hold needs first.
 
 ### Responding to a wrong pause
 

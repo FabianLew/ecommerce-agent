@@ -101,8 +101,8 @@ created before the owner approves the plan and the cost estimate.
      `MailProvider` adapter later; SES sending is not used for it.
    - *Temporal Cloud:* AWS `eu-central-1` (Frankfurt), one namespace for staging and one for production, API keys
      per namespace in Secrets Manager.
-   - *State:* Terraform state in an S3 bucket with a DynamoDB lock table, created once by hand (documented in
-     `infra/terraform/README.md`).
+   - *State:* Terraform state in a versioned, encrypted S3 bucket with S3-native locking (no DynamoDB table),
+     created once by hand (documented in `infra/terraform/README.md`).
 
 ## Alternatives considered
 

@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars (ignored by git). No secrets here: secrets go to Secrets Manager (README).
+app_host           = "app.staging.example.com"
+api_host           = "api.staging.example.com"
+auth_host          = "auth.staging.example.com"
+certificate_arn    = "arn:aws:acm:eu-central-1:123456789012:certificate/00000000-0000-0000-0000-000000000000"
+mail_domain        = "notifications.staging.example.com"
+temporal_address   = "eu-central-1.aws.api.temporal.io:7233"
+temporal_namespace = "operator-staging.abcde"
+backend_image_tag  = "0000000"
+frontend_image_tag = "0000000"
+bedrock_model_arns = []
