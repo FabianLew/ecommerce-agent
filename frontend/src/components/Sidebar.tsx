@@ -47,6 +47,17 @@ export function Sidebar({ stores, currentStoreId }: { stores: StoreOption[]; cur
               );
             })}
           </ul>
+          <ul className="nav-secondary">
+            <li>
+              <Link
+                href={`/stores/${encodeURIComponent(currentStoreId)}/notifications`}
+                aria-current={pathname.endsWith("/notifications") ? "page" : undefined}
+                className="nav-link"
+              >
+                {t.notifications.title}
+              </Link>
+            </li>
+          </ul>
         </nav>
       </div>
     </aside>

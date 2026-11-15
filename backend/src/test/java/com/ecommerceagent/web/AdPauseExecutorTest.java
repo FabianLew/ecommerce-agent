@@ -2,6 +2,9 @@ package com.ecommerceagent.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doReturn;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -400,6 +403,54 @@ class AdPauseExecutorTest extends DecisionScenario {
         ActionOutcomes.Outcome outcome = outcomes.record(scope, noop.executionId());
         assertThat(outcome.authorship()).isEqualTo(ActionOutcomes.Authorship.NONE);
         assertThat(outcome.observations()).isEmpty();
+    }
+
+    @Test
+    void theDecisionDetailAndActivityShowWhatFollowedTheApproval() throws Exception {
+        AuthorizedAction action = authorized();
+        AdPauseExecutor.Outcome verified = pausedAndVerified(action);
+        outcomes.record(scope, verified.executionId());
+
+        mvc.perform(get("/api/v1/stores/{id}/decisions/{p}", store, action.proposalId()).with(user("owner")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.execution.decision").value("APPROVED"))
+                .andExpect(jsonPath("$.execution.executionId").value(verified.executionId().toString()))
+                .andExpect(jsonPath("$.execution.status").value("VERIFIED"))
+                .andExpect(jsonPath("$.execution.outcome.authorship").value("OPERATOR"))
+                .andExpect(jsonPath("$.execution.outcome.observations[0].checkpoint").value("H24"))
+                .andExpect(jsonPath("$.execution.outcome.observations[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.allowedActions").isEmpty());
+
+        String list = mvc.perform(get("/api/v1/stores/{id}/activities?type=ACTION", store).with(user("owner")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].type").value("ACTION"))
+                .andReturn().getResponse().getContentAsString();
+        java.util.List<String> actions = com.jayway.jsonpath.JsonPath.read(list, "$.items[*].action");
+        assertThat(actions).contains("ACTION_AUTHORIZED", "ACTION_EXECUTED", "ACTION_VERIFIED",
+                "ACTION_OUTCOME_RECORDED");
+        java.util.List<String> executed = com.jayway.jsonpath.JsonPath.read(list,
+                "$.items[?(@.action == 'ACTION_EXECUTED')].id");
+        mvc.perform(get("/api/v1/stores/{id}/activities/{a}", store, executed.getFirst()).with(user("owner")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.activity.action").value("ACTION_EXECUTED"))
+                .andExpect(jsonPath("$.executionId").value(verified.executionId().toString()))
+                .andExpect(jsonPath("$.proposalId").value(action.proposalId().toString()));
+        // Another store's person cannot open it.
+        mvc.perform(get("/api/v1/stores/{id}/activities/{a}", otherStore, UUID.randomUUID()).with(user("outsider")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void anUnconfirmedPauseIsShownAsUnknownNotAsDone() throws Exception {
+        AuthorizedAction action = authorized();
+        GRAPH.on("GET ad-9001", ad("ACTIVE"));
+        GRAPH.on("POST ad-9001", Reply.error(503, 2, 0));
+        executor.execute(scope, action.id());
+
+        mvc.perform(get("/api/v1/stores/{id}/decisions/{p}", store, action.proposalId()).with(user("owner")))
+                .andExpect(jsonPath("$.execution.status").value("UNKNOWN"))
+                .andExpect(jsonPath("$.execution.code").value("META_UNCERTAIN"))
+                .andExpect(jsonPath("$.execution.outcome").doesNotExist());
     }
 
     long openSlots() {

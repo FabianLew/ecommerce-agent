@@ -75,14 +75,36 @@ public class AuditTrail {
         if (beforeAt != null) {
             statement = statement.param("beforeAt", Timestamp.from(beforeAt)).param("beforeId", beforeId);
         }
-        return statement.query((rs, row) -> {
-            Map<String, String> details = new TreeMap<>();
-            JSON.readTree(rs.getString("details")).properties()
-                    .forEach(entry -> details.put(entry.getKey(), entry.getValue().asString()));
-            return new AuditRecord(rs.getObject("id", UUID.class), rs.getTimestamp("occurred_at").toInstant(),
-                    rs.getString("action"), rs.getObject("actor_user_id", UUID.class), rs.getString("display_name"),
-                    rs.getString("actor_service"), rs.getString("resource_type"), rs.getString("resource_id"),
-                    details);
-        }).list();
+        return statement.query(AuditTrail::map).list();
+    }
+
+    /** One event of the store with one of {@code actions}; empty for another store's event or another action. */
+    public java.util.Optional<AuditRecord> find(TrustedStoreScope scope, Collection<String> actions, UUID id) {
+        if (actions.isEmpty()) {
+            return java.util.Optional.empty();
+        }
+        return jdbc.sql("""
+                        SELECT e.id, e.occurred_at, e.action, e.actor_user_id, u.display_name, e.actor_service,
+                               e.resource_type, e.resource_id, e.details
+                        FROM audit_event e
+                        LEFT JOIN app_user u ON u.id = e.actor_user_id
+                        WHERE e.organization_id = :organizationId AND e.store_id = :storeId
+                          AND e.action IN (:actions) AND e.id = :id
+                        """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .param("actions", List.copyOf(actions))
+                .param("id", id)
+                .query(AuditTrail::map)
+                .optional();
+    }
+
+    private static AuditRecord map(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
+        Map<String, String> details = new TreeMap<>();
+        JSON.readTree(rs.getString("details")).properties()
+                .forEach(entry -> details.put(entry.getKey(), entry.getValue().asString()));
+        return new AuditRecord(rs.getObject("id", UUID.class), rs.getTimestamp("occurred_at").toInstant(),
+                rs.getString("action"), rs.getObject("actor_user_id", UUID.class), rs.getString("display_name"),
+                rs.getString("actor_service"), rs.getString("resource_type"), rs.getString("resource_id"), details);
     }
 }

@@ -15,6 +15,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.ecommerceagent.automation.guardian.ApprovalException;
+import com.ecommerceagent.automation.execution.ActionExecution;
+import com.ecommerceagent.automation.execution.ActionOutcomes;
+import com.ecommerceagent.automation.execution.AuthorizedAction;
+import com.ecommerceagent.automation.execution.ExecutionAuthority;
+import com.ecommerceagent.automation.execution.ExecutionLedger;
 import com.ecommerceagent.automation.guardian.DecisionApprovals;
 import com.ecommerceagent.automation.guardian.PolicyCheck;
 import com.ecommerceagent.automation.guardian.PolicyEvaluation;
@@ -60,8 +65,8 @@ import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Decision Inbox and Decision Detail (04 §5, ADR-0014). Read only: in the pilot's shadow mode no approval,
- * rejection or reanalysis command exists, and {@code allowedActions} is always empty.
+ * Decision Inbox and Decision Detail (04 §5, ADR-0014), the approval and rejection commands (ADR-0020 point 2) and
+ * what followed a decision (ADR-0021). In shadow mode {@code allowedActions} stays empty.
  */
 @RestController
 @RequestMapping("/api/v1/stores/{storeId}/decisions")
@@ -79,11 +84,15 @@ class DecisionController {
     private final CatalogRepository catalog;
     private final StoreAccess storeAccess;
     private final DecisionApprovals approvals;
+    private final ExecutionAuthority authority;
+    private final ExecutionLedger ledger;
+    private final ActionOutcomes outcomes;
     private final Clock clock;
 
     DecisionController(DecisionInbox inbox, DecisionProposals proposals, Opportunities opportunities,
             ContextSnapshots snapshots, EvidenceStore evidence, PolicyEvaluations policies, CatalogRepository catalog,
-            StoreAccess storeAccess, DecisionApprovals approvals, Clock clock) {
+            StoreAccess storeAccess, DecisionApprovals approvals, ExecutionAuthority authority, ExecutionLedger ledger,
+            ActionOutcomes outcomes, Clock clock) {
         this.inbox = inbox;
         this.proposals = proposals;
         this.opportunities = opportunities;
@@ -93,6 +102,9 @@ class DecisionController {
         this.catalog = catalog;
         this.storeAccess = storeAccess;
         this.approvals = approvals;
+        this.authority = authority;
+        this.ledger = ledger;
+        this.outcomes = outcomes;
         this.clock = clock;
     }
 
@@ -131,7 +143,9 @@ class DecisionController {
         Opportunity opportunity = opportunities.find(scope, opportunityId).orElseThrow(ResourceNotFoundException::new);
         Optional<PolicyEvaluation> evaluation = policies.latest(scope, proposal.proposalId());
         String etag = etag(stored, evaluation.map(PolicyEvaluation::id).orElse(null));
-        if (etag.equals(ifNoneMatch)) {
+        ExecutionView execution = execution(scope, proposal.proposalId());
+        // An execution moves without a new revision: its state is never answered from a cached copy.
+        if (etag.equals(ifNoneMatch) && execution == null) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
         }
         Instant now = clock.instant();
@@ -155,7 +169,7 @@ class DecisionController {
                 proposal.recommendation().evidence().stream().map(EvidenceRef::evidenceId).toList(),
                 evaluation.map(DecisionController::policy).orElse(null),
                 new ProposerRef(proposal.proposer().kind(), proposal.proposer().name(), proposal.proposer().version()),
-                proposal.createdAt(), proposal.expiresAt(), null, allowed(scope, stored, status),
+                proposal.createdAt(), proposal.expiresAt(), execution, allowed(scope, stored, status),
                 blockedReason(scope, stored, status), meta);
         return ResponseEntity.ok().eTag(etag).body(presentation);
     }
@@ -436,10 +450,77 @@ class DecisionController {
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ProposerRef proposer,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant createdAt,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant expiresAt,
-            @Schema(description = "Execution state; always null in the pilot's shadow mode.") Object execution,
+            @Schema(description = "The person's decision and what followed; null until someone decides.")
+            ExecutionView execution,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<String> allowedActions,
             String blockedReason,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ReadMeta meta) {
+    }
+
+    /**
+     * What happened after a person decided (B-44, ADR-0020/0021): the decision, the authorization, the ledger row and
+     * the outcome. {@code status} is the ledger's: APPLIED and UNKNOWN are not a confirmed effect.
+     */
+    private ExecutionView execution(TrustedStoreScope scope, UUID proposalId) {
+        Optional<DecisionApprovals.Approval> approval = approvals.ofProposal(scope, proposalId);
+        if (approval.isEmpty()) {
+            return null;
+        }
+        DecisionApprovals.Approval decided = approval.get();
+        Optional<AuthorizedAction> action = decided.decision() == DecisionApprovals.Decision.APPROVED
+                ? authority.latest(scope, decided.id()) : Optional.empty();
+        Optional<ActionExecution> row = action.flatMap(a -> ledger.byKey(scope, a.idempotencyKey()));
+        Optional<ActionOutcomes.Outcome> outcome = row.flatMap(r -> outcomes.ofExecution(scope, r.id()));
+        return new ExecutionView(decided.decision(), decided.decidedAt(), decided.reason(), decided.expiresAt(),
+                action.map(AuthorizedAction::issuedAt).orElse(null), row.map(ActionExecution::id).orElse(null),
+                row.map(r -> r.status().name()).orElse(null), row.map(ActionExecution::resultCode).orElse(null),
+                row.map(ActionExecution::attempts).orElse(0), row.map(ActionExecution::updatedAt).orElse(null),
+                outcome.map(o -> new OutcomeView(o.authorship().name(), o.verifiedAt(), o.recordedAt(),
+                        o.observations().stream().map(obs -> new ObservationView(obs.checkpoint().name(), obs.dueAt(),
+                                obs.status().name(), values(obs.values()), obs.limitations(), obs.observedAt()))
+                                .toList())).orElse(null));
+    }
+
+    private static Map<String, String> values(JsonNode node) {
+        Map<String, String> values = new java.util.TreeMap<>();
+        if (node != null) {
+            node.properties().forEach(entry -> values.put(entry.getKey(),
+                    entry.getValue().isNull() ? null : entry.getValue().asString()));
+        }
+        return values;
+    }
+
+    record ExecutionView(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) DecisionApprovals.Decision decision,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant decidedAt,
+            String reason,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant approvalExpiresAt,
+            Instant authorizedAt,
+            UUID executionId,
+            @Schema(description = "PLANNED, IN_PROGRESS, APPLIED, VERIFIED, NOOP, UNKNOWN, FAILED or CONFLICT")
+            String status,
+            String code,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int attempts,
+            Instant updatedAt,
+            OutcomeView outcome) {
+    }
+
+    record OutcomeView(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "OPERATOR, UNCERTAIN or NONE")
+            String authorship,
+            Instant verifiedAt,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant recordedAt,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ObservationView> observations) {
+    }
+
+    record ObservationView(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String checkpoint,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant dueAt,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "PENDING, OBSERVED or INCONCLUSIVE")
+            String status,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Map<String, String> values,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<String> limitations,
+            Instant observedAt) {
     }
 
     record RevisionRef(

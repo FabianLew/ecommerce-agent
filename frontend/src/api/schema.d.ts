@@ -68,6 +68,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stores/{storeId}/activities/{activityId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["detail_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stores/{storeId}/ads": {
         parameters: {
             query?: never;
@@ -625,6 +641,20 @@ export interface components {
             targetType: string;
             type: string;
         };
+        ActivityDetailResponse: {
+            activity: components["schemas"]["ActivitySummary"];
+            /**
+             * Format: uuid
+             * @description The execution the event concerns, when there is one
+             */
+            executionId?: string;
+            meta: components["schemas"]["ReadMeta"];
+            /**
+             * Format: uuid
+             * @description The decision the event concerns, when there is one
+             */
+            proposalId?: string;
+        };
         ActivityListResponse: {
             hasMore: boolean;
             items: components["schemas"]["ActivitySummary"][];
@@ -644,7 +674,7 @@ export interface components {
             resourceId?: string;
             resourceType?: string;
             /** @enum {string} */
-            type: "DETECTION" | "RECOMMENDATION" | "POLICY" | "INTEGRATION" | "SETTINGS";
+            type: "DETECTION" | "RECOMMENDATION" | "POLICY" | "ACTION" | "INTEGRATION" | "SETTINGS";
         };
         Actor: {
             displayName?: string;
@@ -818,8 +848,8 @@ export interface components {
             disposition: "RECOMMEND_ACTION" | "NO_ACTION" | "MONITOR" | "INSUFFICIENT_DATA" | "ESCALATE";
             evidenceRefs: string[];
             excludedAds: components["schemas"]["ExcludedAd"][];
-            /** @description Execution state; always null in the pilot's shadow mode. */
-            execution?: unknown;
+            /** @description The person's decision and what followed; null until someone decides. */
+            execution?: components["schemas"]["ExecutionView"];
             /** Format: date-time */
             expiresAt: string;
             facts: components["schemas"]["InventoryFacts"];
@@ -931,6 +961,27 @@ export interface components {
             externalId?: string;
             name?: string;
             reason: string;
+        };
+        ExecutionView: {
+            /** Format: date-time */
+            approvalExpiresAt: string;
+            /** Format: int32 */
+            attempts: number;
+            /** Format: date-time */
+            authorizedAt?: string;
+            code?: string;
+            /** Format: date-time */
+            decidedAt: string;
+            /** @enum {string} */
+            decision: "APPROVED" | "REJECTED";
+            /** Format: uuid */
+            executionId?: string;
+            outcome?: components["schemas"]["OutcomeView"];
+            reason?: string;
+            /** @description PLANNED, IN_PROGRESS, APPLIED, VERIFIED, NOOP, UNKNOWN, FAILED or CONFLICT */
+            status?: string;
+            /** Format: date-time */
+            updatedAt?: string;
         };
         FieldError: {
             code: string;
@@ -1229,6 +1280,19 @@ export interface components {
             /** @enum {string} */
             severity: "INFO" | "WARNING" | "CRITICAL";
         };
+        ObservationView: {
+            checkpoint: string;
+            /** Format: date-time */
+            dueAt: string;
+            limitations: string[];
+            /** Format: date-time */
+            observedAt?: string;
+            /** @description PENDING, OBSERVED or INCONCLUSIVE */
+            status: string;
+            values: {
+                [key: string]: string;
+            };
+        };
         OnboardingRequest: {
             acknowledgements?: ("SKIP_META" | "MAPPINGS_LATER")[];
             /** @enum {string} */
@@ -1250,6 +1314,15 @@ export interface components {
             steps: components["schemas"]["StepResponse"][];
             /** Format: int32 */
             version: number;
+        };
+        OutcomeView: {
+            /** @description OPERATOR, UNCERTAIN or NONE */
+            authorship: string;
+            observations: components["schemas"]["ObservationView"][];
+            /** Format: date-time */
+            recordedAt: string;
+            /** Format: date-time */
+            verifiedAt?: string;
         };
         PeriodDto: {
             /** Format: date-time */
@@ -1643,6 +1716,56 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityListResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    detail_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                activityId: string;
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityDetailResponse"];
                 };
             };
             /** @description Missing or invalid access token */

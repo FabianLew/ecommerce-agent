@@ -3,17 +3,21 @@ import { notFound } from "next/navigation";
 
 import { PageHeading } from "@/components/PageHeading";
 import { formatInstant, formatNumber } from "@/i18n/format";
+import type { Messages } from "@/i18n/messages";
 import { getLocale, getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { decisionPath, storePath } from "@/lib/store-path";
 
 import { coverText, label, problemTitle, recommendationText } from "../labels";
+import { DecisionCommands } from "./DecisionCommands";
+import { ExecutionTimeline } from "./ExecutionTimeline";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Decision Detail (04 §5) in three levels: summary with the proposed action, the "Why" panel with reasons and
- * policy checks, and the evidence the decision used. In the pilot's shadow mode approval is shown but disabled.
+ * policy checks, and the evidence the decision used. Approval and rejection open a confirmation dialog; in shadow
+ * mode, or while changes are stopped, the approval button is disabled with the reason.
  */
 export default async function DecisionDetailPage({
   params,
@@ -38,6 +42,7 @@ export default async function DecisionDetailPage({
   const at = (value: string | undefined | null) => formatInstant(value, timezone, locale);
   const facts = decision.facts;
   const blocked = decision.blockedReason;
+  const etag = detail.response.headers.get("ETag") ?? "";
 
   return (
     <>
@@ -84,25 +89,36 @@ export default async function DecisionDetailPage({
           <dt>{t.expires}</dt>
           <dd>{at(decision.expiresAt)}</dd>
         </dl>
-        {decision.action ? (
+        {decision.action && decision.status === "PROPOSED" ? (
           <div className="decision-actions">
             {blocked ? (
               <p id="approval-blocked" className="form-message warning" role="note" data-testid="approval-blocked">
-                <strong>{blocked === "SHADOW_MODE" ? t.shadowModeTitle : t.proposalStatus.EXPIRED}:</strong>{" "}
-                {blocked === "SHADOW_MODE" ? t.shadowMode : t.expiredNote}
+                <strong>{blockedTitle(blocked, t, messages)}:</strong> {blockedText(blocked, t, messages)}
               </p>
             ) : null}
-            <button
-              type="button"
-              className="button primary"
-              disabled={!decision.allowedActions.includes("APPROVE")}
-              aria-describedby={blocked ? "approval-blocked" : undefined}
-            >
-              {t.approve}
-            </button>
+            {decision.allowedActions.length > 0 ? (
+              <DecisionCommands
+                storeId={storeId}
+                proposalId={proposalId}
+                revision={decision.revision}
+                etag={etag}
+                adLabel={`${decision.action.targetName ?? ""} (${decision.action.targetExternalId})`.trim()}
+                canApprove={decision.allowedActions.includes("APPROVE")}
+                canReject={decision.allowedActions.includes("REJECT")}
+              />
+            ) : (
+              <button type="button" className="button primary" disabled aria-describedby="approval-blocked">
+                {t.approve}
+              </button>
+            )}
           </div>
         ) : null}
       </section>
+
+      {decision.execution ? (
+        <ExecutionTimeline execution={decision.execution} timezone={timezone} locale={locale}
+          t={messages.execution} />
+      ) : null}
 
       <section className="card" aria-labelledby="why-title" data-testid="decision-why">
         <h2 id="why-title">{t.why}</h2>
@@ -241,4 +257,24 @@ export default async function DecisionDetailPage({
       </details>
     </>
   );
+}
+
+function blockedTitle(code: string, t: Messages["decisions"], messages: Messages): string {
+  if (code === "SHADOW_MODE") {
+    return t.shadowModeTitle;
+  }
+  if (code === "PROPOSAL_EXPIRED") {
+    return t.proposalStatus.EXPIRED;
+  }
+  return messages.mutationStop.stopped;
+}
+
+function blockedText(code: string, t: Messages["decisions"], messages: Messages): string {
+  if (code === "SHADOW_MODE") {
+    return t.shadowMode;
+  }
+  if (code === "PROPOSAL_EXPIRED") {
+    return t.expiredNote;
+  }
+  return messages.approval.errors[code] ?? label(t.policyCodes, code);
 }

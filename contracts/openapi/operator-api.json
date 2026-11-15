@@ -26,6 +26,28 @@
         "required" : [ "desiredStatus", "targetId", "targetType", "type" ],
         "type" : "object"
       },
+      "ActivityDetailResponse" : {
+        "properties" : {
+          "activity" : {
+            "$ref" : "#/components/schemas/ActivitySummary"
+          },
+          "executionId" : {
+            "description" : "The execution the event concerns, when there is one",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/ReadMeta"
+          },
+          "proposalId" : {
+            "description" : "The decision the event concerns, when there is one",
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "activity", "meta" ],
+        "type" : "object"
+      },
       "ActivityListResponse" : {
         "properties" : {
           "hasMore" : {
@@ -76,7 +98,7 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "DETECTION", "RECOMMENDATION", "POLICY", "INTEGRATION", "SETTINGS" ],
+            "enum" : [ "DETECTION", "RECOMMENDATION", "POLICY", "ACTION", "INTEGRATION", "SETTINGS" ],
             "type" : "string"
           }
         },
@@ -548,7 +570,8 @@
             "type" : "array"
           },
           "execution" : {
-            "description" : "Execution state; always null in the pilot's shadow mode."
+            "$ref" : "#/components/schemas/ExecutionView",
+            "description" : "The person's decision and what followed; null until someone decides."
           },
           "expiresAt" : {
             "format" : "date-time",
@@ -824,6 +847,53 @@
           }
         },
         "required" : [ "adId", "reason" ],
+        "type" : "object"
+      },
+      "ExecutionView" : {
+        "properties" : {
+          "approvalExpiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "attempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "authorizedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "decidedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "decision" : {
+            "enum" : [ "APPROVED", "REJECTED" ],
+            "type" : "string"
+          },
+          "executionId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "outcome" : {
+            "$ref" : "#/components/schemas/OutcomeView"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "status" : {
+            "description" : "PLANNED, IN_PROGRESS, APPLIED, VERIFIED, NOOP, UNKNOWN, FAILED or CONFLICT",
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "approvalExpiresAt", "attempts", "decidedAt", "decision" ],
         "type" : "object"
       },
       "FieldError" : {
@@ -1581,6 +1651,39 @@
         "required" : [ "createdAt", "id", "kind", "parameters", "read", "severity" ],
         "type" : "object"
       },
+      "ObservationView" : {
+        "properties" : {
+          "checkpoint" : {
+            "type" : "string"
+          },
+          "dueAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "limitations" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "observedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "description" : "PENDING, OBSERVED or INCONCLUSIVE",
+            "type" : "string"
+          },
+          "values" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          }
+        },
+        "required" : [ "checkpoint", "dueAt", "limitations", "status", "values" ],
+        "type" : "object"
+      },
       "OnboardingRequest" : {
         "properties" : {
           "acknowledgements" : {
@@ -1642,6 +1745,30 @@
           }
         },
         "required" : [ "acknowledgements", "canEdit", "currentStep", "domains", "nextStep", "steps", "version" ],
+        "type" : "object"
+      },
+      "OutcomeView" : {
+        "properties" : {
+          "authorship" : {
+            "description" : "OPERATOR, UNCERTAIN or NONE",
+            "type" : "string"
+          },
+          "observations" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ObservationView"
+            },
+            "type" : "array"
+          },
+          "recordedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "verifiedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "authorship", "observations", "recordedAt" ],
         "type" : "object"
       },
       "PeriodDto" : {
@@ -2490,6 +2617,70 @@
               "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ActivityListResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "activity-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/activities/{activityId}" : {
+      "get" : {
+        "operationId" : "detail_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "activityId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ActivityDetailResponse"
                 }
               }
             },

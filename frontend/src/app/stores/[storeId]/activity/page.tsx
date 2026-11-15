@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 type Activity = components["schemas"]["ActivitySummary"];
 type ActivityType = Activity["type"];
 
-const TYPES: ActivityType[] = ["DETECTION", "RECOMMENDATION", "POLICY", "INTEGRATION", "SETTINGS"];
+const TYPES: ActivityType[] = ["DETECTION", "RECOMMENDATION", "POLICY", "ACTION", "INTEGRATION", "SETTINGS"];
 
 /** Activity History (04 §9): the store's operational history, newest first, with links to the decision. */
 export default async function ActivityPage({
@@ -71,7 +71,11 @@ export default async function ActivityPage({
           <tbody>
             {data.items.map((item) => (
               <tr key={item.id}>
-                <td className="nowrap">{formatInstant(item.occurredAt, data.meta.timezone, locale)}</td>
+                <td className="nowrap">
+                  <Link href={`${path}/${encodeURIComponent(item.id)}`}>
+                    {formatInstant(item.occurredAt, data.meta.timezone, locale)}
+                  </Link>
+                </td>
                 <td>
                   <span className="badge">{t.types[item.type]}</span>
                 </td>
