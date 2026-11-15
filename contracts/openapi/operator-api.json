@@ -198,6 +198,16 @@
         "required" : [ "provider", "storeUrl" ],
         "type" : "object"
       },
+      "CreateMetaConnectionRequest" : {
+        "properties" : {
+          "accountId" : {
+            "example" : "act_1234567890",
+            "type" : "string"
+          }
+        },
+        "required" : [ "accountId" ],
+        "type" : "object"
+      },
       "DecisionEvidenceResponse" : {
         "properties" : {
           "hasMore" : {
@@ -821,6 +831,88 @@
           }
         },
         "required" : [ "userId" ],
+        "type" : "object"
+      },
+      "MetaConnectionEnvelope" : {
+        "properties" : {
+          "canCreate" : {
+            "type" : "boolean"
+          },
+          "connection" : {
+            "$ref" : "#/components/schemas/MetaConnectionResponse"
+          }
+        },
+        "required" : [ "canCreate" ],
+        "type" : "object"
+      },
+      "MetaConnectionResponse" : {
+        "properties" : {
+          "accountId" : {
+            "description" : "Ad account id without act_",
+            "type" : "string"
+          },
+          "accountName" : {
+            "type" : "string"
+          },
+          "adsSeen" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "allowedActions" : {
+            "items" : {
+              "enum" : [ "SAVE_TOKEN", "RUN_CHECK" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "canWrite" : {
+            "description" : "The token may pause ads",
+            "type" : "boolean"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "lastCheckAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "lastErrorCode" : {
+            "type" : "string"
+          },
+          "lastSuccessAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "lastSyncAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "lastSyncError" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "PENDING_CREDENTIALS", "CHECK_REQUIRED", "CONNECTED", "ERROR" ],
+            "type" : "string"
+          },
+          "tokenHint" : {
+            "description" : "Last 4 characters of the token",
+            "type" : "string"
+          }
+        },
+        "required" : [ "accountId", "adsSeen", "allowedActions", "canWrite", "id", "status" ],
+        "type" : "object"
+      },
+      "MetaTokenRequest" : {
+        "properties" : {
+          "token" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "token" ],
         "type" : "object"
       },
       "PolicyRef" : {
@@ -1559,7 +1651,7 @@
     },
     "/api/v1/stores/{storeId}/integration-connections" : {
       "post" : {
-        "operationId" : "create",
+        "operationId" : "create_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "storeId",
@@ -1831,7 +1923,7 @@
     },
     "/api/v1/stores/{storeId}/integrations/{integrationId}" : {
       "get" : {
-        "operationId" : "get",
+        "operationId" : "get_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "integrationId",
@@ -1895,7 +1987,7 @@
     },
     "/api/v1/stores/{storeId}/integrations/{integrationId}/checks" : {
       "post" : {
-        "operationId" : "check",
+        "operationId" : "check_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "integrationId",
@@ -2100,6 +2192,266 @@
           }
         },
         "tags" : [ "integration-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/meta-connection" : {
+      "get" : {
+        "operationId" : "get",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MetaConnectionEnvelope"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "meta-connection-controller" ]
+      },
+      "post" : {
+        "operationId" : "create",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateMetaConnectionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MetaConnectionResponse"
+                }
+              }
+            },
+            "description" : "Created"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "meta-connection-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/meta-connection/{connectionId}/checks" : {
+      "post" : {
+        "operationId" : "check",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "connectionId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MetaConnectionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "meta-connection-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/meta-connection/{connectionId}/token" : {
+      "post" : {
+        "operationId" : "token",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "connectionId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MetaTokenRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MetaConnectionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "meta-connection-controller" ]
       }
     },
     "/api/v1/webhooks/woocommerce/{endpointKey}" : {

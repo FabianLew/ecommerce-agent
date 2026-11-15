@@ -15,6 +15,9 @@ operator:
       base-url: https://api.example.test
       # Tests drain the inbox explicitly.
       processor-enabled: false
+    meta:
+      # Tests call MetaAdSync directly.
+      poller-enabled: false
   automation:
     # Tests dispatch the outbox explicitly; short delays keep workflow tests fast.
     dispatcher-enabled: false

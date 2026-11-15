@@ -53,6 +53,15 @@ operator:
       base-url: ${WEBHOOK_BASE_URL:}
       processor-enabled: true
       processor-interval: 2s
+    meta:
+      # Fixed Meta host and pinned version (ADR-0017); only the local and test profiles may use a stub.
+      graph-base-url: ${META_GRAPH_BASE_URL:https://graph.facebook.com}
+      api-version: v23.0
+      connect-timeout: 5s
+      timeout: 20s
+      poll-interval: 30s
+      min-backoff: 60s
+      poller-enabled: true
   automation:
     # Outbox → Temporal (ADR-0010); runs in the worker profile.
     dispatcher-enabled: true
