@@ -15,7 +15,8 @@ import org.springframework.context.annotation.Configuration;
  * and after how long an {@code UNKNOWN} reservation is reconciled conservatively at its full reserved amount
  * ({@code unknown-conservative-settlement-enabled=false} leaves every {@code UNKNOWN} to a person), and how many
  * agent runs may be active on the whole platform at once ({@code max-concurrent-runs}, section 6.2), and how often,
- * how many and for how long uncertain calls are looked up with their providers ({@code reconciliation-*}).
+ * how many and for how long uncertain calls are looked up with their providers ({@code reconciliation-*}), and how
+ * often budgets are compared with the alert thresholds ({@code budget-alert-interval}).
  */
 @ConfigurationProperties(prefix = "operator.ai-governance", ignoreUnknownFields = false)
 public record AiGovernanceSettings(
@@ -29,7 +30,8 @@ public record AiGovernanceSettings(
         @DefaultValue("8") int maxConcurrentRuns,
         @DefaultValue("15m") Duration reconciliationInterval,
         @DefaultValue("100") int reconciliationBatchSize,
-        @DefaultValue("30s") Duration reconciliationTimeLimit) {
+        @DefaultValue("30s") Duration reconciliationTimeLimit,
+        @DefaultValue("5m") Duration budgetAlertInterval) {
 
     public AiGovernanceSettings {
         Objects.requireNonNull(inputTokenMargin, "inputTokenMargin");
@@ -50,6 +52,9 @@ public record AiGovernanceSettings(
                 || reconciliationBatchSize > 1_000 || reconciliationTimeLimit.compareTo(Duration.ofSeconds(1)) < 0
                 || reconciliationTimeLimit.compareTo(Duration.ofMinutes(5)) > 0) {
             throw new IllegalArgumentException("operator.ai-governance reconciliation settings are out of range");
+        }
+        if (budgetAlertInterval.compareTo(Duration.ofSeconds(30)) < 0) {
+            throw new IllegalArgumentException("operator.ai-governance.budget-alert-interval must be at least 30s");
         }
         if (unknownConservativeSettlementAfter.compareTo(Duration.ofMinutes(1)) < 0) {
             throw new IllegalArgumentException(

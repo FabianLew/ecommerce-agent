@@ -16,11 +16,13 @@ class AiGovernanceWorker {
 
     private final AiReservationSweeper sweeper;
     private final AiUnknownReconciler reconciler;
+    private final AiBudgetAlerts budgetAlerts;
 
     AiGovernanceWorker(AiReservationSweeper sweeper, AiUnknownReconciler reconciler, MeterRegistry registry,
-            JdbcClient jdbc, AiAdmission admission, AiStops stops) {
+            JdbcClient jdbc, AiAdmission admission, AiStops stops, AiBudgetAlerts budgetAlerts) {
         this.sweeper = sweeper;
         this.reconciler = reconciler;
+        this.budgetAlerts = budgetAlerts;
         io.micrometer.core.instrument.Gauge.builder("operator.ai.stopped", admission, a -> a.stopped() ? 1 : 0)
                 .description("1 while the platform AI stop is on (ADR-0027 section 12)").register(registry);
         io.micrometer.core.instrument.Gauge.builder("operator.ai.stops.active", stops, AiStops::activeCount)
@@ -44,5 +46,10 @@ class AiGovernanceWorker {
     @Scheduled(initialDelayString = "2m", fixedDelayString = "${operator.ai-governance.reconciliation-interval:15m}")
     void reconcile() {
         reconciler.run();
+    }
+
+    @Scheduled(initialDelayString = "1m", fixedDelayString = "${operator.ai-governance.budget-alert-interval:5m}")
+    void evaluateBudgetAlerts() {
+        budgetAlerts.evaluate();
     }
 }

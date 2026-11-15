@@ -314,7 +314,8 @@ class AiReconciliationTest {
         return new AiGovernanceSettings(settings.inputTokenMargin(), settings.priceMaxVerificationAge(),
                 settings.reservationTimeout(), settings.sweepInterval(), settings.sweepBatchSize(),
                 settings.unknownConservativeSettlementEnabled(), settings.unknownConservativeSettlementAfter(),
-                settings.maxConcurrentRuns(), settings.reconciliationInterval(), 1000, java.time.Duration.ofMinutes(2));
+                settings.maxConcurrentRuns(), settings.reconciliationInterval(), 1000, java.time.Duration.ofMinutes(2),
+                settings.budgetAlertInterval());
     }
 
     private UUID user(String name) {

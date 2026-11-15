@@ -106,6 +106,12 @@ groups:
         annotations:
           summary: "The platform AI stop is on; agent runs are not admitted and the baseline proposes"
           runbook: docs/operations/runbooks.md#ai-stopped
+      - alert: AiBudgetThresholdReached
+        expr: sum by (level, period, threshold) (increase(operator_ai_budget_alerts_total[15m])) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "An AI budget ({{ $labels.level }}, {{ $labels.period }}) reached {{ $labels.threshold }}% of its limit"
+          runbook: docs/operations/runbooks.md#ai-budget-threshold-reached
       - alert: AiScopedStopActive
         expr: max(operator_ai_stops_active) > 0
         for: 24h

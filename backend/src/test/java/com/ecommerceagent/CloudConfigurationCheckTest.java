@@ -121,6 +121,20 @@ class CloudConfigurationCheckTest {
         assertThat(CloudConfigurationCheck.problems(versioned)).isEmpty();
     }
 
+    /** ADR-0027 section 14: the budget alert thresholds are versioned too. */
+    @Test
+    void anUnversionedBudgetAlertOverrideIsRefused() {
+        MockEnvironment environment = cloud().withProperty("operator.ai-budget-alerts.threshold-percents", "50,80,100");
+
+        assertThat(CloudConfigurationCheck.problems(environment)).containsExactly(
+                "operator.ai-budget-alerts differs from the defaults of ai-budget-alerts/1; set its own version");
+
+        MockEnvironment versioned = cloud()
+                .withProperty("operator.ai-budget-alerts.threshold-percents", "50,80,100")
+                .withProperty("operator.ai-budget-alerts.version", "ai-budget-alerts/2");
+        assertThat(CloudConfigurationCheck.problems(versioned)).isEmpty();
+    }
+
     private static MockEnvironment cloud() {
         MockEnvironment environment = new MockEnvironment()
                 .withProperty("spring.datasource.url", "jdbc:postgresql://db.internal.example:5432/operator")
