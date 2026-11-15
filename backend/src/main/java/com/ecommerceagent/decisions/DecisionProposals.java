@@ -12,9 +12,12 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.ecommerceagent.identity.AuditEntry;
+import com.ecommerceagent.identity.AuditTrail;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.metrics.CanonicalJson;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -33,13 +36,17 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 public class DecisionProposals {
 
+    static final String RESOURCE = "decision_proposal";
+
     private final ProposalValidator validator;
     private final JdbcClient jdbc;
+    private final AuditTrail audit;
     private final Clock clock;
 
-    DecisionProposals(ProposalValidator validator, JdbcClient jdbc, Clock clock) {
+    DecisionProposals(ProposalValidator validator, JdbcClient jdbc, AuditTrail audit, Clock clock) {
         this.validator = validator;
         this.jdbc = jdbc;
+        this.audit = audit;
         this.clock = clock;
     }
 
@@ -59,8 +66,13 @@ public class DecisionProposals {
 
         ProposalValidation validation = validator.validate(scope, document);
         if (!validation.valid()) {
-            return new ProposalSubmission(null, reject(scope, opportunityId, contextSnapshotId, proposer, agentRunId,
-                    document, validation.errors(), now), validation.errors());
+            UUID rejection = reject(scope, opportunityId, contextSnapshotId, proposer, agentRunId, document,
+                    validation.errors(), now);
+            audit.record(AuditEntry.inScope(scope, "PROPOSAL_INVALID", "proposal_rejection", rejection.toString(),
+                    Map.of("opportunityId", opportunityId.toString(), "proposer", proposer.name(), "codes",
+                            String.join(",", validation.errors().stream().map(ProposalError::code).distinct()
+                                    .toList()))));
+            return new ProposalSubmission(null, rejection, validation.errors());
         }
         DecisionProposal proposal = validation.proposal();
         jdbc.sql("""
@@ -102,6 +114,9 @@ public class DecisionProposals {
                 .param("createdAt", Timestamp.from(proposal.createdAt()))
                 .param("expiresAt", Timestamp.from(proposal.expiresAt()))
                 .update();
+        audit.record(AuditEntry.inScope(scope, "PROPOSAL_CREATED", RESOURCE, proposal.proposalId().toString(),
+                Map.of("opportunityId", opportunityId.toString(), "revision", Integer.toString(proposal.revision()),
+                        "disposition", proposal.recommendation().disposition().name(), "proposer", proposer.name())));
         return new ProposalSubmission(find(scope, proposal.proposalId()).orElseThrow(), null, List.of());
     }
 
@@ -130,7 +145,7 @@ public class DecisionProposals {
         if (next == ProposalStatus.PROPOSED) {
             throw new IllegalArgumentException("A proposal cannot return to PROPOSED");
         }
-        return jdbc.sql("""
+        boolean closed = jdbc.sql("""
                         UPDATE decision_proposal SET status = :next, status_changed_at = :now
                         WHERE id = :id AND status = 'PROPOSED'
                           AND organization_id = :organizationId AND store_id = :storeId
@@ -141,6 +156,11 @@ public class DecisionProposals {
                 .param("organizationId", scope.organizationId())
                 .param("storeId", scope.storeId())
                 .update() == 1;
+        if (closed) {
+            audit.record(AuditEntry.inScope(scope, "PROPOSAL_STATUS_CHANGED", RESOURCE, proposalId.toString(),
+                    Map.of("from", ProposalStatus.PROPOSED.name(), "to", next.name())));
+        }
+        return closed;
     }
 
     /** Error codes of the rejected attempts of an episode, oldest first (audit, tests). */

@@ -14,12 +14,15 @@ import com.ecommerceagent.decisions.ContextSnapshots;
 import com.ecommerceagent.decisions.DecisionProposals;
 import com.ecommerceagent.decisions.PauseAd;
 import com.ecommerceagent.decisions.StoredProposal;
+import com.ecommerceagent.identity.AuditEntry;
+import com.ecommerceagent.identity.AuditTrail;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.intelligence.inventory.InventoryContext;
 import com.ecommerceagent.metrics.CanonicalJson;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -32,6 +35,7 @@ import tools.jackson.databind.node.ObjectNode;
  * {@code EVALUATION_ONLY}: nothing here authorizes or executes an action.
  */
 @Service
+@NamedInterface("guardian")
 public class PolicyEvaluations {
 
     private final InventoryProtectionPolicy policy;
@@ -39,15 +43,17 @@ public class PolicyEvaluations {
     private final ContextSnapshots snapshots;
     private final StoreIntegrationHealth health;
     private final JdbcClient jdbc;
+    private final AuditTrail audit;
     private final Clock clock;
 
     PolicyEvaluations(InventoryProtectionPolicy policy, DecisionProposals proposals, ContextSnapshots snapshots,
-            StoreIntegrationHealth health, JdbcClient jdbc, Clock clock) {
+            StoreIntegrationHealth health, JdbcClient jdbc, AuditTrail audit, Clock clock) {
         this.policy = policy;
         this.proposals = proposals;
         this.snapshots = snapshots;
         this.health = health;
         this.jdbc = jdbc;
+        this.audit = audit;
         this.clock = clock;
     }
 
@@ -85,6 +91,14 @@ public class PolicyEvaluations {
                 .param("checks", CanonicalJson.write(checks(evaluation.checks())))
                 .param("at", Timestamp.from(now))
                 .update();
+        Map<String, String> details = new TreeMap<>(Map.of("proposalId", proposalId.toString(), "outcome",
+                evaluation.outcome().name(), "policy", evaluation.policyKey() + "@" + evaluation.policyVersion(),
+                "mode", evaluation.mode().name()));
+        if (evaluation.decisiveCode() != null) {
+            details.put("code", evaluation.decisiveCode());
+        }
+        audit.record(AuditEntry.inScope(scope, "POLICY_EVALUATED", "policy_evaluation", evaluation.id().toString(),
+                details));
         return evaluation;
     }
 

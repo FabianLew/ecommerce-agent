@@ -4,12 +4,14 @@ import java.time.Duration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.modulith.NamedInterface;
 
 /**
  * Parameters of policy {@code inventory-protection} (ADR-0012 point 5), with an explicit version recorded in
  * every evaluation. Per-store configuration arrives with the policy screen.
  */
 @ConfigurationProperties("operator.policies.inventory-protection")
+@NamedInterface("guardian")
 public record InventoryProtectionPolicy(
         @DefaultValue("1.0.0") String version,
         @DefaultValue("EVALUATION_ONLY") Mode mode,
