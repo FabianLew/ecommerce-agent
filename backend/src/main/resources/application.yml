@@ -151,6 +151,12 @@ operator:
       # The audit trigger refuses entries younger than 365 days whatever this says.
       audit: 400d
 
+  ai-governance:
+    # ADR-0027: every paid model call reserves its conservative maximum cost first. Budgets and prices live in the
+    # database (ai_budget_policy, ai_price); a missing platform or store budget, or an unverified price, denies the call.
+    input-token-margin: 0.25
+    price-max-verification-age: 90d
+    reservation-timeout: 15m
   agent:
     # The agent proposer (ADR-0016). Off: the deterministic baseline is the only proposer.
     enabled: ${OPERATOR_AGENT_ENABLED:false}

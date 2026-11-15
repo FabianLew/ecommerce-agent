@@ -221,7 +221,8 @@ class RowLevelSecurityTest {
                         WHERE n.nspname = 'public' AND p.prosecdef
                         """).query(String.class).list()).containsExactlyInAnyOrder(
                 "webhook_endpoint:operator_system", "operational_metric:operator_system",
-                "apply_audit_retention:operator_system");
+                "apply_audit_retention:operator_system", "ai_reserve:operator_system",
+                "ai_release:operator_system");
         assertThat(jdbc.sql("SELECT operational_metric('operator.outbox.pending')").query(Double.class).single())
                 .as("a cross-store count, unbound").isGreaterThanOrEqualTo(2.0);
         assertThat(fixtures.sql("""
