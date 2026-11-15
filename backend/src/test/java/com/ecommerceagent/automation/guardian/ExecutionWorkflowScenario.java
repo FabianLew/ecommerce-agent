@@ -16,6 +16,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.automation.TaskQueues;
 import com.ecommerceagent.automation.events.EventDispatch;
@@ -66,7 +67,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -122,7 +122,7 @@ abstract class ExecutionWorkflowScenario {
     @Autowired
     StoreAccess storeAccess;
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
     @Autowired
     Clock clock;
 

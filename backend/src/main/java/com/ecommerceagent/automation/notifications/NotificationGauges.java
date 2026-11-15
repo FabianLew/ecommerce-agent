@@ -14,8 +14,6 @@ class NotificationGauges {
     NotificationGauges(MeterRegistry registry, JdbcClient jdbc, NotificationSettings settings) {
         new DatabaseGauges(registry, jdbc)
                 .gauge("operator.notification.deliveries.exhausted",
-                        "E-mail deliveries FAILED after the last attempt", null,
-                        "SELECT count(*) FROM notification_delivery WHERE status = 'FAILED' AND attempts >= "
-                                + settings.maxAttempts());
+                        "E-mail deliveries FAILED after the last attempt", null, settings.maxAttempts());
     }
 }

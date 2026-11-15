@@ -2,11 +2,17 @@
 # Every address and secret comes from the environment; CloudConfigurationCheck refuses local defaults.
 spring:
   datasource:
+    # The runtime role (ADR-0022); the migration credentials go only to the migration step (ADR-0023).
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: ${DB_POOL_SIZE:10}
+  flyway:
+    # Never in the API or the worker: SchemaVersionCheck only verifies that the schema is current.
+    enabled: false
+    user: ""
+    password: ""
   security:
     oauth2:
       resourceserver:

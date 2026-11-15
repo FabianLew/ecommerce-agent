@@ -123,8 +123,8 @@ public class WooCommerceImport {
      * Running imports of all stores, for the system reconciler only (FIX-02). Identifiers only; the
      * reconciler builds a system scope for each run's store before touching it.
      */
-    public List<SyncRunDispatch> runningRuns(int limit) {
-        return runs.running(limit);
+    public List<SyncRunDispatch> runningRuns(TrustedStoreScope scope, int limit) {
+        return runs.running(scope, limit);
     }
 
     /** Imports all products and variants with their current stock. */

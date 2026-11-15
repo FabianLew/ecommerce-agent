@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.identity.StoreAccess;
 import com.ecommerceagent.identity.TrustedStoreScope;
@@ -18,7 +19,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
  * B-11: commerce repositories. Includes the runtime safety part of ADR-0005: data of store A is neither
@@ -47,7 +47,7 @@ class CommerceRepositoryTest {
     StoreAccess storeAccess;
 
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
 
     TrustedStoreScope scopeA;
     TrustedStoreScope scopeB;

@@ -96,11 +96,14 @@ class SyncRunRepository {
      * Running imports of all stores, oldest first, for the system reconciler only (FIX-02). Returns
      * identifiers, never store data; every follow-up call uses a scope built for that run's store.
      */
-    List<SyncRunDispatch> running(int limit) {
+    List<SyncRunDispatch> running(TrustedStoreScope scope, int limit) {
         return jdbc.sql("""
                         SELECT id, organization_id, store_id, started_at, workflow_started_at FROM sync_run
-                        WHERE status = 'RUNNING' ORDER BY started_at LIMIT :limit
+                        WHERE organization_id = :organizationId AND store_id = :storeId AND status = 'RUNNING'
+                        ORDER BY started_at LIMIT :limit
                         """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
                 .param("limit", limit)
                 .query((rs, rowNum) -> new SyncRunDispatch(
                         rs.getObject("id", UUID.class),

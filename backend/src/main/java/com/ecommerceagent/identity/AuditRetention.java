@@ -34,18 +34,26 @@ class AuditRetention implements RetentionTask {
     }
 
     @Override
-    public int apply(Instant cutoff, int batchSize) {
+    public int apply(TrustedStoreScope scope, Instant cutoff, int batchSize) {
+        return delete(scope.organizationId(), scope.storeId(), cutoff, batchSize);
+    }
+
+    /** Entries without a store (registrations, refused access); runs unbound. */
+    int applyWithoutStore(Instant cutoff, int batchSize) {
+        return delete(null, null, cutoff, batchSize);
+    }
+
+    private int delete(java.util.UUID organizationId, java.util.UUID storeId, Instant cutoff, int batchSize) {
         Instant floor = clock.instant().minus(FLOOR);
         Instant effective = cutoff.isBefore(floor) ? cutoff : floor;
+        // The definer function is the only way to delete audit entries; it enforces the floor itself (ADR-0022).
         Integer deleted = transactions.execute(status -> {
-            jdbc.sql("SELECT set_config('operator.audit_retention', 'on', true)").query(rs -> { });
-            return jdbc.sql("""
-                            DELETE FROM audit_event
-                            WHERE id IN (SELECT id FROM audit_event WHERE occurred_at < :cutoff LIMIT :batch)
-                            """)
+            return jdbc.sql("SELECT apply_audit_retention(:organizationId, :storeId, :cutoff, :batch)")
+                    .param("organizationId", organizationId, java.sql.Types.OTHER)
+                    .param("storeId", storeId, java.sql.Types.OTHER)
                     .param("cutoff", Timestamp.from(effective))
                     .param("batch", batchSize)
-                    .update();
+                    .query(Integer.class).single();
         });
         return deleted == null ? 0 : deleted;
     }

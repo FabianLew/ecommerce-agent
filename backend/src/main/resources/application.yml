@@ -3,10 +3,15 @@ spring:
     name: ecommerce-agent
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/operator}
-    username: ${DB_USERNAME:operator}
-    password: ${DB_PASSWORD:operator}
+    # The runtime role (ADR-0022): owns nothing, subject to every row-level security policy.
+    username: ${DB_USERNAME:operator_runtime}
+    password: ${DB_PASSWORD:operator_runtime}
   flyway:
     locations: classpath:db/migration
+    # Migrations run as the owner of the schema, never as the runtime role. In the cloud profile they run only in
+    # the separate migration step (ADR-0023); locally and in tests on start, with the migrator's own connection.
+    user: ${DB_MIGRATION_USERNAME:operator_migrator}
+    password: ${DB_MIGRATION_PASSWORD:operator_migrator}
   security:
     oauth2:
       resourceserver:
@@ -135,7 +140,8 @@ operator:
     app-base-url: ${OPERATOR_APP_BASE_URL:http://localhost:3000}
 
   row-security:
-    # Second line of store isolation (ADR-0022): store work runs as operator_app under RLS. Off only for diagnosis.
+    # Second line of store isolation (ADR-0022): sets the bound store scope on every connection. Off only for local
+    # diagnosis; the cloud profile refuses to start without it. Unbound, store tables show no rows either way.
     enabled: true
 
   retention:

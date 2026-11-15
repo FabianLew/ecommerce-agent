@@ -11,6 +11,9 @@ public interface RetentionTask {
     /** The key of the task's period in {@code operator.retention.periods}, e.g. {@code webhook-inbox}. */
     String name();
 
-    /** Handles at most {@code batchSize} rows older than {@code cutoff}; returns how many rows it changed. */
-    int apply(Instant cutoff, int batchSize);
+    /**
+     * Handles at most {@code batchSize} rows of the store older than {@code cutoff}; returns how many rows it
+     * changed. Runs bound to the store's system scope (ADR-0022 point 4).
+     */
+    int apply(TrustedStoreScope scope, Instant cutoff, int batchSize);
 }

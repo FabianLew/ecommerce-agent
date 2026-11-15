@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 
@@ -22,6 +23,7 @@ import javax.crypto.spec.SecretKeySpec;
 import com.ecommerceagent.identity.AuditEntry;
 import com.ecommerceagent.identity.AuditTrail;
 import com.ecommerceagent.identity.StoreAccess;
+import com.ecommerceagent.identity.SystemStoreRunner;
 import com.ecommerceagent.identity.StorePermission;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.integration.IntegrationConnectionRepository.WebhookEndpoint;
@@ -67,6 +69,7 @@ public class WooWebhooks {
     private final WooPayloadNormalizer normalizer;
     private final SecretCipher cipher;
     private final StoreAccess storeAccess;
+    private final SystemStoreRunner stores;
     private final AuditTrail audit;
     private final TransactionTemplate transactions;
     private final Clock clock;
@@ -74,14 +77,15 @@ public class WooWebhooks {
 
     WooWebhooks(IntegrationConnectionRepository connections, IntegrationConnections integrationConnections,
             WebhookInboxRepository inbox, WooPayloadNormalizer normalizer, SecretCipher cipher,
-            StoreAccess storeAccess, AuditTrail audit, TransactionTemplate transactions, Clock clock,
-            IntegrationProperties properties) {
+            StoreAccess storeAccess, SystemStoreRunner stores, AuditTrail audit, TransactionTemplate transactions,
+            Clock clock, IntegrationProperties properties) {
         this.connections = connections;
         this.integrationConnections = integrationConnections;
         this.inbox = inbox;
         this.normalizer = normalizer;
         this.cipher = cipher;
         this.storeAccess = storeAccess;
+        this.stores = stores;
         this.audit = audit;
         this.transactions = transactions;
         this.clock = clock;
@@ -172,24 +176,28 @@ public class WooWebhooks {
     }
 
     /**
-     * Processes up to {@code limit} due inbox items, each in its own transaction with its state change and
-     * outbox events (worker side). Returns the number of items handled.
+     * Processes up to {@code limit} due inbox items, store by store under that store's system scope (ADR-0022
+     * point 4), each item in its own transaction with its state change and outbox events (worker side). Returns the
+     * number of items handled.
      */
     public int processPending(int limit) {
+        AtomicInteger handled = new AtomicInteger();
+        stores.forEachStore(WEBHOOK_SERVICE, scope -> handled.addAndGet(processStore(scope, limit - handled.get())));
+        return handled.get();
+    }
+
+    private int processStore(TrustedStoreScope scope, int limit) {
         int handled = 0;
         for (; handled < limit; handled++) {
             AtomicReference<InboxItem> claimed = new AtomicReference<>();
             try {
                 Boolean found = transactions.execute(status -> {
-                    Optional<InboxItem> next = inbox.claimNext();
+                    Optional<InboxItem> next = inbox.claimNext(scope);
                     if (next.isEmpty()) {
                         return false;
                     }
                     InboxItem item = next.get();
                     claimed.set(item);
-                    TrustedStoreScope scope = storeAccess
-                            .systemScope(WEBHOOK_SERVICE, item.organizationId(), item.storeId())
-                            .orElseThrow(() -> new IllegalStateException("Store of inbox item no longer exists"));
                     WooPayloadNormalizer.Result result = normalizer.apply(scope, item.id(), item.topic(),
                             item.payload());
                     inbox.finish(scope, item.id(), result.status(), result.outcome());
@@ -203,20 +211,20 @@ public class WooWebhooks {
                 if (item == null) {
                     throw e;
                 }
-                fail(item, e);
+                fail(scope, item, e);
             }
         }
         return handled;
     }
 
-    private void fail(InboxItem item, RuntimeException e) {
+    private void fail(TrustedStoreScope scope, InboxItem item, RuntimeException e) {
         // An unreadable payload will not get better on retry.
         boolean permanent = e instanceof WooImportException || e instanceof JacksonException;
         Instant next = clock.instant().plus(Duration.ofSeconds(5L << Math.min(item.attempts(), 10)));
         String outcome = permanent ? "INVALID_PAYLOAD" : "ERROR:" + e.getClass().getSimpleName();
         log.warn("Webhook inbox item {} failed (attempt {}): {}", item.id(), item.attempts() + 1, outcome, e);
         transactions.executeWithoutResult(status ->
-                inbox.recordFailure(item.id(), permanent ? 1 : MAX_ATTEMPTS, next, outcome));
+                inbox.recordFailure(scope, item.id(), permanent ? 1 : MAX_ATTEMPTS, next, outcome));
     }
 
     private static boolean isPing(WebhookHeaders headers, byte[] body) {

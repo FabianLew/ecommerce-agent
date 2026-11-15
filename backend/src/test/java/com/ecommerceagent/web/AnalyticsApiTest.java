@@ -18,6 +18,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.commerce.Backorders;
 import com.ecommerceagent.commerce.CatalogRepository;
@@ -36,7 +37,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -50,7 +50,7 @@ class AnalyticsApiTest {
     @Autowired
     MockMvc mvc;
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
     @Autowired
     OrderRepository orders;
     @Autowired

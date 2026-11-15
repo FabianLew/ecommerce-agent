@@ -224,12 +224,10 @@ class IntegrationConnectionRepository {
      * scope: the caller is the shop, and the result is used only to build a system scope for that store.
      */
     Optional<WebhookEndpoint> webhookEndpoint(String endpointKey) {
-        return jdbc.sql("""
-                        SELECT id, organization_id, store_id, provider FROM integration_connection
-                        WHERE webhook_endpoint_key = :key
-                        """)
+        // The store is not known yet, so the lookup is the reviewed definer function (ADR-0022 point 4).
+        return jdbc.sql("SELECT connection_id, organization_id, store_id, provider FROM webhook_endpoint(:key)")
                 .param("key", endpointKey)
-                .query((rs, n) -> new WebhookEndpoint(rs.getObject("id", UUID.class),
+                .query((rs, n) -> new WebhookEndpoint(rs.getObject("connection_id", UUID.class),
                         rs.getObject("organization_id", UUID.class), rs.getObject("store_id", UUID.class),
                         IntegrationProvider.valueOf(rs.getString("provider"))))
                 .optional();

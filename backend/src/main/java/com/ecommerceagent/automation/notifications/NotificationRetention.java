@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.ecommerceagent.identity.RetentionTask;
+import com.ecommerceagent.identity.TrustedStoreScope;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -31,16 +32,19 @@ class NotificationRetention implements RetentionTask {
     }
 
     @Override
-    public int apply(Instant cutoff, int batchSize) {
+    public int apply(TrustedStoreScope scope, Instant cutoff, int batchSize) {
         Integer deleted = transactions.execute(status -> {
             List<UUID> ids = jdbc.sql("""
                             SELECT n.id FROM operator_notification n
-                            WHERE n.created_at < :cutoff
+                            WHERE n.organization_id = :organizationId AND n.store_id = :storeId
+                              AND n.created_at < :cutoff
                               AND NOT EXISTS (SELECT 1 FROM notification_delivery d
                                               WHERE d.notification_id = n.id AND d.status IN ('PENDING', 'SENDING'))
                             LIMIT :batch
                             FOR UPDATE SKIP LOCKED
                             """)
+                    .param("organizationId", scope.organizationId())
+                    .param("storeId", scope.storeId())
                     .param("cutoff", Timestamp.from(cutoff))
                     .param("batch", batchSize)
                     .query(UUID.class).list();

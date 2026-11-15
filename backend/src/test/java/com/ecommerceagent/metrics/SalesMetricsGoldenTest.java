@@ -9,6 +9,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.commerce.Backorders;
 import com.ecommerceagent.commerce.CatalogRepository;
@@ -28,7 +29,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 
 /** Golden tests for net_sales, qualifying_orders, aov and variant_net_sales v1 (ADR-0019). Exact values. */
@@ -52,7 +52,7 @@ class SalesMetricsGoldenTest {
     @Autowired
     StoreAccess storeAccess;
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
 
     TrustedStoreScope scope;
     TrustedStoreScope other;

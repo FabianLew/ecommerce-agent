@@ -203,13 +203,16 @@ class MetaConnectionRepository {
     }
 
     /** Connected stores whose next poll is due; ids only, for the poller. */
-    List<DueConnection> due(Instant now, int limit) {
+    List<DueConnection> due(TrustedStoreScope scope, Instant now, int limit) {
         return jdbc.sql("""
                         SELECT id, organization_id, store_id FROM meta_connection
-                        WHERE status = 'CONNECTED' AND (next_sync_after IS NULL OR next_sync_after <= :now)
+                        WHERE organization_id = :organizationId AND store_id = :storeId
+                          AND status = 'CONNECTED' AND (next_sync_after IS NULL OR next_sync_after <= :now)
                         ORDER BY last_sync_at NULLS FIRST
                         LIMIT :limit
                         """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
                 .param("now", Timestamp.from(now))
                 .param("limit", limit)
                 .query((rs, n) -> new DueConnection(rs.getObject("id", UUID.class),

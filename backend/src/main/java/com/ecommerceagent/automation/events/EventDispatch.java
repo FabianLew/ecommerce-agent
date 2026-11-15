@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -19,6 +20,7 @@ import com.ecommerceagent.automation.sync.StoreSyncWorkflow;
 import com.ecommerceagent.automation.temporal.StoreContextPropagator;
 import com.ecommerceagent.automation.temporal.WorkflowStoreContext;
 import com.ecommerceagent.identity.StoreAccess;
+import com.ecommerceagent.identity.SystemStoreRunner;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.integration.IntegrationConnection;
 import com.ecommerceagent.integration.IntegrationConnections;
@@ -55,6 +57,7 @@ public class EventDispatch {
     private final OutboxEvents outbox;
     private final IntegrationConnections connections;
     private final StoreAccess storeAccess;
+    private final SystemStoreRunner stores;
     private final WorkflowClient client;
     private final TransactionTemplate transactions;
     private final Clock clock;
@@ -63,13 +66,14 @@ public class EventDispatch {
     private final long catalogDelaySeconds;
 
     EventDispatch(OutboxEvents outbox, IntegrationConnections connections, StoreAccess storeAccess,
-            WorkflowClient client, TransactionTemplate transactions, Clock clock,
+            SystemStoreRunner stores, WorkflowClient client, TransactionTemplate transactions, Clock clock,
             @Value("${operator.automation.inventory.verify-delay:10s}") Duration verifyDelay,
             @Value("${operator.automation.inventory.order-delay:60s}") Duration orderDelay,
             @Value("${operator.automation.catalog.refresh-delay:30s}") Duration catalogDelay) {
         this.outbox = outbox;
         this.connections = connections;
         this.storeAccess = storeAccess;
+        this.stores = stores;
         this.client = client;
         this.transactions = transactions;
         this.clock = clock;
@@ -78,20 +82,29 @@ public class EventDispatch {
         this.catalogDelaySeconds = catalogDelay.toSeconds();
     }
 
-    /** Dispatches up to {@code limit} due events; returns how many were handled (dispatched or postponed). */
+    /**
+     * Dispatches up to {@code limit} due events, store by store under the store's system scope (ADR-0022 point 4);
+     * returns how many were handled (dispatched or postponed).
+     */
     public int dispatchPending(int limit) {
+        AtomicInteger handled = new AtomicInteger();
+        stores.forEachStore(SYNC_SERVICE, scope -> handled.addAndGet(dispatchStore(scope, limit - handled.get())));
+        return handled.get();
+    }
+
+    private int dispatchStore(TrustedStoreScope scope, int limit) {
         int handled = 0;
         for (; handled < limit; handled++) {
             AtomicReference<PendingEvent> claimed = new AtomicReference<>();
             try {
                 Boolean found = transactions.execute(status -> {
-                    Optional<PendingEvent> next = outbox.claimNext();
+                    Optional<PendingEvent> next = outbox.claimNext(scope);
                     if (next.isEmpty()) {
                         return false;
                     }
                     claimed.set(next.get());
-                    dispatch(next.get());
-                    outbox.markDispatched(next.get().event().id());
+                    dispatch(scope, next.get());
+                    outbox.markDispatched(scope, next.get().event().id());
                     return true;
                 });
                 if (!Boolean.TRUE.equals(found)) {
@@ -106,16 +119,14 @@ public class EventDispatch {
                 Instant next = clock.instant().plus(backoff.compareTo(MAX_BACKOFF) > 0 ? MAX_BACKOFF : backoff);
                 log.warn("Dispatch of outbox event {} failed (attempt {}), retry at {}", pending.event().id(),
                         pending.attempts() + 1, next, e);
-                transactions.executeWithoutResult(status -> outbox.recordFailure(pending.event().id(), next));
+                transactions.executeWithoutResult(status -> outbox.recordFailure(scope, pending.event().id(), next));
             }
         }
         return handled;
     }
 
-    private void dispatch(PendingEvent pending) {
+    private void dispatch(TrustedStoreScope scope, PendingEvent pending) {
         OutboxEvent event = pending.event();
-        TrustedStoreScope scope = storeAccess.systemScope(SYNC_SERVICE, pending.organizationId(), pending.storeId())
-                .orElseThrow(() -> new IllegalStateException("Store of outbox event no longer exists"));
         JsonNode payload = JSON.readTree(event.payload());
         String sourceUpdatedAt = text(payload, "sourceUpdatedAt");
         switch (event.eventType()) {

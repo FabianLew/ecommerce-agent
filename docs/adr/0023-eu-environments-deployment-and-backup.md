@@ -25,22 +25,24 @@ and the backup and restore procedure, so that choosing a provider is a matter of
    non-root user) and `frontend/Dockerfile` (Next.js standalone server). The backend image runs as two processes:
    `SPRING_PROFILES_ACTIVE=cloud,api` (HTTP, scaled by load) and `cloud,worker` (Temporal workers, sweeps,
    observers and retention; at least one, more for throughput). Neither of them migrates the database.
-3. **A separate migration step.** Each deployment runs the same image once as a one-off job with
-   `SPRING_PROFILES_ACTIVE=cloud,migrate`. It connects as `operator_migrator` (ADR-0022) with `DB_MIGRATION_USERNAME`
-   and `DB_MIGRATION_PASSWORD`, runs Flyway (`migrate`, then `validate`), starts no web server, worker or scheduler,
-   and exits with a non-zero status on any failure.
+3. **A separate migration step.** Each deployment runs the same image once as a one-off job with another main
+   class, `MigrateCommand`:
+   `java -Dloader.main=com.ecommerceagent.MigrateCommand -cp app.jar org.springframework.boot.loader.launch.PropertiesLauncher`.
+   It connects as `operator_migrator` (ADR-0022) with `DB_URL`, `DB_MIGRATION_USERNAME` and
+   `DB_MIGRATION_PASSWORD`, runs Flyway (`migrate`, then `validate`), starts no Spring context, web server, worker or
+   scheduler, and exits with a non-zero status on any failure.
    - *Order of a deployment:* note the point-in-time recovery mark, then run the migration job and wait for success,
      then roll out the worker, then the API. A failed migration stops the rollout, and the running version keeps
      serving.
    - *Runtime processes* (`api`, `worker`) run with `spring.flyway.enabled=false` as `operator_runtime`. At start
-     they read `flyway_schema_history` (they have `SELECT` only) and refuse to start when the schema is older than
-     the newest migration in the image, or when a migration failed. A newer schema is accepted, because of the next
-     rule.
+     `SchemaVersionCheck` reads `flyway_schema_history` (`SELECT` only) and refuses to start when a migration of the
+     image is pending, a migration failed, or the history is not readable. A newer schema is accepted, because of
+     the next rule.
    - *Migrations are backward compatible with the previous release* (expand, then contract in a later release):
      during a rollout the old version runs on the new schema. A destructive change ships in two releases.
-   - *Locally and in tests* the same split applies with the bootstrap roles of ADR-0022. Compose has a `migrate`
-     service that the others depend on, and Testcontainers runs the migration as the migrator before the context
-     connects as the runtime role.
+   - *Locally and in tests* the backend is not in Compose. It migrates on start, but with the migrator's own
+     connection (`spring.flyway.user`), and serves requests as the runtime role, so the role split is the same
+     everywhere.
 4. **Configuration contract.** Profile `cloud` (`application-cloud.yml`) takes every address and secret from the
    environment, with no defaults: `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `OIDC_ISSUER_URI`, `TEMPORAL_ADDRESS`,
    `TEMPORAL_NAMESPACE`, `TEMPORAL_API_KEY`, `INTEGRATION_SECRETS_KEY`, `INTEGRATION_SECRETS_KEY_ID`,
@@ -50,8 +52,7 @@ and the backup and restore procedure, so that choosing a provider is a matter of
    `DB_MIGRATION_PASSWORD`. `CloudConfigurationCheck` stops the start before any bean connects anywhere when:
    - a value is missing or points at a local address;
    - a local, test or e2e profile is mixed in;
-   - `migrate` is combined with `api` or `worker`;
-   - an `api` or `worker` process is given the migration credentials or `spring.flyway.enabled=true`;
+   - an `api` or `worker` process is given the migration credentials or does not have `spring.flyway.enabled=false`;
    - `operator.row-security.enabled=false` is set (ADR-0022).
 5. **Temporal Cloud.** One namespace per environment in an EU region, API key authentication over TLS
    (`spring.temporal.connection.api-key`, `enable-https`); mTLS certificates are the alternative the starter
@@ -91,19 +92,20 @@ and the backup and restore procedure, so that choosing a provider is a matter of
 
 ## Implementation status
 
-On the pilot branch both processes run Flyway on start with one database user, and there is no `migrate` profile.
-After this revision is approved, a follow-up adds the profile, the start-up schema check, the new configuration
-rules, the Compose `migrate` service and the test set-up with two roles, together with the role change of ADR-0022.
+Implemented on the pilot branch: `MigrateCommand`, `SchemaVersionCheck`, `spring.flyway.enabled=false` in the cloud
+profile, the new configuration rules, and migrations as the migrator locally and in tests.
 
 ## Verification
 
 - `CloudConfigurationCheckTest`: these refuse the start, and a complete configuration passes:
   - missing values, unresolved placeholders and local addresses;
-  - mixed profiles, including `migrate` with `api` or `worker`;
+  - mixed profiles;
   - migration credentials or Flyway on a runtime process;
   - RLS switched off.
-- Migration step test: the `migrate` profile applies all migrations as the migrator and exits. A runtime process on
-  an older schema refuses to start, and one on the current or a newer schema starts.
+- `MigrationStepTest`:
+  - `MigrateCommand` applies all migrations as the migrator, which then owns the tables.
+  - The runtime role cannot migrate.
+  - A runtime process refuses an older schema and starts on the current one.
 - CI job "Container images" builds both images.
 - The backup and restore scripts were run against a scratch PostgreSQL 17 with all migrations: the restore check
   passes and refuses the database named `operator`.

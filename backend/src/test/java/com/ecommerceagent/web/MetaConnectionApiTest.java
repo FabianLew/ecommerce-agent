@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.identity.StoreAccess;
 import com.ecommerceagent.integration.MetaAdSync;
@@ -33,7 +34,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -75,7 +75,7 @@ class MetaConnectionApiTest {
     MockMvc mvc;
 
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
 
     @Autowired
     MetaAdSync sync;

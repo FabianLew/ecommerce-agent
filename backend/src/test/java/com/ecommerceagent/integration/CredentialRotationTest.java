@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.UUID;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.identity.StoreRowGuard;
 import com.ecommerceagent.identity.TestScopes;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.TestPropertySource;
 
 /** ADR-0022 point 4: a credential sealed with a previous key is readable and moves to the current key on use. */
@@ -28,7 +28,7 @@ class CredentialRotationTest {
     static final String NEW_KEY = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=";
 
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
 
     @Autowired
     IntegrationConnectionRepository repository;

@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.identity.StoreAccess;
 import com.ecommerceagent.identity.TrustedStoreScope;
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 
 /** B-20: ads and SKU mappings with a version and verification bound to the creative. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
@@ -37,7 +37,7 @@ class AdRepositoryTest {
     @Autowired
     StoreAccess storeAccess;
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
 
     TrustedStoreScope scopeA;
     TrustedStoreScope scopeB;

@@ -1,5 +1,8 @@
 package com.ecommerceagent.decisions;
 
+import com.ecommerceagent.FixtureDb;
+import com.ecommerceagent.identity.StoreScopeBinding;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -41,7 +44,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -79,7 +81,13 @@ class InventoryRiskDetectorTest {
     @Autowired
     TransactionTemplate transactions;
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
+
+    @Autowired
+    JdbcClient appJdbc;
+
+    @Autowired
+    StoreScopeBinding binding;
 
     final TestClock clock = new TestClock(AS_OF);
     InventoryRiskDetector detector;
@@ -98,7 +106,9 @@ class InventoryRiskDetectorTest {
         scopeA = storeAccess.systemScope("risk-test", ORG, STORE_A).orElseThrow();
         scopeB = storeAccess.systemScope("risk-test", ORG, STORE_B).orElseThrow();
         clock.set(AS_OF);
-        detector = new InventoryRiskDetector(metrics, opportunities, SETTINGS, jdbc, clock);
+        // Built by hand for its clock; the binding advisor gives it the store binding a bean has (ADR-0022).
+        detector = (InventoryRiskDetector) binding.postProcessAfterInitialization(
+                new InventoryRiskDetector(metrics, opportunities, SETTINGS, appJdbc, clock), "detector");
 
         catalog.upsertProduct(scopeA, CommerceSource.WOOCOMMERCE,
                 new ProductData("812", "Serum", "SERUM", "variable", "publish", null));

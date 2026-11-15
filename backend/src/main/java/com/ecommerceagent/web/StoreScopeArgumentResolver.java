@@ -63,8 +63,10 @@ class StoreScopeArgumentResolver implements HandlerMethodArgumentResolver {
         StorePermission required = requiredPermission(parameter);
         if (!scope.get().has(required)) {
             // The user is a member, so the store's existence is not secret; the missing permission is.
-            audit.record(AuditEntry.inScope(scope.get(), "STORE_PERMISSION_DENIED", "store",
-                    scope.get().storeId().toString(), Map.of("permission", required.name())));
+            try (StoreRowGuard.Binding ignored = StoreRowGuard.bind(scope.get())) {
+                audit.record(AuditEntry.inScope(scope.get(), "STORE_PERMISSION_DENIED", "store",
+                        scope.get().storeId().toString(), Map.of("permission", required.name())));
+            }
             throw new StoreAccessDeniedException(scope.get().storeId(), required);
         }
         // Row-level security for the rest of the request; StoreRowGuardInterceptor clears it (ADR-0022).

@@ -4,6 +4,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 
 import com.ecommerceagent.identity.RetentionTask;
+import com.ecommerceagent.identity.TrustedStoreScope;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
@@ -26,14 +27,17 @@ class AgentRunRetention implements RetentionTask {
     }
 
     @Override
-    public int apply(Instant cutoff, int batchSize) {
+    public int apply(TrustedStoreScope scope, Instant cutoff, int batchSize) {
         return jdbc.sql("""
                         UPDATE agent_run_step SET payload = '{"redacted": true}'::jsonb
                         WHERE (run_id, seq) IN (SELECT run_id, seq FROM agent_run_step
-                                                WHERE created_at < :cutoff
+                                                WHERE organization_id = :organizationId
+                                                  AND store_id = :storeId AND created_at < :cutoff
                                                   AND payload <> '{"redacted": true}'::jsonb
                                                 LIMIT :batch)
                         """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
                 .param("cutoff", Timestamp.from(cutoff))
                 .param("batch", batchSize)
                 .update();

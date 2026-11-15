@@ -14,16 +14,11 @@ class ExecutionGauges {
     ExecutionGauges(MeterRegistry registry, JdbcClient jdbc) {
         new DatabaseGauges(registry, jdbc)
                 .gauge("operator.executions.unknown", "Executions whose effect is not confirmed (UNKNOWN)",
-                        null, "SELECT count(*) FROM action_execution WHERE status = 'UNKNOWN'")
+                        null)
                 .gauge("operator.executions.stuck", "Executions IN_PROGRESS or APPLIED for more than 15 minutes",
-                        null, """
-                        SELECT count(*) FROM action_execution
-                        WHERE status IN ('IN_PROGRESS', 'APPLIED') AND updated_at < now() - interval '15 minutes'""")
-                .gauge("operator.mutation.stops.active", "Stores whose mutations are stopped", null,
-                        "SELECT count(*) FROM store_mutation_stop WHERE stopped")
+                        null)
+                .gauge("operator.mutation.stops.active", "Stores whose mutations are stopped", null)
                 .gauge("operator.observations.overdue", "Outcome checkpoints more than an hour past due",
-                        null, """
-                        SELECT count(*) FROM outcome_observation
-                        WHERE status = 'PENDING' AND due_at < now() - interval '1 hour'""");
+                        null);
     }
 }

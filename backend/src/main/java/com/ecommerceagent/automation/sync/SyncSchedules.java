@@ -5,12 +5,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.ecommerceagent.automation.TaskQueues;
 import com.ecommerceagent.automation.events.EventDispatch;
 import com.ecommerceagent.automation.temporal.StoreContextPropagator;
 import com.ecommerceagent.automation.temporal.WorkflowStoreContext;
-import com.ecommerceagent.identity.StoreAccess;
+import com.ecommerceagent.identity.SystemStoreRunner;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.integration.SyncTarget;
 import com.ecommerceagent.integration.WooIncrementalSync;
@@ -41,19 +42,19 @@ public class SyncSchedules {
     private static final Logger log = LoggerFactory.getLogger(SyncSchedules.class);
 
     private final WooIncrementalSync sync;
-    private final StoreAccess storeAccess;
+    private final SystemStoreRunner stores;
     private final ScheduleClient schedules;
     private final Duration pollInterval;
     private final Duration reconcileInterval;
     private final HistorySettings history;
     private final Set<UUID> ensured = ConcurrentHashMap.newKeySet();
 
-    SyncSchedules(WooIncrementalSync sync, StoreAccess storeAccess, ScheduleClient schedules,
+    SyncSchedules(WooIncrementalSync sync, SystemStoreRunner stores, ScheduleClient schedules,
             @Value("${operator.automation.sync.poll-interval:5m}") Duration pollInterval,
             @Value("${operator.automation.sync.reconcile-interval:1h}") Duration reconcileInterval,
             HistorySettings history) {
         this.sync = sync;
-        this.storeAccess = storeAccess;
+        this.stores = stores;
         this.schedules = schedules;
         this.pollInterval = pollInterval;
         this.reconcileInterval = reconcileInterval;
@@ -62,25 +63,21 @@ public class SyncSchedules {
 
     /** Ensures schedules for every target not yet handled by this worker; returns how many were created. */
     public int ensureAll() {
-        int created = 0;
-        for (SyncTarget target : sync.targets()) {
-            if (ensured.contains(target.connectionId())) {
-                continue;
+        AtomicInteger created = new AtomicInteger();
+        stores.forEachStore(EventDispatch.SYNC_SERVICE, scope -> {
+            for (SyncTarget target : sync.targets(scope)) {
+                if (ensured.contains(target.connectionId())) {
+                    continue;
+                }
+                created.addAndGet(ensure(scope, target.connectionId(), "POLL", pollInterval));
+                created.addAndGet(ensure(scope, target.connectionId(), "RECONCILE", reconcileInterval));
+                if (history.enabled()) {
+                    created.addAndGet(ensure(scope, target.connectionId(), "HISTORY", history.interval()));
+                }
+                ensured.add(target.connectionId());
             }
-            TrustedStoreScope scope = storeAccess
-                    .systemScope(EventDispatch.SYNC_SERVICE, target.organizationId(), target.storeId())
-                    .orElse(null);
-            if (scope == null) {
-                continue;
-            }
-            created += ensure(scope, target.connectionId(), "POLL", pollInterval);
-            created += ensure(scope, target.connectionId(), "RECONCILE", reconcileInterval);
-            if (history.enabled()) {
-                created += ensure(scope, target.connectionId(), "HISTORY", history.interval());
-            }
-            ensured.add(target.connectionId());
-        }
-        return created;
+        });
+        return created.get();
     }
 
     public static String scheduleId(UUID connectionId, String kind) {

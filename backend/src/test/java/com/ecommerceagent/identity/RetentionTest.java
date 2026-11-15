@@ -1,5 +1,6 @@
 package com.ecommerceagent.identity;
 
+import org.springframework.jdbc.core.simple.JdbcClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -9,6 +10,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -16,7 +18,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** ADR-0022 point 5: each task removes or redacts only what is past its period; recent audit is untouchable. */
@@ -28,7 +29,10 @@ class RetentionTest {
     RetentionRunner runner;
 
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
+
+    @Autowired
+    JdbcClient appJdbc;
 
     @Autowired
     TransactionTemplate transactions;
@@ -86,15 +90,37 @@ class RetentionTest {
 
         assertThatThrownBy(() -> jdbc.sql("DELETE FROM audit_event WHERE id = ?").param(old).update())
                 .isInstanceOf(DataAccessException.class).hasMessageContaining("append-only");
-        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
-            jdbc.sql("SELECT set_config('operator.audit_retention', 'on', true)").query(rs -> { });
-            jdbc.sql("DELETE FROM audit_event WHERE id = ?").param(recent).update();
+        assertThatThrownBy(() -> jdbc.inTransaction(tx -> {
+            tx.sql("SELECT set_config('operator.audit_retention', 'on', true)").query(rs -> { });
+            tx.sql("DELETE FROM audit_event WHERE id = ?").param(recent).update();
         })).isInstanceOf(DataAccessException.class).hasMessageContaining("append-only");
-        transactions.executeWithoutResult(status -> {
-            jdbc.sql("SELECT set_config('operator.audit_retention', 'on', true)").query(rs -> { });
-            assertThat(jdbc.sql("DELETE FROM audit_event WHERE id = ?").param(old).update()).isEqualTo(1);
+        jdbc.inTransaction(tx -> {
+            tx.sql("SELECT set_config('operator.audit_retention', 'on', true)").query(rs -> { });
+            assertThat(tx.sql("DELETE FROM audit_event WHERE id = ?").param(old).update()).isEqualTo(1);
         });
         assertThat(exists("audit_event", recent)).isTrue();
+    }
+
+    @Test
+    void theRuntimeRoleDeletesAuditOnlyThroughTheRetentionFunctionAndNeverRecentEntries() {
+        UUID recent = audit(days(300));
+        UUID old = audit(days(400));
+        TrustedStoreScope scope = TestScopes.system(organization, store);
+
+        assertThatThrownBy(() -> appJdbc.sql("DELETE FROM audit_event WHERE id = ?").param(old).update())
+                .isInstanceOf(DataAccessException.class).rootCause().hasMessageContaining("permission denied");
+        assertThatThrownBy(() -> appJdbc.sql("SELECT apply_audit_retention(?, ?, now(), 100)")
+                .params(organization, store).query(Integer.class).single())
+                .as("only for the bound store")
+                .isInstanceOf(DataAccessException.class);
+        try (StoreRowGuard.Binding ignored = StoreRowGuard.bind(scope)) {
+            Integer deleted = transactions.execute(status -> appJdbc
+                    .sql("SELECT apply_audit_retention(?, ?, now(), 100)")
+                    .params(organization, store).query(Integer.class).single());
+            assertThat(deleted).isEqualTo(1);
+        }
+        assertThat(exists("audit_event", old)).isFalse();
+        assertThat(exists("audit_event", recent)).as("the 365-day floor holds whatever the cutoff").isTrue();
     }
 
     private Instant days(int days) {
@@ -162,9 +188,9 @@ class RetentionTest {
     /** A step without its run: foreign keys are switched off for this insert only (test database superuser). */
     private UUID agentStep(Instant createdAt) {
         UUID runId = UUID.randomUUID();
-        transactions.executeWithoutResult(status -> {
-            jdbc.sql("SET LOCAL session_replication_role = replica").update();
-            jdbc.sql("""
+        jdbc.inTransaction(tx -> {
+            tx.sql("SET LOCAL session_replication_role = replica").update();
+            tx.sql("""
                             INSERT INTO agent_run_step (run_id, organization_id, store_id, seq, kind, name, status,
                                                         payload, created_at)
                             VALUES (?, ?, ?, 1, 'MODEL_CALL', 'model', 'OK', '{"prompt": "text"}'::jsonb, ?)

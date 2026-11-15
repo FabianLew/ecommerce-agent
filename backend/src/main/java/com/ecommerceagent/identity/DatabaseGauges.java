@@ -9,8 +9,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
- * Registers gauges read from the database when the registry publishes (ADR-0024). Each value is one small count over
- * all stores, read without a store binding; a failing query reports {@code NaN} instead of breaking the export.
+ * Registers gauges read from the database when the registry publishes (ADR-0024). Each value is one count over all
+ * stores from the reviewed definer function {@code operational_metric} (ADR-0022 point 4), the only way the runtime
+ * role can count across stores; a failing query reports {@code NaN} instead of breaking the export.
  */
 public final class DatabaseGauges {
 
@@ -24,11 +25,18 @@ public final class DatabaseGauges {
         this.jdbc = jdbc;
     }
 
-    /** A gauge whose value is the single number {@code sql} returns ({@code NULL} counts as 0). */
-    public DatabaseGauges gauge(String name, String description, String baseUnit, String sql) {
+    /** A gauge whose value is {@code operational_metric(name)}. */
+    public DatabaseGauges gauge(String name, String description, String baseUnit) {
+        return gauge(name, description, baseUnit, null);
+    }
+
+    /** A gauge whose value is {@code operational_metric(name, maxAttempts)}. */
+    public DatabaseGauges gauge(String name, String description, String baseUnit, Integer maxAttempts) {
         Supplier<Number> value = () -> {
             try {
-                Number number = jdbc.sql(sql).query(Double.class).optional().orElse(null);
+                Number number = jdbc.sql("SELECT operational_metric(:name, :maxAttempts)")
+                        .param("name", name).param("maxAttempts", maxAttempts, java.sql.Types.INTEGER)
+                        .query(Double.class).optional().orElse(null);
                 return number == null ? 0 : number;
             } catch (RuntimeException e) {
                 log.warn("Gauge {} could not be read: {}", name, e.getMessage());

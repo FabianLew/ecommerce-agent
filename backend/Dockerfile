@@ -1,4 +1,7 @@
 # Backend image (ADR-0023): one image, the process role is chosen with SPRING_PROFILES_ACTIVE (api or worker).
+# The migration step of a deployment runs the same image with another main class (ADR-0023 point 3):
+#   java -Dloader.main=com.ecommerceagent.MigrateCommand -cp /app/app.jar \
+#        org.springframework.boot.loader.launch.PropertiesLauncher
 # Build from the repository root, because the build packs /knowledge into the jar:
 #   docker build -f backend/Dockerfile -t operator-backend .
 FROM eclipse-temurin:21-jdk AS build

@@ -33,9 +33,13 @@ metrics); it must keep working without a general way around the policies.
      DELETE` on the application tables (default privileges of `operator_migrator` cover future tables), no DDL and
      no `TRUNCATE`. It has `SELECT` only on `flyway_schema_history` (for the start-up version check) and `SELECT,
      INSERT` only on `audit_event` (ADR-0004 point 8).
-   - Both roles are created out of band by the database administrator (the provider's console or
-     `infra/db/bootstrap-roles.sql` locally, in Compose and in Testcontainers), so neither needs `CREATEROLE`.
-     Migrations only grant and revoke; a migration that needs a role that does not exist fails.
+   - `operator_system` (NOLOGIN) owns the reviewed definer functions of point 4 and nothing else. The migrator may
+     set it as an owner (`SET TRUE`) without inheriting its rights (`INHERIT FALSE`).
+   - The roles are created out of band by the database administrator with
+     `infra/postgres/init/02-operator-roles.sql` (Compose and Testcontainers run it on a new database; staging and
+     production run it with passwords from the secret store), so none of them needs `CREATEROLE`. Migrations only
+     grant and revoke, and V25 fails when the roles are missing. The NOLOGIN `operator_app` of the first draft is
+     still created so that V23 applies unchanged; V25 removes all its privileges.
 2. **Policies, forced and fail-closed.** Every table with `store_id` and `organization_id` gets `ENABLE` and `FORCE
    ROW LEVEL SECURITY` (so not even the owner is exempt by accident) and one policy `store_isolation`: a row is
    visible and writable only when both columns equal `current_setting('app.store_id', true)` and
@@ -43,18 +47,27 @@ metrics); it must keep working without a general way around the policies.
    lets no row be written; there is no "unset means everything" branch. `audit_event` has a read policy for the bound
    store and an insert policy that also accepts organization-level entries without a store, but only when
    `app.organization_id` is set and equal. Tables without a store (organizations, stores, members, users) are
-   governed by grants and by the identity module's queries, as today. A schema test fails when a store table lacks
+   governed by grants and by the identity module's queries, as today; `store_membership` is one of them, because
+   `StoreAccess` reads it to build a scope before any store can be bound. A schema test fails when a store table lacks
    `FORCE`, RLS or the policy, or when the runtime role owns an object, has `BYPASSRLS` or holds a privilege outside
    the list above.
-3. **Scope management.** The scope reaches the database only from `StoreRowGuard` (identity), which is bound only
-   where `StoreAccess` built a `TrustedStoreScope` for a user or a named system actor: the web scope resolver
-   (cleared after the request by an interceptor), the Temporal activity interceptor (cleared in `finally`) and the
-   system runner of point 4.
-   - Binding while another scope is bound is refused (no silent switch); the guard is a stack of one.
-   - `RowSecurityDataSource` sets `app.store_id` and `app.organization_id` on every connection checkout, and resets
-     them to empty when the connection is returned. When a transaction is active the values are set
-     transaction-local (`set_config(..., true)`) at its start, so they end with it even if the reset is skipped.
-   - If setting or resetting fails, the connection is closed and evicted from the pool, never handed out.
+3. **Scope management.** The scope reaches the database only from `StoreRowGuard` (identity). It is bound only
+   from a `TrustedStoreScope`, which only `StoreAccess` builds, in four places:
+   - the web scope resolver, cleared after the request by an interceptor;
+   - the Temporal activity interceptor, cleared in `finally`;
+   - the system runner of point 4;
+   - `StoreScopeBinding`, an advisor on every application bean method that receives a `TrustedStoreScope`. It
+     binds that scope for the call, before the transaction advice, so the queries a method runs are checked against
+     the same store its code filters by.
+
+   The rules for the binding and the connections:
+   - Binding another store while one is bound is refused (no silent switch). Binding the same store again is a
+     no-op.
+   - `RowSecurityDataSource` sets `app.store_id` and `app.organization_id` on every connection checkout. It sets
+     them again before a statement whenever the thread's binding differs from what the connection holds (a
+     transaction that started unbound and then calls a store-scoped method, or settings undone by a rollback).
+     It resets them to empty when the connection is returned.
+   - If setting or resetting fails, the connection is evicted from the pool, never handed out.
    - There is no switch that turns RLS off in production: `operator.row-security.enabled=false` is accepted only in
      the `local` and test profiles, and `CloudConfigurationCheck` refuses it (ADR-0023).
    - Unbound connections stay possible (for point 4 and the identity tables), and on store tables they see and
@@ -65,11 +78,16 @@ metrics); it must keep working without a general way around the policies.
      list the active stores through `StoreAccess` and then, for each store, bind a `TrustedStoreScope` of the
      system actor of that job (`SYSTEM:<job>`) and do the work under RLS. A failure in one store does not stop the
      others. Writes are audited with that actor, as user writes are.
-   - **Cross-store reads go through named functions.** When a question spans stores and returns no store data (the
-     worker's gauges in ADR-0024, "which stores have due work", "which store owns this webhook endpoint"), it is a
-     `SECURITY DEFINER` function owned by `operator_migrator` with a fixed `search_path`. It returns only counts or
-     identifiers, and `EXECUTE` on it is granted to `operator_runtime`. The functions are listed in one migration
-     file per module, and the schema test fails on a definer function that is not in the list.
+   - **Cross-store reads go through named functions.** When a question spans stores and returns no store data, it
+     is a `SECURITY DEFINER` function owned by `operator_system` with a fixed `search_path`.
+     - It returns only counts or identifiers, and `EXECUTE` on it is granted to `operator_runtime` only.
+     - `operator_system` reads the tables a function needs through a read policy for that role, with column grants
+       where the function needs only a few columns.
+     - The reviewed list (V25):
+       - `webhook_endpoint(key)`: which store owns a webhook endpoint, before the delivery is resolved;
+       - `operational_metric(name)`: the worker's gauges in ADR-0024;
+       - `apply_audit_retention(...)`: see below.
+     - The schema test fails on any other definer function.
    - **Privileged maintenance is a function too.** Deleting audit rows (point 6) runs only through
      `apply_audit_retention(cutoff, batch_size)`, a definer function that enforces the 365-day floor itself. The
      runtime role has no `DELETE` on `audit_event`.
@@ -112,8 +130,8 @@ metrics); it must keep working without a general way around the policies.
 - **A runtime role with `BYPASSRLS` for jobs.** Simple for the jobs, but it is the general bypass this ADR removes;
   per-store binding and named functions give the jobs what they need.
 - **Only `SET LOCAL` per transaction.** Most `JdbcClient` reads run outside a transaction and would run without the
-  settings; they would see nothing (fail closed) but would not work. Checkout setting plus reset, with
-  transaction-local values inside transactions, covers both.
+  settings; they would see nothing (fail closed) but would not work. Setting the scope on checkout and before a
+  statement when it changed, and resetting it on return, covers both.
 - **One retention job that knows every table.** Spreads knowledge of other modules' tables into one place; module
   tasks keep each table with its owner.
 
@@ -126,19 +144,22 @@ metrics); it must keep working without a general way around the policies.
 - Every cross-store need is a reviewed definer function; jobs that used to read all stores in one query now
   iterate stores. That costs a few more queries per run, which is acceptable at pilot scale.
 - One extra statement per connection checkout and one per return.
-- Roles are cluster-wide, so environments sharing a cluster must use different role names (configuration).
+- Roles are cluster-wide. The role names are fixed, so each environment has its own database instance (ADR-0023).
+- A future data migration that must touch store rows adds a policy for the migrator in that migration and drops it
+  at the end, because the migrator is subject to the forced policies too.
 
 ## Implementation status
 
-The code on the pilot branch implements the first draft: migration V23 creates a `NOLOGIN` `operator_app` role
-switched per connection, owners are not forced, unbound jobs run as the owner and bypass RLS, and Flyway runs inside
-the application. After this revision is approved, a follow-up changes it. That follow-up:
+Implemented on the pilot branch with migration V25 (V23 and V24 unchanged):
+- the role bootstrap script and the three roles;
+- forced, fail-closed policies for the runtime role;
+- `StoreScopeBinding` and the statement-level scope in `RowSecurityDataSource`;
+- `SystemStoreRunner`, with the inbox, outbox, sync reconciliation and schedules, Meta polling, notification retry,
+  outcome observation and retention moved to per-store runs;
+- the three definer functions;
+- the migration step of ADR-0023.
 
-- Adds the bootstrap script and the two roles, and has migrations grant to `operator_runtime`.
-- Forces RLS and makes the policies fail-closed with `current_setting(..., true)`.
-- Moves the jobs to per-store binding and the definer functions.
-- Adds the reset and eviction in `RowSecurityDataSource` and the profile rule for `operator.row-security.enabled`.
-- Moves migrations to the separate step of ADR-0023.
+The full test suite connects as `operator_runtime`, and test fixtures write as the database superuser.
 
 ## Verification
 
@@ -150,8 +171,8 @@ the application. After this revision is approved, a follow-up changes it. That f
   - A failed reset evicts the connection, and the binding does not outlive a request, an activity or a system
     iteration.
   - Workflow tests run their activities under the binding.
-- Job tests: each per-store job processes two stores under their own bindings; the definer functions return only
-  counts or identifiers.
+- Job tests: the system runner processes two stores under their own bindings; the definer functions are exactly
+  the reviewed list, owned by `operator_system`, which cannot log in or create objects.
 - The full test suite runs connected as `operator_runtime` with RLS on.
 - Cipher tests: open with a previous key, reseal on open, unknown key refused.
 - Retention tests: each task removes or redacts only expired rows; the audit function and trigger refuse recent

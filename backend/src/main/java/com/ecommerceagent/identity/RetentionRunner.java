@@ -13,9 +13,10 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.stereotype.Component;
 
 /**
- * Runs every {@link RetentionTask} in batches and records one {@code RETENTION_APPLIED} audit entry per task that
- * changed rows (ADR-0022 point 5). {@link RetentionSchedule} calls it in the worker profile when
- * {@code operator.retention.enabled=true}. It runs without a store binding: retention walks all stores.
+ * Runs every {@link RetentionTask} store by store under the retention system scope (ADR-0022 points 4 and 6), in
+ * batches, and records one {@code RETENTION_APPLIED} audit entry per task and store that changed rows. Audit entries
+ * without a store are handled once more unbound. {@link RetentionSchedule} calls it in the worker profile when
+ * {@code operator.retention.enabled=true}.
  */
 @Component
 @EnableConfigurationProperties(RetentionSettings.class)
@@ -26,47 +27,72 @@ public class RetentionRunner {
 
     private final List<RetentionTask> tasks;
     private final RetentionSettings settings;
+    private final SystemStoreRunner stores;
+    private final AuditRetention auditRetention;
     private final AuditTrail audit;
     private final Clock clock;
 
-    RetentionRunner(List<RetentionTask> tasks, RetentionSettings settings, AuditTrail audit, Clock clock) {
+    RetentionRunner(List<RetentionTask> tasks, RetentionSettings settings, SystemStoreRunner stores,
+            AuditRetention auditRetention, AuditTrail audit, Clock clock) {
         this.tasks = tasks;
         this.settings = settings;
+        this.stores = stores;
+        this.auditRetention = auditRetention;
         this.audit = audit;
         this.clock = clock;
     }
 
-    /** Applies every task once; returns the changed rows per task. */
+    /** Applies every task once to every store; returns the changed rows per task over all stores. */
     public Map<String, Integer> runAll() {
         Map<String, Integer> changed = new LinkedHashMap<>();
-        for (RetentionTask task : tasks) {
-            Duration period = settings.periods().get(task.name());
-            if (period == null) {
-                log.warn("Retention task {} has no period in operator.retention.periods and is skipped", task.name());
-                continue;
+        Instant now = clock.instant();
+        stores.forEachStore(SERVICE, scope -> {
+            for (RetentionTask task : tasks) {
+                Duration period = settings.periods().get(task.name());
+                if (period == null) {
+                    log.warn("Retention task {} has no period in operator.retention.periods and is skipped",
+                            task.name());
+                    continue;
+                }
+                Instant cutoff = now.minus(period);
+                try {
+                    int rows = run(batch -> task.apply(scope, cutoff, batch));
+                    changed.merge(task.name(), rows, Integer::sum);
+                    if (rows > 0) {
+                        audit.record(AuditEntry.inScope(scope, "RETENTION_APPLIED", "retention_task", task.name(),
+                                Map.of("rows", Integer.toString(rows), "cutoff", cutoff.toString())));
+                    }
+                } catch (RuntimeException e) {
+                    log.error("Retention task {} failed for store {}", task.name(), scope.storeId(), e);
+                }
             }
-            Instant cutoff = clock.instant().minus(period);
+        });
+        Duration auditPeriod = settings.periods().get(auditRetention.name());
+        if (auditPeriod != null) {
             try {
-                changed.put(task.name(), run(task, cutoff));
+                Instant cutoff = now.minus(auditPeriod);
+                int rows = run(batch -> auditRetention.applyWithoutStore(cutoff, batch));
+                changed.merge(auditRetention.name(), rows, Integer::sum);
+                if (rows > 0) {
+                    audit.record(new AuditEntry("RETENTION_APPLIED", null, null, null, SERVICE, "retention_task",
+                            auditRetention.name() + ":without-store",
+                            Map.of("rows", Integer.toString(rows), "cutoff", cutoff.toString())));
+                }
             } catch (RuntimeException e) {
-                log.error("Retention task {} failed", task.name(), e);
+                log.error("Retention of audit entries without a store failed", e);
             }
         }
         return changed;
     }
 
-    private int run(RetentionTask task, Instant cutoff) {
+    private int run(java.util.function.IntUnaryOperator batch) {
         int total = 0;
-        for (int batch = 0; batch < settings.maxBatches(); batch++) {
-            int rows = task.apply(cutoff, settings.batchSize());
+        for (int i = 0; i < settings.maxBatches(); i++) {
+            int rows = batch.applyAsInt(settings.batchSize());
             total += rows;
             if (rows < settings.batchSize()) {
                 break;
             }
-        }
-        if (total > 0) {
-            audit.record(new AuditEntry("RETENTION_APPLIED", null, null, null, SERVICE, "retention_task",
-                    task.name(), Map.of("rows", Integer.toString(total), "cutoff", cutoff.toString())));
         }
         return total;
     }

@@ -52,6 +52,19 @@ public class CloudConfigurationCheck implements ApplicationListener<ApplicationE
         if (key == null || key.isBlank()) {
             problems.add("operator.integration.secrets-key is required");
         }
+        // ADR-0022/0023: the API and the worker never migrate and never hold the migration credentials.
+        if (!"false".equalsIgnoreCase(value(environment, "spring.flyway.enabled"))) {
+            problems.add("spring.flyway.enabled must be false; migrations run in the separate migration step");
+        }
+        for (String variable : List.of("DB_MIGRATION_USERNAME", "DB_MIGRATION_PASSWORD")) {
+            String present = value(environment, variable);
+            if (present != null && !present.isBlank()) {
+                problems.add(variable + " must not be given to the API or the worker");
+            }
+        }
+        if ("false".equalsIgnoreCase(value(environment, "operator.row-security.enabled"))) {
+            problems.add("operator.row-security.enabled cannot be switched off");
+        }
         return problems;
     }
 

@@ -4,6 +4,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 
 import com.ecommerceagent.identity.RetentionTask;
+import com.ecommerceagent.identity.TrustedStoreScope;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -21,7 +22,8 @@ class IntegrationRetention {
         return new Task("webhook-inbox", jdbc, """
                 DELETE FROM webhook_inbox
                 WHERE id IN (SELECT id FROM webhook_inbox
-                             WHERE status <> 'RECEIVED' AND received_at < :cutoff LIMIT :batch)
+                             WHERE organization_id = :organizationId AND store_id = :storeId
+                               AND status <> 'RECEIVED' AND received_at < :cutoff LIMIT :batch)
                 """);
     }
 
@@ -30,15 +32,17 @@ class IntegrationRetention {
         return new Task("outbox", jdbc, """
                 DELETE FROM outbox_event
                 WHERE id IN (SELECT id FROM outbox_event
-                             WHERE dispatched_at IS NOT NULL AND dispatched_at < :cutoff LIMIT :batch)
+                             WHERE organization_id = :organizationId AND store_id = :storeId
+                               AND dispatched_at IS NOT NULL AND dispatched_at < :cutoff LIMIT :batch)
                 """);
     }
 
     private record Task(String name, JdbcClient jdbc, String sql) implements RetentionTask {
 
         @Override
-        public int apply(Instant cutoff, int batchSize) {
-            return jdbc.sql(sql).param("cutoff", Timestamp.from(cutoff)).param("batch", batchSize).update();
+        public int apply(TrustedStoreScope scope, Instant cutoff, int batchSize) {
+            return jdbc.sql(sql).param("organizationId", scope.organizationId()).param("storeId", scope.storeId())
+                    .param("cutoff", Timestamp.from(cutoff)).param("batch", batchSize).update();
         }
     }
 }

@@ -4,7 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
 
-import com.ecommerceagent.identity.StoreAccess;
+import com.ecommerceagent.identity.SystemStoreRunner;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.integration.SyncRunDispatch;
 import com.ecommerceagent.integration.SyncRunStatus;
@@ -38,39 +38,37 @@ public class SyncRunReconciler {
     private static final Logger log = LoggerFactory.getLogger(SyncRunReconciler.class);
 
     private final WooCommerceImport woo;
-    private final StoreAccess storeAccess;
+    private final SystemStoreRunner stores;
     private final ImportWorkflowStarter starter;
     private final SyncProperties properties;
     private final Clock clock;
 
-    SyncRunReconciler(WooCommerceImport woo, StoreAccess storeAccess, ImportWorkflowStarter starter,
+    SyncRunReconciler(WooCommerceImport woo, SystemStoreRunner stores, ImportWorkflowStarter starter,
             SyncProperties properties, Clock clock) {
         this.woo = woo;
-        this.storeAccess = storeAccess;
+        this.stores = stores;
         this.starter = starter;
         this.properties = properties;
         this.clock = clock;
     }
 
-    /** One pass over the running runs; a failure on one run does not stop the others. */
+    /**
+     * One pass over the running runs, store by store under the import service's scope (ADR-0022 point 4); a
+     * failure on one run does not stop the others.
+     */
     public void reconcile() {
-        for (SyncRunDispatch run : woo.runningRuns(properties.batchSize())) {
-            try {
-                reconcile(run);
-            } catch (RuntimeException e) {
-                log.warn("Reconciliation of import run {} failed; next pass retries", run.runId(), e);
+        stores.forEachStore(StoreSync.IMPORT_SERVICE, system -> {
+            for (SyncRunDispatch run : woo.runningRuns(system, properties.batchSize())) {
+                try {
+                    reconcile(system, run);
+                } catch (RuntimeException e) {
+                    log.warn("Reconciliation of import run {} failed; next pass retries", run.runId(), e);
+                }
             }
-        }
+        });
     }
 
-    private void reconcile(SyncRunDispatch run) {
-        // The scope comes from the run record; the store must still exist for the system actor.
-        Optional<TrustedStoreScope> scope = storeAccess.systemScope(StoreSync.IMPORT_SERVICE, run.organizationId(),
-                run.storeId());
-        if (scope.isEmpty()) {
-            return;
-        }
-        TrustedStoreScope system = scope.get();
+    private void reconcile(TrustedStoreScope system, SyncRunDispatch run) {
         if (run.workflowStarted()) {
             closeIfEnded(system, run);
             return;

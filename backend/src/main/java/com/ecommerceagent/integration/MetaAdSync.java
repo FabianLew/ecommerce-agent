@@ -5,12 +5,13 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.ecommerceagent.commerce.AdData;
 import com.ecommerceagent.commerce.AdRepository;
 import com.ecommerceagent.commerce.AdSource;
 import com.ecommerceagent.commerce.AdStatus;
-import com.ecommerceagent.identity.StoreAccess;
+import com.ecommerceagent.identity.SystemStoreRunner;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.integration.meta.MetaAd;
 import com.ecommerceagent.integration.meta.MetaApiException;
@@ -35,32 +36,31 @@ public class MetaAdSync {
     private final MetaConnections connections;
     private final MetaGraphClient client;
     private final AdRepository ads;
-    private final StoreAccess storeAccess;
+    private final SystemStoreRunner stores;
     private final MetaProperties properties;
     private final Clock clock;
 
     MetaAdSync(MetaConnectionRepository repository, MetaConnections connections, MetaGraphClient client,
-            AdRepository ads, StoreAccess storeAccess, MetaProperties properties, Clock clock) {
+            AdRepository ads, SystemStoreRunner stores, MetaProperties properties, Clock clock) {
         this.repository = repository;
         this.connections = connections;
         this.client = client;
         this.ads = ads;
-        this.storeAccess = storeAccess;
+        this.stores = stores;
         this.properties = properties;
         this.clock = clock;
     }
 
     /** Polls every connected account that is due; returns how many were polled. */
     public int syncDue() {
-        int polled = 0;
-        for (MetaConnectionRepository.DueConnection due : repository.due(clock.instant(), BATCH)) {
-            Optional<TrustedStoreScope> scope = storeAccess.systemScope(SERVICE, due.organizationId(), due.storeId());
-            if (scope.isPresent()) {
-                sync(scope.get());
-                polled++;
+        AtomicInteger polled = new AtomicInteger();
+        stores.forEachStore(SERVICE, scope -> {
+            if (!repository.due(scope, clock.instant(), BATCH).isEmpty()) {
+                sync(scope);
+                polled.incrementAndGet();
             }
-        }
-        return polled;
+        });
+        return polled.get();
     }
 
     /** Reads all ads of the store's connected account; returns the number upserted. */

@@ -59,9 +59,9 @@ public class WooIncrementalSync {
         this.clock = clock;
     }
 
-    /** Connections that need schedules: connected and imported (worker side). */
-    public List<SyncTarget> targets() {
-        return state.syncTargets();
+    /** Connections of the store that need schedules: connected and imported (worker side). */
+    public List<SyncTarget> targets(TrustedStoreScope scope) {
+        return state.syncTargets(scope);
     }
 
     /** Reads products and variations changed since the watermark and records them as fresh reads. */

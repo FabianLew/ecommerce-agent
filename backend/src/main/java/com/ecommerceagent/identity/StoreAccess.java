@@ -65,6 +65,18 @@ public class StoreAccess {
     }
 
     /**
+     * System scopes of every store, for a job that does its work store by store under row-level security
+     * (ADR-0022 point 4). Use {@link SystemStoreRunner} to bind each one.
+     */
+    public List<TrustedStoreScope> systemScopes(String service) {
+        SystemActor actor = new SystemActor(service);
+        return jdbc.sql("SELECT id, organization_id FROM store ORDER BY organization_id, id")
+                .query((rs, row) -> new TrustedStoreScope(rs.getObject("organization_id", UUID.class),
+                        rs.getObject("id", UUID.class), actor, Set.of(), SYSTEM_PERMISSIONS))
+                .list();
+    }
+
+    /**
      * Re-checks the actor against the database right before a sensitive operation and returns a fresh
      * scope. A scope or approval created earlier never outlives a revoked membership or a changed role.
      *

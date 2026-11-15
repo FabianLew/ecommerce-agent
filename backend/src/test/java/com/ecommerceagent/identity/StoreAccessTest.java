@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.UUID;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.identity.Actor.SystemActor;
 import com.ecommerceagent.identity.Actor.UserActor;
@@ -13,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 
 /**
  * Runtime safety (ADR-0004): scopes come only from the trusted factory, carry the actor kind and
@@ -33,7 +33,7 @@ class StoreAccessTest {
     StoreAccess storeAccess;
 
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
 
     @BeforeEach
     void tenants() {

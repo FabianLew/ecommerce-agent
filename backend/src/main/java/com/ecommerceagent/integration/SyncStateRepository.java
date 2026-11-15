@@ -161,14 +161,17 @@ class SyncStateRepository {
      * Connections that need polling schedules: connected, with a successful initial import (worker side,
      * across stores). The store ids are used only to build a verified system scope.
      */
-    List<SyncTarget> syncTargets() {
+    List<SyncTarget> syncTargets(TrustedStoreScope scope) {
         return jdbc.sql("""
                         SELECT c.id, c.organization_id, c.store_id FROM integration_connection c
-                        WHERE c.status = 'CONNECTED'
+                        WHERE c.organization_id = :organizationId AND c.store_id = :storeId
+                          AND c.status = 'CONNECTED'
                           AND EXISTS (SELECT 1 FROM sync_run r WHERE r.connection_id = c.id
                                       AND r.kind = 'INITIAL_IMPORT' AND r.status = 'SUCCEEDED')
                         ORDER BY c.id
                         """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
                 .query((rs, n) -> new SyncTarget(rs.getObject("id", UUID.class),
                         rs.getObject("organization_id", UUID.class), rs.getObject("store_id", UUID.class)))
                 .list();

@@ -8,9 +8,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.ecommerceagent.identity.RegisteredUser;
 import com.ecommerceagent.identity.StoreAccess;
+import com.ecommerceagent.identity.SystemStoreRunner;
 import com.ecommerceagent.identity.StorePermission;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.metrics.CanonicalJson;
@@ -42,16 +44,18 @@ public class OperatorNotifier {
             n.created_at""";
 
     private final StoreAccess storeAccess;
+    private final SystemStoreRunner stores;
     private final MailProvider mail;
     private final NotificationSettings settings;
     private final JdbcClient jdbc;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
-    OperatorNotifier(StoreAccess storeAccess, MailProvider mail, NotificationSettings settings, JdbcClient jdbc,
+    OperatorNotifier(StoreAccess storeAccess, SystemStoreRunner stores, MailProvider mail, NotificationSettings settings, JdbcClient jdbc,
             TransactionTemplate transactions, Clock clock, MeterRegistry meters) {
         this.meters = meters;
         this.storeAccess = storeAccess;
+        this.stores = stores;
         this.mail = mail;
         this.settings = settings;
         this.jdbc = jdbc;
@@ -184,25 +188,30 @@ public class OperatorNotifier {
      * failed. Runs as a system actor of each store: it only sends what was stored, it changes nothing else.
      */
     public int retryOpen(int limit) {
-        List<UUID[]> open = jdbc.sql("""
-                        SELECT DISTINCT organization_id, store_id, notification_id FROM notification_delivery
-                        WHERE (status IN ('PENDING', 'FAILED') OR (status = 'SENDING' AND claimed_until < :now))
+        AtomicInteger failed = new AtomicInteger();
+        stores.forEachStore(SWEEP, scope -> failed.addAndGet(retryOpen(scope, limit)));
+        return failed.get();
+    }
+
+    private int retryOpen(TrustedStoreScope scope, int limit) {
+        List<UUID> open = jdbc.sql("""
+                        SELECT DISTINCT notification_id FROM notification_delivery
+                        WHERE organization_id = :organizationId AND store_id = :storeId
+                          AND (status IN ('PENDING', 'FAILED') OR (status = 'SENDING' AND claimed_until < :now))
                           AND attempts < :max AND updated_at <= :due
                         LIMIT :limit
                         """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
                 .param("now", Timestamp.from(clock.instant()))
                 .param("max", settings.maxAttempts())
                 .param("due", Timestamp.from(clock.instant().minus(settings.retryInterval())))
                 .param("limit", limit)
-                .query((rs, n) -> new UUID[] {rs.getObject("organization_id", UUID.class),
-                        rs.getObject("store_id", UUID.class), rs.getObject("notification_id", UUID.class)})
+                .query(UUID.class)
                 .list();
         int failed = 0;
-        for (UUID[] row : open) {
-            Optional<TrustedStoreScope> scope = storeAccess.systemScope(SWEEP, row[0], row[1]);
-            if (scope.isPresent()) {
-                failed += deliver(scope.get(), row[2]);
-            }
+        for (UUID notificationId : open) {
+            failed += deliver(scope, notificationId);
         }
         return failed;
     }

@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.commerce.Backorders;
 import com.ecommerceagent.commerce.CatalogRepository;
@@ -28,7 +29,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
@@ -61,7 +61,7 @@ class EvidenceTest {
     @Autowired
     StoreAccess storeAccess;
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
 
     TrustedStoreScope scopeA;
     TrustedStoreScope scopeB;

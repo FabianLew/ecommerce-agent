@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.ecommerceagent.commerce.CommerceSource;
 import com.ecommerceagent.commerce.InventoryObservation;
@@ -22,6 +23,7 @@ import com.ecommerceagent.decisions.OpportunitySubject;
 import com.ecommerceagent.identity.AuditEntry;
 import com.ecommerceagent.identity.AuditTrail;
 import com.ecommerceagent.identity.StoreAccess;
+import com.ecommerceagent.identity.SystemStoreRunner;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.integration.MetaAdActions;
 import com.ecommerceagent.metrics.CanonicalJson;
@@ -97,6 +99,7 @@ public class ActionOutcomes {
     private final InventoryRepository inventory;
     private final OrderRepository orders;
     private final StoreAccess storeAccess;
+    private final SystemStoreRunner stores;
     private final AuditTrail audit;
     private final JdbcClient jdbc;
     private final TransactionTemplate transactions;
@@ -104,7 +107,7 @@ public class ActionOutcomes {
 
     ActionOutcomes(ExecutionLedger ledger, ExecutionAuthority authority, DecisionProposals proposals,
             Opportunities opportunities, MetaAdActions meta, InventoryRepository inventory, OrderRepository orders,
-            StoreAccess storeAccess, AuditTrail audit, JdbcClient jdbc, TransactionTemplate transactions,
+            StoreAccess storeAccess, SystemStoreRunner stores, AuditTrail audit, JdbcClient jdbc, TransactionTemplate transactions,
             Clock clock, MeterRegistry meters) {
         this.meters = meters;
         this.ledger = ledger;
@@ -115,6 +118,7 @@ public class ActionOutcomes {
         this.inventory = inventory;
         this.orders = orders;
         this.storeAccess = storeAccess;
+        this.stores = stores;
         this.audit = audit;
         this.jdbc = jdbc;
         this.transactions = transactions;
@@ -241,14 +245,23 @@ public class ActionOutcomes {
      * verification, with the limitations that keep it from being read as proof.
      */
     public int observeDue(int limit) {
+        AtomicInteger observed = new AtomicInteger();
+        stores.forEachStore(SERVICE, scope -> observed.addAndGet(observeDue(scope, limit)));
+        return observed.get();
+    }
+
+    private int observeDue(TrustedStoreScope scope, int limit) {
         List<Object[]> due = jdbc.sql("""
                         SELECT o.organization_id, o.store_id, o.id, o.checkpoint, o.due_at, a.variant_id, a.verified_at
                         FROM outcome_observation o
                         JOIN action_outcome a ON a.id = o.outcome_id AND a.store_id = o.store_id
-                        WHERE o.status = 'PENDING' AND o.due_at <= :now
+                        WHERE o.organization_id = :organizationId AND o.store_id = :storeId
+                          AND o.status = 'PENDING' AND o.due_at <= :now
                         ORDER BY o.due_at
                         LIMIT :limit
                         """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
                 .param("now", Timestamp.from(clock.instant()))
                 .param("limit", limit)
                 .query((rs, n) -> new Object[] {rs.getObject("organization_id", UUID.class),
@@ -258,11 +271,8 @@ public class ActionOutcomes {
                 .list();
         int observed = 0;
         for (Object[] row : due) {
-            Optional<TrustedStoreScope> scope = storeAccess.systemScope(SERVICE, (UUID) row[0], (UUID) row[1]);
-            if (scope.isPresent()) {
-                observe(scope.get(), (UUID) row[2], (Instant) row[6], (Instant) row[4], (UUID) row[5]);
-                observed++;
-            }
+            observe(scope, (UUID) row[2], (Instant) row[6], (Instant) row[4], (UUID) row[5]);
+            observed++;
         }
         return observed;
     }

@@ -20,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.automation.StoreSync;
 import com.ecommerceagent.commerce.CatalogRepository;
@@ -50,7 +51,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
@@ -90,7 +90,7 @@ class WooImportTest {
     @Autowired
     OrderRepository orders;
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
     @Autowired
     Clock clock;
 
