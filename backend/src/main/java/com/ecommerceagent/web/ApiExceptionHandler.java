@@ -3,6 +3,7 @@ package com.ecommerceagent.web;
 import java.util.List;
 
 import com.ecommerceagent.automation.OnboardingConflictException;
+import com.ecommerceagent.automation.execution.ActionPermissionException;
 import com.ecommerceagent.automation.execution.MutationStopException;
 import com.ecommerceagent.automation.guardian.ApprovalException;
 import com.ecommerceagent.businessprofile.BusinessProfileException;
@@ -101,6 +102,25 @@ class ApiExceptionHandler {
                     "The stop was changed by someone else. Reload it and try again.", false);
             case PRECONDITION_REQUIRED -> error(request, HttpStatus.PRECONDITION_REQUIRED, exception.code(),
                     "Reload the stop and try again.", false);
+        };
+    }
+
+    @ExceptionHandler(ActionPermissionException.class)
+    ResponseEntity<ApiError> actionPermission(ActionPermissionException exception, HttpServletRequest request) {
+        return switch (exception.kind()) {
+            case INVALID -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(new ApiError(
+                    "VALIDATION_FAILED", "Correct the highlighted fields.",
+                    List.of(new ApiError.FieldError(exception.code().startsWith("LEVEL") ? "level" : "reason",
+                            exception.code(), exception.getMessage())), false,
+                    RequestCorrelationFilter.requestId(request), null));
+            case NOT_FOUND -> error(request, HttpStatus.NOT_FOUND, exception.code(),
+                    "The resource does not exist or is not available.", false);
+            case CONFLICT -> error(request, HttpStatus.CONFLICT, exception.code(),
+                    "The store is not ready for this level yet.", false);
+            case PRECONDITION_FAILED -> error(request, HttpStatus.PRECONDITION_FAILED, exception.code(),
+                    "The permission was changed by someone else. Reload it and try again.", false);
+            case PRECONDITION_REQUIRED -> error(request, HttpStatus.PRECONDITION_REQUIRED, exception.code(),
+                    "Reload the permission and try again.", false);
         };
     }
 

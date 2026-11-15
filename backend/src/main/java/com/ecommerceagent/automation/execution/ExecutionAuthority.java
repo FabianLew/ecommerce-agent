@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.ecommerceagent.automation.Onboarding;
 import com.ecommerceagent.automation.guardian.DecisionApprovals;
 import com.ecommerceagent.automation.guardian.PolicyEvaluation;
 import com.ecommerceagent.automation.guardian.PolicyEvaluations;
@@ -69,18 +68,16 @@ public class ExecutionAuthority {
     private final StoreAccess storeAccess;
     private final MetaConnections meta;
     private final AdRepository ads;
-    private final MutationStops stops;
+    private final ActionPermissions permissions;
     private final ExecutionSettings settings;
     private final AuditTrail audit;
     private final JdbcClient jdbc;
     private final Clock clock;
-    private final Onboarding onboarding;
 
     ExecutionAuthority(DecisionApprovals approvals, DecisionProposals proposals, Opportunities opportunities,
             InventoryContextBuilder contexts, PolicyEvaluations evaluations, StoreAccess storeAccess,
-            MetaConnections meta, AdRepository ads, MutationStops stops, ExecutionSettings settings,
-            AuditTrail audit, JdbcClient jdbc, Clock clock, Onboarding onboarding) {
-        this.onboarding = onboarding;
+            MetaConnections meta, AdRepository ads, ActionPermissions permissions, ExecutionSettings settings,
+            AuditTrail audit, JdbcClient jdbc, Clock clock) {
         this.approvals = approvals;
         this.proposals = proposals;
         this.opportunities = opportunities;
@@ -89,7 +86,7 @@ public class ExecutionAuthority {
         this.storeAccess = storeAccess;
         this.meta = meta;
         this.ads = ads;
-        this.stops = stops;
+        this.permissions = permissions;
         this.settings = settings;
         this.audit = audit;
         this.jdbc = jdbc;
@@ -110,12 +107,11 @@ public class ExecutionAuthority {
         if (!now.isBefore(approval.expiresAt())) {
             return Authorization.refused("APPROVAL_EXPIRED");
         }
-        Optional<String> stopped = stops.blocker(scope);
-        if (stopped.isPresent()) {
-            return Authorization.refused(stopped.get());
-        }
-        if (!onboarding.monitoringStarted(scope)) {
-            return Authorization.refused(Onboarding.MONITORING_NOT_STARTED);
+        // The effective level right before issuing (ADR-0025 point 4): a level lowered after the approval, the
+        // deployment ceiling, the Meta connection, a stop or a missing monitoring start all refuse here.
+        Optional<String> level = permissions.effective(scope, ActionPermissions.PAUSE_AD).refusal();
+        if (level.isPresent()) {
+            return Authorization.refused(level.get());
         }
         // The approval is the person's: it holds only while they may still approve in this store (ADR-0004).
         boolean stillAllowed = storeAccess.scopeFor(approval.decidedBy(), scope.storeId())

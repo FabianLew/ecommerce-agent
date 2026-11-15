@@ -1,6 +1,67 @@
 {
   "components" : {
     "schemas" : {
+      "ActionPermissionRequest" : {
+        "properties" : {
+          "level" : {
+            "enum" : [ "OFF", "PROPOSE_ONLY", "APPROVAL_REQUIRED" ],
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Required when raising the level, at most 500 characters",
+            "type" : "string"
+          }
+        },
+        "required" : [ "level" ],
+        "type" : "object"
+      },
+      "ActionPermissionResponse" : {
+        "properties" : {
+          "actionType" : {
+            "type" : "string"
+          },
+          "canLower" : {
+            "type" : "boolean"
+          },
+          "canRaise" : {
+            "type" : "boolean"
+          },
+          "caps" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CapResponse"
+            },
+            "type" : "array"
+          },
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changedBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "effectiveLevel" : {
+            "description" : "The lowest of the store's level and every cap",
+            "enum" : [ "OFF", "PROPOSE_ONLY", "APPROVAL_REQUIRED" ],
+            "type" : "string"
+          },
+          "level" : {
+            "description" : "The store's own level",
+            "enum" : [ "OFF", "PROPOSE_ONLY", "APPROVAL_REQUIRED" ],
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "version" : {
+            "description" : "0 until the first change",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "actionType", "canLower", "canRaise", "caps", "effectiveLevel", "level", "version" ],
+        "type" : "object"
+      },
       "ActionRef" : {
         "properties" : {
           "desiredStatus" : {
@@ -269,6 +330,23 @@
           }
         },
         "required" : [ "kind" ],
+        "type" : "object"
+      },
+      "CapResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "level" : {
+            "enum" : [ "OFF", "PROPOSE_ONLY", "APPROVAL_REQUIRED" ],
+            "type" : "string"
+          },
+          "source" : {
+            "enum" : [ "MONITORING", "STORE", "DEPLOYMENT", "META", "MUTATION_STOP" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "code", "level", "source" ],
         "type" : "object"
       },
       "CheckRef" : {
@@ -1536,8 +1614,16 @@
       "MonitoringResponse" : {
         "properties" : {
           "ads" : {
-            "enum" : [ "NONE", "PROPOSALS_ONLY", "APPROVAL_REQUIRED" ],
+            "description" : "Effective level of ad pauses for the store (ADR-0025 point 3)",
+            "enum" : [ "OFF", "PROPOSE_ONLY", "APPROVAL_REQUIRED" ],
             "type" : "string"
+          },
+          "adsCaps" : {
+            "description" : "Each source that keeps ad pauses below APPROVAL_REQUIRED",
+            "items" : {
+              "$ref" : "#/components/schemas/CapResponse"
+            },
+            "type" : "array"
           },
           "startedAt" : {
             "format" : "date-time",
@@ -1548,7 +1634,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "ads" ],
+        "required" : [ "ads", "adsCaps" ],
         "type" : "object"
       },
       "MonitoringStartRequest" : {
@@ -2607,6 +2693,149 @@
           }
         },
         "tags" : [ "identity-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/action-permissions/{actionType}" : {
+      "get" : {
+        "operationId" : "actionPermission",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "actionType",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ActionPermissionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "action-permission-controller" ]
+      },
+      "put" : {
+        "operationId" : "changeActionPermission",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "actionType",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ActionPermissionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ActionPermissionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "action-permission-controller" ]
       }
     },
     "/api/v1/stores/{storeId}/activities" : {

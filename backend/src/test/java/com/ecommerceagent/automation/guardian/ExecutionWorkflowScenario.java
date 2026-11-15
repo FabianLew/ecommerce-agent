@@ -148,12 +148,17 @@ abstract class ExecutionWorkflowScenario {
                 + "'o@shop.test')").param(OWNER).update();
         jdbc.sql("INSERT INTO store_membership (organization_id, store_id, user_id, role) VALUES (?, ?, ?, 'OWNER')")
                 .params(ORG, STORE, OWNER).update();
-        // ADR-0025: execution needs the store's monitoring start; tests of the gate remove it.
+        // ADR-0025: execution needs the monitoring start and the store's PAUSE_AD level; gate tests remove them.
         jdbc.sql("""
                 INSERT INTO onboarding_progress (store_id, organization_id, current_step, updated_at,
                                                  monitoring_started_at)
                 VALUES (?, ?, 'START_MONITORING', now(), now())
                 """).params(STORE, ORG).update();
+        jdbc.sql("""
+                INSERT INTO store_action_permission (store_id, organization_id, action_type, level, reason, version,
+                                                     changed_by, changed_at)
+                VALUES (?, ?, 'PAUSE_AD', 'APPROVAL_REQUIRED', 'test', 1, ?, now())
+                """).params(STORE, ORG, OWNER).update();
         scope = storeAccess.systemScope(EventDispatch.SYNC_SERVICE, ORG, STORE).orElseThrow();
         Instant now = clock.instant();
 

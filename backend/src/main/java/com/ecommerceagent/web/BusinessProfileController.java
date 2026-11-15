@@ -11,6 +11,8 @@ import com.ecommerceagent.automation.Onboarding.DomainState;
 import com.ecommerceagent.automation.Onboarding.OnboardingState;
 import com.ecommerceagent.automation.Onboarding.Step;
 import com.ecommerceagent.automation.Onboarding.StepState;
+import com.ecommerceagent.automation.execution.ActionLevel;
+import com.ecommerceagent.automation.execution.ActionPermissions;
 import com.ecommerceagent.businessprofile.BusinessProfile;
 import com.ecommerceagent.businessprofile.BusinessProfiles;
 import com.ecommerceagent.businessprofile.BusinessProfiles.ProfileState;
@@ -39,10 +41,12 @@ class BusinessProfileController {
 
     private final BusinessProfiles profiles;
     private final Onboarding onboarding;
+    private final ActionPermissions permissions;
 
-    BusinessProfileController(BusinessProfiles profiles, Onboarding onboarding) {
+    BusinessProfileController(BusinessProfiles profiles, Onboarding onboarding, ActionPermissions permissions) {
         this.profiles = profiles;
         this.onboarding = onboarding;
+        this.permissions = permissions;
     }
 
     @GetMapping("/business-profile")
@@ -74,13 +78,13 @@ class BusinessProfileController {
 
     @GetMapping("/onboarding")
     OnboardingResponse onboarding(TrustedStoreScope scope) {
-        return OnboardingResponse.from(onboarding.state(scope), scope);
+        return respond(onboarding.state(scope), scope);
     }
 
     @PatchMapping("/onboarding")
     OnboardingResponse updateOnboarding(@RequiresPermission(StorePermission.STORE_MANAGE) TrustedStoreScope scope,
             @RequestBody OnboardingRequest request) {
-        return OnboardingResponse.from(onboarding.update(scope, request.currentStep(), request.acknowledgements(),
+        return respond(onboarding.update(scope, request.currentStep(), request.acknowledgements(),
                 request.expectedVersion()), scope);
     }
 
@@ -88,7 +92,11 @@ class BusinessProfileController {
     @PostMapping("/onboarding/monitoring-start")
     OnboardingResponse startMonitoring(@RequiresPermission(StorePermission.STORE_MANAGE) TrustedStoreScope scope,
             @RequestBody MonitoringStartRequest request) {
-        return OnboardingResponse.from(onboarding.startMonitoring(scope, request.expectedVersion()), scope);
+        return respond(onboarding.startMonitoring(scope, request.expectedVersion()), scope);
+    }
+
+    private OnboardingResponse respond(OnboardingState state, TrustedStoreScope scope) {
+        return OnboardingResponse.from(state, permissions.effective(scope, ActionPermissions.PAUSE_AD), scope);
     }
 
     record MonitoringStartRequest(
@@ -99,7 +107,11 @@ class BusinessProfileController {
     record MonitoringResponse(
             Instant startedAt,
             UUID startedBy,
-            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Onboarding.AdsScope ads) {
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED,
+                    description = "Effective level of ad pauses for the store (ADR-0025 point 3)") ActionLevel ads,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED,
+                    description = "Each source that keeps ad pauses below APPROVAL_REQUIRED")
+            List<ActionPermissionController.CapResponse> adsCaps) {
     }
 
     record DraftRequest(Goal goal, Integer planningHorizonDays, RiskPreference riskPreference, TaxBasis taxBasis,
@@ -184,14 +196,15 @@ class BusinessProfileController {
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) MonitoringResponse monitoring,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean canEdit) {
 
-        static OnboardingResponse from(OnboardingState state, TrustedStoreScope scope) {
+        static OnboardingResponse from(OnboardingState state, ActionPermissions.Effective ads,
+                TrustedStoreScope scope) {
             return new OnboardingResponse(state.currentStep(), state.nextStep(),
                     state.steps().stream().map(s -> new StepResponse(s.step(), s.complete(), s.blockers())).toList(),
                     state.domains().stream().map((DomainState d) -> new DomainResponse(d.domain(), d.readiness(),
                             d.detail())).toList(),
                     state.acknowledgements().stream().sorted().toList(), state.version(),
                     new MonitoringResponse(state.monitoring().startedAt(), state.monitoring().startedBy(),
-                            state.monitoring().ads()),
+                            ads.level(), ActionPermissionController.CapResponse.of(ads)),
                     scope.has(StorePermission.STORE_MANAGE));
         }
     }

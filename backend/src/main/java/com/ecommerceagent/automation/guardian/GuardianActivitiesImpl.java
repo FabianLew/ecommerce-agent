@@ -8,6 +8,7 @@ import java.util.UUID;
 import com.ecommerceagent.automation.TaskQueues;
 import com.ecommerceagent.automation.temporal.ActivityStoreScope;
 import com.ecommerceagent.automation.execution.ActionOutcomes;
+import com.ecommerceagent.automation.execution.ActionPermissions;
 import com.ecommerceagent.automation.execution.AdPauseExecutor;
 import com.ecommerceagent.automation.execution.ExecutionAuthority;
 import com.ecommerceagent.automation.execution.ExecutionLedger;
@@ -46,7 +47,7 @@ public class GuardianActivitiesImpl implements GuardianActivities {
     private final DecisionProposals proposals;
     private final PolicyEvaluations policies;
     private final GuardianSettings settings;
-    private final InventoryProtectionPolicy policy;
+    private final ActionPermissions permissions;
     private final DecisionApprovals approvals;
     private final ExecutionAuthority authority;
     private final AdPauseExecutor executor;
@@ -58,7 +59,7 @@ public class GuardianActivitiesImpl implements GuardianActivities {
 
     GuardianActivitiesImpl(Opportunities opportunities, InventoryContextBuilder contexts, ContextSnapshots snapshots,
             BaselineProposer baseline, InventoryAgentProposer agent, DecisionProposals proposals,
-            PolicyEvaluations policies, GuardianSettings settings, InventoryProtectionPolicy policy,
+            PolicyEvaluations policies, GuardianSettings settings, ActionPermissions permissions,
             DecisionApprovals approvals, ExecutionAuthority authority, AdPauseExecutor executor, ExecutionLedger ledger,
             ActionOutcomes outcomes, GuardianNotifications notifications, TransactionTemplate transactions,
             Clock clock) {
@@ -70,7 +71,7 @@ public class GuardianActivitiesImpl implements GuardianActivities {
         this.proposals = proposals;
         this.policies = policies;
         this.settings = settings;
-        this.policy = policy;
+        this.permissions = permissions;
         this.approvals = approvals;
         this.authority = authority;
         this.executor = executor;
@@ -173,7 +174,9 @@ public class GuardianActivitiesImpl implements GuardianActivities {
 
     @Override
     public boolean awaitsApproval(String proposalId) {
-        if (policy.mode() != InventoryProtectionPolicy.Mode.EXECUTE_ON_APPROVAL) {
+        // Only a proposal the store and the deployment let a person decide is put to one (ADR-0025 point 3).
+        if (permissions.effective(ActivityStoreScope.current(), ActionPermissions.PAUSE_AD)
+                .refusal(ActionPermissions.DECIDABLE).isPresent()) {
             return false;
         }
         return policies.latest(ActivityStoreScope.current(), UUID.fromString(proposalId))

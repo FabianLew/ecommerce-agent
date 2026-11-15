@@ -116,6 +116,8 @@ abstract class DecisionScenario {
 
     UUID store;
     UUID otherStore;
+    /** A writable Meta connection: approving needs it (ADR-0025 point 3); gate tests change or remove it. */
+    UUID metaConnection;
     TrustedStoreScope scope;
     UUID serum;
     UUID dedicatedAd;
@@ -141,12 +143,23 @@ abstract class DecisionScenario {
                 INSERT INTO store_membership (organization_id, store_id, user_id, role) VALUES
                   (?, ?, ?, 'OWNER'), (?, ?, ?, 'OWNER')
                 """).params(ORG, store, OWNER, ORG, otherStore, OUTSIDER).update();
-        // ADR-0025: execution needs the store's monitoring start; tests of the gate remove it.
+        // ADR-0025: execution needs the monitoring start and the store's PAUSE_AD level; gate tests remove them.
         jdbc.sql("""
                 INSERT INTO onboarding_progress (store_id, organization_id, current_step, updated_at,
                                                  monitoring_started_at)
                 VALUES (?, ?, 'START_MONITORING', now(), now())
                 """).params(store, ORG).update();
+        jdbc.sql("""
+                INSERT INTO store_action_permission (store_id, organization_id, action_type, level, reason, version,
+                                                     changed_by, changed_at)
+                VALUES (?, ?, 'PAUSE_AD', 'APPROVAL_REQUIRED', 'test', 1, ?, now())
+                """).params(store, ORG, OWNER).update();
+        metaConnection = UUID.randomUUID();
+        jdbc.sql("""
+                INSERT INTO meta_connection (id, organization_id, store_id, account_id, status, can_write, created_at,
+                                             updated_at)
+                VALUES (?, ?, ?, '1234567890', 'CONNECTED', true, now(), now())
+                """).params(metaConnection, ORG, store).update();
         scope = storeAccess.systemScope(EventDispatch.SYNC_SERVICE, ORG, store).orElseThrow();
 
         Instant now = clock.instant();

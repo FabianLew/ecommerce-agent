@@ -103,12 +103,7 @@ class AdPauseExecutorTest extends DecisionScenario {
     void metaConnected() {
         GRAPH.reset();
         owner = storeAccess.scopeFor(OWNER, store).orElseThrow();
-        UUID connection = UUID.randomUUID();
-        jdbc.sql("""
-                INSERT INTO meta_connection (id, organization_id, store_id, account_id, status, can_write, created_at,
-                                             updated_at)
-                VALUES (?, ?, ?, '1234567890', 'CONNECTED', true, now(), now())
-                """).params(connection, ORG, store).update();
+        UUID connection = metaConnection;
         connections.saveToken(owner, connection, GraphApiStub.TOKEN);
         jdbc.sql("UPDATE meta_connection SET status = 'CONNECTED', can_write = true WHERE id = ?")
                 .param(connection).update();

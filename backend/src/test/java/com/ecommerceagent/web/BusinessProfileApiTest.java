@@ -181,7 +181,8 @@ class BusinessProfileApiTest {
         approve("owner", STORE_A, 1);
         mvc.perform(get("/api/v1/stores/{storeId}/onboarding", STORE_A).with(user("owner")))
                 .andExpect(jsonPath("$.steps[3].blockers[0]").value("EARLIER_STEPS_INCOMPLETE"))
-                .andExpect(jsonPath("$.monitoring.ads").value("NONE"));
+                .andExpect(jsonPath("$.monitoring.ads").value("OFF"))
+                .andExpect(jsonPath("$.monitoring.adsCaps[0].code").value("MONITORING_NOT_STARTED"));
         startMonitoring("owner", STORE_A, 0).andExpect(status().isUnprocessableContent());
 
         UUID connection = UUID.randomUUID();
@@ -207,8 +208,13 @@ class BusinessProfileApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.steps[3].complete").value(true))
                 .andExpect(jsonPath("$.monitoring.startedBy").value(OWNER.toString()))
-                .andExpect(jsonPath("$.monitoring.ads").value("NONE"))
+                .andExpect(jsonPath("$.monitoring.ads").value("OFF"))
+                .andExpect(jsonPath("$.monitoring.adsCaps[0].code").value("ACTION_NOT_PERMITTED"))
+                .andExpect(jsonPath("$.monitoring.adsCaps[0].level").value("PROPOSE_ONLY"))
                 .andExpect(jsonPath("$.version").value(2));
+        // Starting monitoring is consent to analyses and proposals only: no action permission changes.
+        org.assertj.core.api.Assertions.assertThat(jdbc.sql("SELECT count(*) FROM store_action_permission")
+                .query(Long.class).single()).isZero();
         startMonitoring("owner", STORE_A, 1).andExpect(status().isOk()).andExpect(jsonPath("$.version").value(2));
         org.assertj.core.api.Assertions.assertThat(jdbc.sql(
                         "SELECT count(*) FROM audit_event WHERE action = 'MONITORING_STARTED' AND store_id = ?")

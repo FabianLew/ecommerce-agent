@@ -12,7 +12,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.ecommerceagent.automation.guardian.InventoryProtectionPolicy;
 import com.ecommerceagent.businessprofile.BusinessProfiles;
 import com.ecommerceagent.commerce.AdMappingScope;
 import com.ecommerceagent.commerce.AdMappings;
@@ -75,21 +74,15 @@ public class Onboarding {
     public record DomainState(Domain domain, Readiness readiness, String detail) {
     }
 
-    /** What monitoring covers now (ADR-0025 point 2); computed from the mode and the connections, never stored. */
-    public enum AdsScope {
-        NONE,
-        PROPOSALS_ONLY,
-        APPROVAL_REQUIRED
-    }
-
-    public record Monitoring(Instant startedAt, java.util.UUID startedBy, AdsScope ads) {
+    /** Who started monitoring and when; what it covers is the effective action level (ADR-0025 point 3). */
+    public record Monitoring(Instant startedAt, java.util.UUID startedBy) {
     }
 
     public record OnboardingState(Step currentStep, Step nextStep, List<StepState> steps, List<DomainState> domains,
             Set<Acknowledgement> acknowledgements, int version, Monitoring monitoring) {
     }
 
-    /** The refusal code while a store has not started monitoring (ADR-0025 point 3). */
+    /** The refusal code while a store has not started monitoring (ADR-0025 point 4). */
     public static final String MONITORING_NOT_STARTED = "MONITORING_NOT_STARTED";
 
     private final JdbcClient jdbc;
@@ -98,14 +91,11 @@ public class Onboarding {
     private final MetaConnections meta;
     private final AdMappings mappings;
     private final BusinessProfiles profiles;
-    private final InventoryProtectionPolicy policy;
     private final AuditTrail audit;
     private final Clock clock;
 
     Onboarding(JdbcClient jdbc, IntegrationConnections connections, WooCommerceImport imports, MetaConnections meta,
-            AdMappings mappings, BusinessProfiles profiles, InventoryProtectionPolicy policy, AuditTrail audit,
-            Clock clock) {
-        this.policy = policy;
+            AdMappings mappings, BusinessProfiles profiles, AuditTrail audit, Clock clock) {
         this.audit = audit;
         this.jdbc = jdbc;
         this.connections = connections;
@@ -160,13 +150,12 @@ public class Onboarding {
                 : List.of(earlierDone ? "MONITORING_NOT_STARTED" : "EARLIER_STEPS_INCOMPLETE")));
         Step next = steps.stream().filter(s -> !s.complete()).map(StepState::step).findFirst()
                 .orElse(Step.START_MONITORING);
-        Monitoring monitoring = new Monitoring(progress.monitoringStartedAt(), progress.monitoringStartedBy(),
-                adsScope(metaConnection, skipMeta));
+        Monitoring monitoring = new Monitoring(progress.monitoringStartedAt(), progress.monitoringStartedBy());
         return new OnboardingState(progress.currentStep(), next, List.copyOf(steps), List.copyOf(domains),
                 progress.acknowledgements(), progress.version(), monitoring);
     }
 
-    /** Whether the store's owner started monitoring; execution is refused until then (ADR-0025 point 3). */
+    /** Whether the store's owner started monitoring; execution is refused until then (ADR-0025 point 4). */
     public boolean monitoringStarted(TrustedStoreScope scope) {
         return progress(scope).monitoringStartedAt() != null;
     }
@@ -224,16 +213,8 @@ public class Onboarding {
         }
         OnboardingState started = state(scope);
         audit.record(AuditEntry.inScope(scope, "MONITORING_STARTED", "onboarding_progress",
-                scope.storeId().toString(), Map.of("ads", started.monitoring().ads().name())));
+                scope.storeId().toString(), Map.of("startedAt", started.monitoring().startedAt().toString())));
         return started;
-    }
-
-    private AdsScope adsScope(Optional<MetaConnection> connection, boolean skipped) {
-        if (skipped || connection.isEmpty() || connection.get().status() != MetaConnectionStatus.CONNECTED) {
-            return AdsScope.NONE;
-        }
-        return policy.mode() == InventoryProtectionPolicy.Mode.EXECUTE_ON_APPROVAL && connection.get().canWrite()
-                ? AdsScope.APPROVAL_REQUIRED : AdsScope.PROPOSALS_ONLY;
     }
 
     /** Stores the user's position and acknowledgements; readiness stays computed (ADR-0018). */

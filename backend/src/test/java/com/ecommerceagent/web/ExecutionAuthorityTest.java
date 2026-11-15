@@ -54,12 +54,7 @@ class ExecutionAuthorityTest extends DecisionScenario {
 
     @BeforeEach
     void metaConnected() {
-        connection = UUID.randomUUID();
-        jdbc.sql("""
-                INSERT INTO meta_connection (id, organization_id, store_id, account_id, status, can_write, created_at,
-                                             updated_at)
-                VALUES (?, ?, ?, '1234567890', 'CONNECTED', true, now(), now())
-                """).params(connection, ORG, store).update();
+        connection = metaConnection;
         owner = storeAccess.scopeFor(OWNER, store).orElseThrow();
     }
 

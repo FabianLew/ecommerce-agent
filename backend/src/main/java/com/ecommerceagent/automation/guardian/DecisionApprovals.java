@@ -10,8 +10,7 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
 
-import com.ecommerceagent.automation.Onboarding;
-import com.ecommerceagent.automation.execution.MutationStops;
+import com.ecommerceagent.automation.execution.ActionPermissions;
 import com.ecommerceagent.decisions.DecisionDisposition;
 import com.ecommerceagent.decisions.DecisionProposal;
 import com.ecommerceagent.decisions.DecisionProposals;
@@ -61,50 +60,49 @@ public class DecisionApprovals {
     private final DecisionProposals proposals;
     private final Opportunities opportunities;
     private final PolicyEvaluations evaluations;
-    private final InventoryProtectionPolicy policy;
     private final StoreAccess storeAccess;
     private final AuditTrail audit;
     private final JdbcClient jdbc;
     private final TransactionTemplate transactions;
     private final GuardianSignals signals;
-    private final MutationStops stops;
-    private final Onboarding onboarding;
+    private final ActionPermissions permissions;
     private final Clock clock;
 
     DecisionApprovals(DecisionProposals proposals, Opportunities opportunities, PolicyEvaluations evaluations,
-            InventoryProtectionPolicy policy, StoreAccess storeAccess, AuditTrail audit, JdbcClient jdbc,
-            TransactionTemplate transactions, GuardianSignals signals, MutationStops stops, Onboarding onboarding,
-            Clock clock) {
-        this.onboarding = onboarding;
+            StoreAccess storeAccess, AuditTrail audit, JdbcClient jdbc, TransactionTemplate transactions,
+            GuardianSignals signals, ActionPermissions permissions, Clock clock) {
         this.proposals = proposals;
         this.opportunities = opportunities;
         this.evaluations = evaluations;
-        this.policy = policy;
         this.storeAccess = storeAccess;
         this.audit = audit;
         this.jdbc = jdbc;
         this.transactions = transactions;
         this.signals = signals;
-        this.stops = stops;
+        this.permissions = permissions;
         this.clock = clock;
     }
 
     /** Whether the proposal can be approved now; the reason code when it cannot (for {@code allowedActions}). */
     public Optional<String> blocker(TrustedStoreScope scope, StoredProposal stored, Decision decision) {
-        if (policy.mode() != InventoryProtectionPolicy.Mode.EXECUTE_ON_APPROVAL) {
-            return Optional.of("SHADOW_MODE");
+        Optional<String> level = levelRefusal(scope, decision);
+        if (level.isPresent()) {
+            return level;
         }
         if (!scope.has(StorePermission.DECISION_APPROVE)) {
             return Optional.of("PERMISSION_MISSING");
         }
-        Optional<String> stopped = stops.blocker(scope);
-        if (stopped.isPresent() && decision == Decision.APPROVED) {
-            return stopped;
-        }
-        if (decision == Decision.APPROVED && !onboarding.monitoringStarted(scope)) {
-            return Optional.of(Onboarding.MONITORING_NOT_STARTED);
-        }
         return precondition(scope, stored, decision, clock.instant());
+    }
+
+    /**
+     * The effective action level (ADR-0025 point 4): an approval needs {@code APPROVAL_REQUIRED}; a rejection only
+     * needs a proposal that was put to a person, so the Meta connection, a stop or the monitoring start do not
+     * block it.
+     */
+    private Optional<String> levelRefusal(TrustedStoreScope scope, Decision decision) {
+        ActionPermissions.Effective effective = permissions.effective(scope, ActionPermissions.PAUSE_AD);
+        return decision == Decision.APPROVED ? effective.refusal() : effective.refusal(ActionPermissions.DECIDABLE);
     }
 
     public Result approve(TrustedStoreScope scope, UUID proposalId, int revision, String idempotencyKey) {
@@ -143,9 +141,9 @@ public class DecisionApprovals {
         if (note != null && note.length() > 1000) {
             throw new ApprovalException(ApprovalException.Kind.INVALID, "REASON_TOO_LONG");
         }
-        if (policy.mode() != InventoryProtectionPolicy.Mode.EXECUTE_ON_APPROVAL) {
-            throw new ApprovalException(ApprovalException.Kind.CONFLICT, "SHADOW_MODE");
-        }
+        levelRefusal(scope, Decision.REJECTED).ifPresent(code -> {
+            throw new ApprovalException(ApprovalException.Kind.CONFLICT, code);
+        });
         // Approving changes what the operator may do to a store's ads: re-check the membership (ADR-0004).
         TrustedStoreScope fresh = storeAccess.reauthorize(scope, StorePermission.DECISION_APPROVE);
         UUID userId = fresh.userId().orElseThrow(() -> new ApprovalException(ApprovalException.Kind.FORBIDDEN,
@@ -165,16 +163,11 @@ public class DecisionApprovals {
             }
             StoredProposal stored = proposals.find(fresh, proposalId)
                     .orElseThrow(() -> new ApprovalException(ApprovalException.Kind.NOT_FOUND, "NOT_FOUND"));
-            // A rejection changes nothing outside: only an approval is refused while mutations are stopped.
-            if (decision == Decision.APPROVED) {
-                stops.blocker(fresh).ifPresent(code -> {
-                    throw new ApprovalException(ApprovalException.Kind.CONFLICT, code);
-                });
-                // ADR-0025: nothing is approved for execution before the owner started monitoring.
-                if (!onboarding.monitoringStarted(fresh)) {
-                    throw new ApprovalException(ApprovalException.Kind.CONFLICT, Onboarding.MONITORING_NOT_STARTED);
-                }
-            }
+            // Checked again right before the write, as the mutation stop is (ADR-0025 point 4). A rejection changes
+            // nothing outside and is refused only when the proposal was not put to a person.
+            levelRefusal(fresh, decision).ifPresent(code -> {
+                throw new ApprovalException(ApprovalException.Kind.CONFLICT, code);
+            });
             if (ofProposal(fresh, proposalId).isPresent()) {
                 throw new ApprovalException(ApprovalException.Kind.CONFLICT, "ALREADY_DECIDED");
             }

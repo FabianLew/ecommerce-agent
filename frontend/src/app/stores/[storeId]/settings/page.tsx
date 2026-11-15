@@ -9,6 +9,7 @@ import { getLocale, getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { storePath } from "@/lib/store-path";
 
+import { ActionPermissionForm } from "./ActionPermissionForm";
 import { MutationStopForm } from "./MutationStopForm";
 import { ProfileForm } from "./ProfileForm";
 
@@ -16,16 +17,23 @@ export const dynamic = "force-dynamic";
 
 type Profile = components["schemas"]["ProfileResponse"];
 type Stop = components["schemas"]["MutationStopResponse"];
+type Permission = components["schemas"]["ActionPermissionResponse"];
 
-/** Settings: the mutation stop (B-40, ADR-0020) and the Store Business Profile (B-33, ADR-0018). */
+/**
+ * Settings: the mutation stop (B-40, ADR-0020), the ad pause permission (ADR-0025) and the Store Business Profile
+ * (B-33, ADR-0018).
+ */
 export default async function SettingsPage({ params }: { params: Promise<{ storeId: string }> }) {
   const { storeId } = await params;
   const path = storePath(storeId, "settings");
   const api = await backend(path);
-  const [store, profile, stop, locale, messages] = await Promise.all([
+  const [store, profile, stop, permission, locale, messages] = await Promise.all([
     api.GET("/api/v1/stores/{storeId}", { params: { path: { storeId } } }),
     api.GET("/api/v1/stores/{storeId}/business-profile", { params: { path: { storeId } } }),
     api.GET("/api/v1/stores/{storeId}/mutation-stop", { params: { path: { storeId } } }),
+    api.GET("/api/v1/stores/{storeId}/action-permissions/{actionType}", {
+      params: { path: { storeId, actionType: "PAUSE_AD" } },
+    }),
     getLocale(),
     getMessages(),
   ]);
@@ -42,6 +50,10 @@ export default async function SettingsPage({ params }: { params: Promise<{ store
       {stop.data ? (
         <MutationStopCard storeId={storeId} stop={stop.data} timezone={store.data.timezone} locale={locale}
           t={messages.mutationStop} />
+      ) : null}
+      {permission.data ? (
+        <ActionPermissionCard storeId={storeId} permission={permission.data} timezone={store.data.timezone}
+          locale={locale} t={messages.actionPermission} />
       ) : null}
       <section className="card" aria-labelledby="profile-title" data-testid="profile-card">
         <div className="card-header">
@@ -148,6 +160,63 @@ function MutationStopCard({
         <MutationStopForm key={stop.version} storeId={storeId} version={stop.version} stopped={stop.stopped} />
       ) : (
         <p className="muted">{stop.stopped ? t.resumeReadOnly : t.readOnly}</p>
+      )}
+    </section>
+  );
+}
+
+function ActionPermissionCard({
+  storeId,
+  permission,
+  timezone,
+  locale,
+  t,
+}: {
+  storeId: string;
+  permission: Permission;
+  timezone: string;
+  locale: Locale;
+  t: Messages["actionPermission"];
+}) {
+  const executable = permission.effectiveLevel === "APPROVAL_REQUIRED";
+  return (
+    <section className="card" aria-labelledby="permission-title" data-testid="action-permission-card">
+      <div className="card-header">
+        <h2 id="permission-title">{t.title}</h2>
+        <span className={`badge ${executable ? "badge-connected" : "badge-pending"}`}
+          data-testid="action-permission-effective">
+          {t.effective}: {t.levels[permission.effectiveLevel].split(":")[0]}
+        </span>
+      </div>
+      <p className="muted">{t.intro}</p>
+      <dl className="details">
+        <dt>{t.level}</dt>
+        <dd data-testid="action-permission-level">{t.levels[permission.level]}</dd>
+        {permission.reason ? (
+          <>
+            <dt>{t.reason}</dt>
+            <dd>{permission.reason}</dd>
+          </>
+        ) : null}
+      </dl>
+      {permission.caps.length ? (
+        <>
+          <h3 className="subheading">{t.capsTitle}</h3>
+          <ul data-testid="action-permission-caps">
+            {permission.caps.map((cap) => (
+              <li key={cap.source}>{t.caps[cap.code] ?? cap.code}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {permission.changedAt ? (
+        <p className="muted">{t.changedAt(formatInstant(permission.changedAt, timezone, locale))}</p>
+      ) : null}
+      {permission.canLower || permission.canRaise ? (
+        <ActionPermissionForm key={permission.version} storeId={storeId} version={permission.version}
+          level={permission.level} canRaise={permission.canRaise} />
+      ) : (
+        <p className="muted">{t.readOnly}</p>
       )}
     </section>
   );

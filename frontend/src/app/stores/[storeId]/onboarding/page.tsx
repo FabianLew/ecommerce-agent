@@ -73,6 +73,7 @@ export default async function OnboardingPage({ params }: { params: Promise<{ sto
                   <dt>{t.scopeAds}</dt>
                   <dd data-testid="monitoring-ads">{t.adsScope[monitoring.ads]}</dd>
                 </dl>
+                <p className="muted">{t.adsConsent}</p>
               </>
             ) : null}
             {step.blockers.map((blocker) => (

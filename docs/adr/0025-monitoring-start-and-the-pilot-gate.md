@@ -82,11 +82,18 @@ deliberate act each.
 
 ## Implementation status
 
-The code on the pilot branch implements the first draft: V24 records the start, and approval and authorization
-refuse with `MONITORING_NOT_STARTED`. The effective scope (`NONE`, `PROPOSALS_ONLY`, `APPROVAL_REQUIRED`) is derived
-from the deployment mode and the connection only. After this revision is approved, a follow-up adds
-`store_action_permission`, the endpoint, the effective level with its caps, the new refusal codes and the settings
-control.
+Implemented on the pilot branch with migration V26 (V24 unchanged):
+- `store_action_permission` with forced, fail-closed RLS (ADR-0022);
+- `ActionPermissions`: the stored level, the effective level with each cap (`MONITORING`, `STORE`, `DEPLOYMENT`,
+  `META`, `MUTATION_STOP`) and the audited change;
+- `GET/PUT /api/v1/stores/{storeId}/action-permissions/{actionType}` with `If-Match` (`"permission-{version}"`);
+- approval, `allowedActions` and `ExecutionAuthority` refuse with the codes of point 4, in that order;
+- the onboarding state returns the effective level of `PAUSE_AD` with its caps (`monitoring.ads`, `adsCaps`);
+- the settings page has the ad pause control.
+
+A rejection is refused only by the store level and the deployment ceiling, the two sources that decide whether a
+proposal is put to a person at all (the guardian waits for a decision only then). The Meta connection, a stop and
+a missing monitoring start refuse an approval but not a rejection.
 
 ## Verification
 

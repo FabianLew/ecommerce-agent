@@ -52,6 +52,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stores/{storeId}/action-permissions/{actionType}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["actionPermission"];
+        put: operations["changeActionPermission"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stores/{storeId}/activities": {
         parameters: {
             query?: never;
@@ -648,6 +664,38 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ActionPermissionRequest: {
+            /** @enum {string} */
+            level: "OFF" | "PROPOSE_ONLY" | "APPROVAL_REQUIRED";
+            /** @description Required when raising the level, at most 500 characters */
+            reason?: string;
+        };
+        ActionPermissionResponse: {
+            actionType: string;
+            canLower: boolean;
+            canRaise: boolean;
+            caps: components["schemas"]["CapResponse"][];
+            /** Format: date-time */
+            changedAt?: string;
+            /** Format: uuid */
+            changedBy?: string;
+            /**
+             * @description The lowest of the store's level and every cap
+             * @enum {string}
+             */
+            effectiveLevel: "OFF" | "PROPOSE_ONLY" | "APPROVAL_REQUIRED";
+            /**
+             * @description The store's own level
+             * @enum {string}
+             */
+            level: "OFF" | "PROPOSE_ONLY" | "APPROVAL_REQUIRED";
+            reason?: string;
+            /**
+             * Format: int32
+             * @description 0 until the first change
+             */
+            version: number;
+        };
         ActionRef: {
             desiredStatus: string;
             targetExternalId?: string;
@@ -759,6 +807,13 @@ export interface components {
             resourceId?: string;
             /** @description Business summary of a decision */
             summary?: string;
+        };
+        CapResponse: {
+            code: string;
+            /** @enum {string} */
+            level: "OFF" | "PROPOSE_ONLY" | "APPROVAL_REQUIRED";
+            /** @enum {string} */
+            source: "MONITORING" | "STORE" | "DEPLOYMENT" | "META" | "MUTATION_STOP";
         };
         CheckRef: {
             code?: string;
@@ -1245,8 +1300,13 @@ export interface components {
             value?: string;
         };
         MonitoringResponse: {
-            /** @enum {string} */
-            ads: "NONE" | "PROPOSALS_ONLY" | "APPROVAL_REQUIRED";
+            /**
+             * @description Effective level of ad pauses for the store (ADR-0025 point 3)
+             * @enum {string}
+             */
+            ads: "OFF" | "PROPOSE_ONLY" | "APPROVAL_REQUIRED";
+            /** @description Each source that keeps ad pauses below APPROVAL_REQUIRED */
+            adsCaps: components["schemas"]["CapResponse"][];
             /** Format: date-time */
             startedAt?: string;
             /** Format: uuid */
@@ -1695,6 +1755,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StoreResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    actionPermission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                actionType: string;
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionPermissionResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    changeActionPermission: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                actionType: string;
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActionPermissionRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionPermissionResponse"];
                 };
             };
             /** @description Missing or invalid access token */
