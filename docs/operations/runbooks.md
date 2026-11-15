@@ -89,8 +89,8 @@ product works without the agent (ADR-0016).
 ### Agent cost high
 
 The estimated model cost passed 20 USD in a day. Check whether the number of analyses grew (a webhook storm causes
-many) or the runs grew (more model calls per run). Reduce the run limits or switch the agent off; the price list
-version is on every run.
+many) or the runs grew (more model calls per run). Reduce the run limits or switch the agent off; the price version
+of every call is on its reservation (`ai_budget_reservation.price_id`, catalog `ai_price`).
 
 ### AI reservation unknown
 

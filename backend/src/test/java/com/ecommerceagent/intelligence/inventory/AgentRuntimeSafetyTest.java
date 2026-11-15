@@ -63,7 +63,8 @@ class AgentRuntimeSafetyTest {
 
     final TrustedStoreScope scope = TestScopes.system(UUID.randomUUID(), UUID.randomUUID());
     final FakeModelGateway model = new FakeModelGateway();
-    final InMemoryAiGovernance governance = new InMemoryAiGovernance();
+    final InMemoryAiGovernance governance = new InMemoryAiGovernance().price(PRIMARY.name(), "4", "20")
+            .price(FALLBACK.name(), "2", "10").unpriced("unpriced", "NOT_PRICED");
     final InMemoryAgentRuns runs = new InMemoryAgentRuns();
     final MutableClock clock = new MutableClock(InventoryContextFixture.AS_OF);
     final KnowledgeRegistry knowledge = new KnowledgeRegistry();
@@ -85,9 +86,7 @@ class AgentRuntimeSafetyTest {
     }
 
     static AgentSettings settings(List<String> models) {
-        return new AgentSettings(true, models, "low", new AgentSettings.PriceListSettings("test-1", Map.of(
-                PRIMARY.toString(), new AgentSettings.PriceSettings(new BigDecimal("4"), new BigDecimal("20")),
-                FALLBACK.toString(), new AgentSettings.PriceSettings(new BigDecimal("2"), new BigDecimal("10")))));
+        return new AgentSettings(true, models, "low");
     }
 
     AgentRuntime runtime() {
@@ -178,7 +177,7 @@ class AgentRuntimeSafetyTest {
         assertThat(run.knowledgeHash()).isEqualTo(knowledge.skill(InventoryAgent.SKILL).orElseThrow().hash());
         assertThat(run.promptHash()).hasSize(64);
         assertThat(run.toolsHash()).hasSize(64);
-        assertThat(run.priceList()).isEqualTo("test-1");
+        assertThat(run.priceList()).as("every cost comes from the catalog").isEqualTo("ai_price");
         assertThat(run.runPolicy()).isEqualTo("inventory-agent-run/2");
         assertThat(runs.started.get(run.id()).limits()).isEqualTo(POLICY.limits());
         // The output limit of one call comes from the run policy.
@@ -362,6 +361,19 @@ class AgentRuntimeSafetyTest {
         assertThat(model.requests()).isEmpty();
     }
 
+    /** ADR-0027 section 9 (E-54.2): the run's own cost limit is checked with the catalog price, nothing else. */
+    @Test
+    void theRunCostLimitUsesTheCatalogPrice() {
+        AgentRunResult cheap = run(PRIMARY, new BigDecimal("0.09"));
+        assertThat(cheap.stopReason()).isEqualTo("MAX_COST");
+
+        governance.price(PRIMARY.name(), "0.40", "2.00");
+        model.thenText(pause());
+        AgentRunResult priced = run(PRIMARY, new BigDecimal("0.09"));
+        assertThat(priced.stopReason()).as("a lower catalog price fits the same limit").isNotEqualTo("MAX_COST");
+        assertThat(model.requests()).hasSize(1);
+    }
+
     @Test
     void oversizedRequestIsNotSent() {
         var skill = knowledge.skill(InventoryAgent.SKILL).orElseThrow();
@@ -500,8 +512,10 @@ class AgentRuntimeSafetyTest {
     @Test
     void unpricedModelIsNotCalled() {
         AgentRunResult result = run(new ModelId("fake", "unpriced"), BigDecimal.ZERO);
-        assertThat(result.stopReason()).isEqualTo("MODEL_NOT_PRICED");
+        assertThat(result.stopReason()).isEqualTo("AI_GOVERNANCE:NOT_PRICED");
+        assertThat(result.status()).isEqualTo(AgentRunStatus.MODEL_FAILED);
         assertThat(model.requests()).isEmpty();
+        assertThat(governance.reservations()).as("nothing was reserved").isEmpty();
     }
 
     @Test
@@ -765,8 +779,7 @@ class AgentRuntimeSafetyTest {
 
     @Test
     void switchedOffAgentNeverCallsAModel() {
-        settings = new AgentSettings(false, List.of(PRIMARY.toString()), "low",
-                new AgentSettings.PriceListSettings("test-1", Map.of()));
+        settings = new AgentSettings(false, List.of(PRIMARY.toString()), "low");
         assertThat(proposer().propose(scope, SnapshotFixture.OPPORTUNITY, snapshot)).isEmpty();
         assertThat(model.requests()).isEmpty();
         assertThat(runs.started).isEmpty();

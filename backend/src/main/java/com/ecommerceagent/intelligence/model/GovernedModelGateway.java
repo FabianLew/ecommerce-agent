@@ -8,6 +8,7 @@ import java.util.Objects;
 import com.ecommerceagent.aigovernance.AiBudgetGovernor;
 import com.ecommerceagent.aigovernance.AiCallEstimate;
 import com.ecommerceagent.aigovernance.AiUsageLedger;
+import com.ecommerceagent.aigovernance.CostQuote;
 import com.ecommerceagent.aigovernance.ProviderUsage;
 import com.ecommerceagent.aigovernance.ReservationDecision;
 import com.ecommerceagent.aigovernance.ReservationRequest;
@@ -75,6 +76,15 @@ public class GovernedModelGateway {
     /** Ends the run's lease; safe to call for a run that was never admitted. */
     public void endRun(TrustedStoreScope scope, java.util.UUID runId) {
         admission.release(scope, runId);
+    }
+
+    /**
+     * The conservative maximum cost of a call from the price catalog, the platform's only price source (ADR-0027
+     * section 9); reserves nothing. A run checks its own cost limit with it.
+     */
+    public CostQuote quote(ModelId model, long estimatedInputTokens, int maxOutputTokens) {
+        return governor.quote(AiCallEstimate.of(model.provider(), model.name(), providers.region(model),
+                estimatedInputTokens, maxOutputTokens));
     }
 
     public ModelCapabilities capabilities(ModelId model) {

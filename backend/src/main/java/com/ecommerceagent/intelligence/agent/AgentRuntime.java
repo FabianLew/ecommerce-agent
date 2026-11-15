@@ -9,10 +9,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.ecommerceagent.aigovernance.CostQuote;
 import com.ecommerceagent.intelligence.model.AiCallDenied;
 import com.ecommerceagent.intelligence.model.GovernedCall;
 import com.ecommerceagent.intelligence.model.GovernedModelFailure;
 import com.ecommerceagent.intelligence.model.GovernedModelGateway;
+import com.ecommerceagent.intelligence.model.GovernedTurn;
 import com.ecommerceagent.intelligence.model.ModelFailure;
 import com.ecommerceagent.intelligence.model.ModelMessage;
 import com.ecommerceagent.intelligence.model.ModelRequest;
@@ -62,6 +64,12 @@ public class AgentRuntime {
         this.clock = clock;
     }
 
+    /**
+     * Recorded as the price list of a run: every cost comes from the catalog {@code ai_price} (ADR-0027 section 9);
+     * the price version of each call is on its reservation.
+     */
+    static final String PRICE_SOURCE = "ai_price";
+
     static final java.time.Duration LEASE_MARGIN = java.time.Duration.ofMinutes(1);
 
     public AgentRunResult run(AgentRunRequest request) {
@@ -77,7 +85,6 @@ public class AgentRuntime {
         private final ToolRegistry.ToolSet tools;
         private final AgentRunContext context;
         private final List<ModelMessage> messages = new ArrayList<>();
-        private final PriceList prices;
         private int seq;
         private int modelCalls;
         private int toolCalls;
@@ -93,7 +100,6 @@ public class AgentRuntime {
             this.tools = registry.forRun(request.agent(), request.skill().requiredReadTools());
             this.context = new AgentRunContext(id, request.scope(), request.opportunityId(), request.snapshot(),
                     request.agent(), request.model(), request.attempt());
-            this.prices = settings.prices();
         }
 
         AgentRunResult execute() {
@@ -101,7 +107,7 @@ public class AgentRuntime {
             runs.start(request.scope(), new AgentRuns.Start(id, request.analysisKey(), request.attempt(),
                     request.opportunityId(), request.snapshot().id(), request.agent(), request.skill().reference(),
                     request.skill().hash(), request.prompts().hash(), tools.hash(), request.model().provider(),
-                    request.model().name(), prices.version(), limits, request.situation(), started));
+                    request.model().name(), PRICE_SOURCE, limits, request.situation(), started));
             try {
                 // Admission before anything is reserved (ADR-0027 section 6.2); the lease outlives the run's wall
                 // time by a margin, so a lost worker frees the slot on its own.
@@ -131,10 +137,6 @@ public class AgentRuntime {
         }
 
         private AgentRunResult loop(Instant started) {
-            Optional<PriceList.Price> price = prices.price(request.model());
-            if (price.isEmpty()) {
-                return finish(AgentRunStatus.MODEL_FAILED, "MODEL_NOT_PRICED", null);
-            }
             hooks.forEach(hook -> hook.beforeAgentRun(context));
             Instant deadline = started.plus(limits.maxWallTime());
             gateway.capabilities(request.model());
@@ -159,7 +161,15 @@ public class AgentRuntime {
                 if (estimatedInput > limits.maxInputTokens()) {
                     return finish(AgentRunStatus.LIMIT_EXCEEDED, "MAX_INPUT_TOKENS", null);
                 }
-                BigDecimal reserved = price.get().cost(estimatedInput, outputCap);
+                BigDecimal reserved;
+                switch (gateway.quote(request.model(), estimatedInput, outputCap)) {
+                    case CostQuote.Priced priced -> reserved = priced.amount();
+                    case CostQuote.Unpriced unpriced -> {
+                        // The catalog cannot price the call: nothing is reserved or sent (ADR-0027 section 9).
+                        AiCallDenied denied = new AiCallDenied(unpriced.reason());
+                        return finish(deniedStatus(denied), "AI_GOVERNANCE:" + denied.reason(), null);
+                    }
+                }
                 if (request.costSpentBefore().add(cost).add(reserved).compareTo(limits.maxEstimatedCostUsd()) > 0) {
                     return finish(AgentRunStatus.LIMIT_EXCEEDED, "MAX_COST", null);
                 }
@@ -170,10 +180,12 @@ public class AgentRuntime {
                 }
                 Instant callStarted = clock.instant();
                 ModelTurn turn;
+                GovernedTurn governed;
                 try {
                     modelCalls++;
-                    turn = gateway.complete(request.scope(), new GovernedCall(automationType(), call, modelCalls,
-                            estimatedInput)).turn();
+                    governed = gateway.complete(request.scope(), new GovernedCall(automationType(), call, modelCalls,
+                            estimatedInput));
+                    turn = governed.turn();
                 } catch (AiCallDenied denied) {
                     // Nothing was sent: no cost, and the run ends on the governance decision (ADR-0027).
                     step(AgentRunStep.Kind.MODEL_CALL, request.model().toString(), null, "DENIED", denied.reason(),
@@ -185,13 +197,13 @@ public class AgentRuntime {
                         usageComplete = false;
                         inputTokens += estimatedInput;
                         outputTokens += outputCap;
-                        cost = cost.add(reserved);
+                        cost = cost.add(governedFailure.recordedCost());
                     }
                     step(AgentRunStep.Kind.MODEL_CALL, request.model().toString(), null, "FAILED",
                             failure.type().name(), failurePayload(failure), callStarted);
                     return finish(AgentRunStatus.MODEL_FAILED, failure.type().name(), null);
                 }
-                settle(turn.usage(), estimatedInput, outputCap, price.get());
+                settle(turn.usage(), estimatedInput, outputCap, governed);
                 step(AgentRunStep.Kind.MODEL_CALL, request.model().toString(), null, turn.finishReason().name(), null,
                         turnPayload(turn), callStarted);
                 for (AgentHook hook : hooks) {
@@ -257,7 +269,8 @@ public class AgentRuntime {
                     outcome.failed());
         }
 
-        private void settle(ModelUsage usage, int estimatedInput, int outputCap, PriceList.Price price) {
+        /** Counts the call with the cost governance recorded for it: settled, or the full reservation if unknown. */
+        private void settle(ModelUsage usage, int estimatedInput, int outputCap, GovernedTurn governed) {
             int in = usage.inputTokens() != null ? usage.inputTokens() : estimatedInput;
             int out = usage.outputTokens() != null ? usage.outputTokens() : outputCap;
             if (!usage.known()) {
@@ -265,7 +278,10 @@ public class AgentRuntime {
             }
             inputTokens += in;
             outputTokens += out;
-            cost = cost.add(price.cost(in, out));
+            if (!governed.settled()) {
+                usageComplete = false;
+            }
+            cost = cost.add(governed.cost());
         }
 
         /** The agent's name as the automation of its budget and ledger rows. */

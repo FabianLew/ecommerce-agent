@@ -14,6 +14,12 @@ import com.ecommerceagent.identity.TrustedStoreScope;
  */
 public interface AiBudgetGovernor {
 
+    /**
+     * The conservative maximum cost of a call from the price catalog, for a caller's own limits; reserves nothing.
+     * The only price source of the platform: callers never keep their own price list.
+     */
+    CostQuote quote(AiCallEstimate estimate);
+
     ReservationDecision reserve(TrustedStoreScope scope, ReservationRequest request);
 
     /** Releases a reservation still {@code RESERVED}; a second release changes nothing. */

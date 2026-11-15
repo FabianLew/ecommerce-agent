@@ -870,3 +870,9 @@ after a stream started and for calls that were never sent.
   `AiGovernancePlatformIndependenceTest` fails the build when the governance module depends on anything but
   `identity`, when the governed model path depends on an integration, commerce or automation module, or when a
   governance source or migration names a commerce or ad platform.
+- **E-54.2, one price source.** `operator.agent.price-list` and `PriceList` are gone. A run checks its own cost
+  limit with `GovernedModelGateway.quote`, which asks the governor for the conservative maximum from `ai_price` with
+  the same price checks and calculation as the reservation (`CostQuote`); an unpriced call ends the run with
+  `AI_GOVERNANCE:<reason>` (for example `NOT_PRICED`, `PRICE_STALE`) before anything is reserved. The run's cost is
+  the settled cost of each call, or the full reservation while it is unknown. Runs record `ai_price` as their price
+  source; each call's price version is on its reservation. The cloud profile refuses a configured price list.

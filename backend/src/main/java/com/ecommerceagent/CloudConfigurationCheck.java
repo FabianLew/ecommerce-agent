@@ -79,6 +79,15 @@ public class CloudConfigurationCheck implements ApplicationListener<ApplicationE
             problems.add("operator.agent.max-output-tokens-per-call is no longer read; set "
                     + InventoryAgentRunPolicy.PREFIX + ".max-output-tokens-per-call with its own version");
         }
+        // ADR-0027 section 9: prices come only from the catalog ai_price; a configured price list would be ignored.
+        boolean priceList = environment.getPropertySources().stream()
+                .filter(source -> source instanceof org.springframework.core.env.EnumerablePropertySource<?>)
+                .flatMap(source -> java.util.Arrays.stream(
+                        ((org.springframework.core.env.EnumerablePropertySource<?>) source).getPropertyNames()))
+                .anyMatch(name -> name.startsWith("operator.agent.price-list"));
+        if (priceList) {
+            problems.add("operator.agent.price-list is no longer read; prices come from the catalog ai_price");
+        }
         problems.addAll(parameterSetProblems(environment));
         return problems;
     }
