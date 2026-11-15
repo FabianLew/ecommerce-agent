@@ -729,6 +729,28 @@ below.
 - Not yet: run limits as versioned policies (step 4). The agent stays off on the pilot until stage 1 is complete,
   and prices must be verified and budgets set before it can be switched on.
 
+**Stage 1, step 4 (V32): run limits as versioned policies.**
+
+- Gap 5 is closed. The limits of an Inventory Agent run are the parameter set `inventory-agent-run`
+  (`InventoryAgentRunPolicy`, `operator.agent.run-policies.inventory-agent`), version `inventory-agent-run/1` with
+  the values that were code before: 5 model calls, 8 tool calls, 60 s, 12,000 estimated input tokens per call,
+  1,500 output tokens per call (moved from `operator.agent.max-output-tokens-per-call`), 4,000 output tokens per
+  run, USD 0.10 per analysis, 1 repair call, and at most 2 attempts along the model policy. Money is a
+  `BigDecimal`.
+- It follows ADR-0026 point 6: `ParameterSetVersionTest` pins a hash of the defaults to the version, and the cloud
+  profile refuses an override that keeps the default version, and refuses the old output key, which would otherwise
+  be ignored silently. An inconsistent set (a per-call output limit above the run limit, a zero cost or wall time,
+  a malformed version) stops the start-up.
+- `AgentDefinition` no longer carries limits; `AgentRunRequest` carries the `RunLimits` of the policy, and every
+  `agent_run` records `run_policy` and `run_limits` (V32), next to the price list. Runs started before V32 have both
+  empty.
+- Tightening a policy: the policy is read at start-up, so a change applies from the next start. A run lasts at most
+  `maxRunDuration` and a run lost by a stopped worker counts as a used attempt, so no run continues under an older
+  policy after a restart. The global AI stop that applies before the next call without a restart is gap 9.
+- Not in this step, and still open before the agent runs on the pilot store: the per-store and global concurrency
+  admission (gap 8), the runtime AI stop (gap 9) and the cooldown (gap 10). The run's own estimate still uses the
+  configured price list, while the reservation uses the catalog price (`ai_price`); both must be verified together.
+
 ### Rollout relative to the pilot
 
 The agent stays off on the pilot until stage 1 is complete, because the pilot runs on the platform's money and the

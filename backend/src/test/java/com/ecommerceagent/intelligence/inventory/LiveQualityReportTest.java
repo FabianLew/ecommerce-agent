@@ -41,7 +41,7 @@ class LiveQualityReportTest {
     void reportOnTheConfiguredModelPolicy() {
         // The agent is off by default everywhere; this run switches it on for the harness only.
         AgentSettings settings = new AgentSettings(true, configured.models(), configured.effort(),
-                configured.maxOutputTokensPerCall(), configured.priceList());
+                configured.priceList());
         Clock clock = Clock.systemUTC();
         QualityHarness harness = new QualityHarness(knowledge, clock);
 

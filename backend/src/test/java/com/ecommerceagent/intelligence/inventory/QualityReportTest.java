@@ -64,7 +64,7 @@ class QualityReportTest {
             }
             model.thenText(CanonicalJson.write(answer));
         }
-        AgentSettings settings = new AgentSettings(true, List.of("fake/primary"), "low", 1500,
+        AgentSettings settings = new AgentSettings(true, List.of("fake/primary"), "low",
                 new AgentSettings.PriceListSettings("test-1", Map.of("fake/primary",
                         new AgentSettings.PriceSettings(new BigDecimal("4"), new BigDecimal("20")))));
 

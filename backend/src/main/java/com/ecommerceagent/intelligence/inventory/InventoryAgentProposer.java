@@ -22,6 +22,7 @@ import com.ecommerceagent.intelligence.agent.AgentRunStatus;
 import com.ecommerceagent.intelligence.agent.AgentRuns;
 import com.ecommerceagent.intelligence.agent.AgentRuntime;
 import com.ecommerceagent.intelligence.agent.AgentSettings;
+import com.ecommerceagent.intelligence.agent.RunLimits;
 import com.ecommerceagent.intelligence.agent.ToolRegistry;
 import com.ecommerceagent.intelligence.knowledge.KnowledgeRegistry;
 import com.ecommerceagent.intelligence.knowledge.PromptPackage;
@@ -34,8 +35,8 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * The agent proposer of the Inventory Guardian (ADR-0016 point 8). One analysis is one snapshot; its attempts follow
- * the model policy and share the cost limit. A succeeded run of the analysis is reused without a new model call.
- * Returns nothing when the agent is off or no attempt produced an answer: the caller then uses the baseline.
+ * the model policy, at most {@code maxAttempts} of the run policy, and share its cost limit. A succeeded run of the
+ * analysis is reused without a new model call. Returns nothing when the agent is off or no attempt produced an answer: the caller then uses the baseline.
  */
 @Service
 public class InventoryAgentProposer {
@@ -43,15 +44,17 @@ public class InventoryAgentProposer {
     private final AgentRuntime runtime;
     private final AgentRuns runs;
     private final AgentSettings settings;
+    private final InventoryAgentRunPolicy policy;
     private final SkillPackage skill;
     private final PromptPackage prompts;
     private final String outputSchema;
 
-    InventoryAgentProposer(AgentRuntime runtime, AgentRuns runs, AgentSettings settings, KnowledgeRegistry knowledge,
-            ToolRegistry tools) {
+    InventoryAgentProposer(AgentRuntime runtime, AgentRuns runs, AgentSettings settings,
+            InventoryAgentRunPolicy policy, KnowledgeRegistry knowledge, ToolRegistry tools) {
         this.runtime = runtime;
         this.runs = runs;
         this.settings = settings;
+        this.policy = policy;
         this.skill = knowledge.skill(InventoryAgent.SKILL)
                 .orElseThrow(() -> new IllegalStateException("Missing skill " + InventoryAgent.SKILL));
         this.prompts = knowledge.prompts(InventoryAgent.DEFINITION.systemPromptRef())
@@ -97,13 +100,15 @@ public class InventoryAgentProposer {
         }
         BigDecimal spent = earlier.stream().map(AgentRun::estimatedCostUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
         List<ModelId> models = settings.modelIds();
+        int attempts = Math.min(models.size(), policy.maxAttempts());
+        RunLimits limits = policy.limits();
         InventoryContext context = InventoryContext.of(snapshot);
         String system = PromptPackage.fill(prompts.system(), Map.of("skill", skill.instructions()));
         String task = task(context);
         // A run left RUNNING by a lost worker counts as a used attempt; its cost stays in the shared limit.
-        for (int attempt = earlier.size() + 1; attempt <= models.size(); attempt++) {
+        for (int attempt = earlier.size() + 1; attempt <= attempts; attempt++) {
             AgentRunResult result = runtime.run(new AgentRunRequest(scope, opportunityId, snapshot,
-                    InventoryAgent.DEFINITION, skill, prompts, system, task, models.get(attempt - 1), key, attempt,
+                    InventoryAgent.DEFINITION, limits, skill, prompts, system, task, models.get(attempt - 1), key, attempt,
                     spent));
             if (result.succeeded()) {
                 return Optional.of(new AgentProposal(result.runId(), InventoryAgent.PROPOSER, result.output()));

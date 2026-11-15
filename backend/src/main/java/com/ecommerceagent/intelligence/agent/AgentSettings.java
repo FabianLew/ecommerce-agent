@@ -10,13 +10,13 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.context.annotation.Configuration;
 
-/** {@code operator.agent} (ADR-0016 point 9): whether the agent proposes, its models, effort and price list. */
+/** {@code operator.agent} (ADR-0016 point 9): whether the agent proposes, its models, effort and price
+ * list. The limits of a run are the agent's versioned run policy, not settings here. */
 @ConfigurationProperties("operator.agent")
 public record AgentSettings(
         @DefaultValue("false") boolean enabled,
         @DefaultValue List<String> models,
         String effort,
-        @DefaultValue("1500") int maxOutputTokensPerCall,
         @DefaultValue PriceListSettings priceList) {
 
     public AgentSettings {

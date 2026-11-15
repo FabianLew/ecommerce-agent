@@ -52,6 +52,7 @@ import tools.jackson.databind.JsonNode;
  */
 class AgentRuntimeSafetyTest {
 
+    static final InventoryAgentRunPolicy POLICY = InventoryAgentRunPolicy.defaults();
     static final ModelId PRIMARY = new ModelId("fake", "primary");
     static final ModelId FALLBACK = new ModelId("fake", "fallback");
     static final String VARIANT = InventoryContextFixture.VARIANT.toString();
@@ -80,7 +81,7 @@ class AgentRuntimeSafetyTest {
     }
 
     static AgentSettings settings(List<String> models) {
-        return new AgentSettings(true, models, "low", 1500, new AgentSettings.PriceListSettings("test-1", Map.of(
+        return new AgentSettings(true, models, "low", new AgentSettings.PriceListSettings("test-1", Map.of(
                 PRIMARY.toString(), new AgentSettings.PriceSettings(new BigDecimal("4"), new BigDecimal("20")),
                 FALLBACK.toString(), new AgentSettings.PriceSettings(new BigDecimal("2"), new BigDecimal("10")))));
     }
@@ -91,14 +92,24 @@ class AgentRuntimeSafetyTest {
     }
 
     InventoryAgentProposer proposer() {
-        return new InventoryAgentProposer(runtime(), runs, settings, knowledge, registry);
+        return proposer(POLICY);
+    }
+
+    InventoryAgentProposer proposer(InventoryAgentRunPolicy policy) {
+        return new InventoryAgentProposer(runtime(), runs, settings, policy, knowledge, registry);
+    }
+
+    static InventoryAgentRunPolicy policy(String version, int maxModelCalls, int maxOutputTokensPerCall,
+            int maxAttempts) {
+        return new InventoryAgentRunPolicy(version, maxModelCalls, 8, Duration.ofSeconds(60), 12_000,
+                maxOutputTokensPerCall, 4_000, new BigDecimal("0.10"), 1, maxAttempts);
     }
 
     AgentRunResult run(ModelId modelId, BigDecimal spentBefore) {
         var skill = knowledge.skill(InventoryAgent.SKILL).orElseThrow();
         var prompts = knowledge.prompts("inventory-agent").orElseThrow();
         return runtime().run(new AgentRunRequest(scope, SnapshotFixture.OPPORTUNITY, snapshot,
-                InventoryAgent.DEFINITION, skill, prompts, "system", "Assess the episode.", modelId, "key", 1,
+                InventoryAgent.DEFINITION, POLICY.limits(), skill, prompts, "system", "Assess the episode.", modelId, "key", 1,
                 spentBefore));
     }
 
@@ -160,6 +171,10 @@ class AgentRuntimeSafetyTest {
         assertThat(run.promptHash()).hasSize(64);
         assertThat(run.toolsHash()).hasSize(64);
         assertThat(run.priceList()).isEqualTo("test-1");
+        assertThat(run.runPolicy()).isEqualTo("inventory-agent-run/1");
+        assertThat(runs.started.get(run.id()).limits()).isEqualTo(POLICY.limits());
+        // The output limit of one call comes from the run policy.
+        assertThat(model.requests()).extracting(ModelRequest::maxOutputTokens).containsOnly(1500);
         assertThat(run.modelCalls()).isEqualTo(3);
         assertThat(run.toolCalls()).isEqualTo(3);
         assertThat(run.inputTokens()).isEqualTo(1500);
@@ -344,7 +359,7 @@ class AgentRuntimeSafetyTest {
         var skill = knowledge.skill(InventoryAgent.SKILL).orElseThrow();
         var prompts = knowledge.prompts("inventory-agent").orElseThrow();
         AgentRunResult result = runtime().run(new AgentRunRequest(scope, SnapshotFixture.OPPORTUNITY, snapshot,
-                InventoryAgent.DEFINITION, skill, prompts, "x".repeat(40_000), "task", PRIMARY, "key", 1,
+                InventoryAgent.DEFINITION, POLICY.limits(), skill, prompts, "x".repeat(40_000), "task", PRIMARY, "key", 1,
                 BigDecimal.ZERO));
         assertThat(result.stopReason()).isEqualTo("MAX_INPUT_TOKENS");
         assertThat(model.requests()).isEmpty();
@@ -517,6 +532,43 @@ class AgentRuntimeSafetyTest {
         assertThat(model.requests().getFirst().system()).contains("Inventory Guardian").doesNotContain("{{");
     }
 
+    /** ADR-0027 section 5: the run applies the limits of the policy it was given and records that policy. */
+    @Test
+    void aStricterRunPolicyIsAppliedAndRecordedOnEveryAttempt() {
+        model.thenTools(call("t1", InventoryReadTools.FORECAST, "{\"productVariantId\":\"" + VARIANT + "\"}"))
+                .thenTools(call("t2", InventoryReadTools.FORECAST, "{\"productVariantId\":\"" + VARIANT + "\"}"))
+                .thenText(pause());
+        InventoryAgentRunPolicy strict = policy("inventory-agent-run/9", 1, 600, 2);
+
+        var proposal = proposer(strict).propose(scope, SnapshotFixture.OPPORTUNITY, snapshot);
+
+        // One model call per run: both attempts stop after their first turn, and the answer is never requested.
+        assertThat(proposal).isEmpty();
+        List<AgentRun> attempts = runs.attempts(scope,
+                InventoryAgentProposer.analysisKey(SnapshotFixture.OPPORTUNITY, SnapshotFixture.SNAPSHOT));
+        assertThat(attempts).extracting(AgentRun::status, AgentRun::stopReason, AgentRun::runPolicy).containsOnly(
+                org.assertj.core.groups.Tuple.tuple(AgentRunStatus.LIMIT_EXCEEDED, "MAX_MODEL_CALLS",
+                        "inventory-agent-run/9"));
+        assertThat(model.requests()).extracting(ModelRequest::maxOutputTokens).containsOnly(600);
+        assertThat(runs.started.values()).extracting(start -> start.limits().recorded().get("maxModelCalls"))
+                .containsOnly("1");
+    }
+
+    /** The policy bounds the attempts of one analysis even when the model policy lists more models. */
+    @Test
+    void maxAttemptsOfThePolicyStopsTheFallback() {
+        model.thenFailure(ModelFailure.Type.UNAVAILABLE).thenText(pause());
+
+        var proposal = proposer(policy("inventory-agent-run/9", 5, 1500, 1))
+                .propose(scope, SnapshotFixture.OPPORTUNITY, snapshot);
+
+        assertThat(proposal).isEmpty();
+        assertThat(model.requests()).extracting(ModelRequest::model).containsExactly(PRIMARY);
+        assertThat(runs.attempts(scope,
+                InventoryAgentProposer.analysisKey(SnapshotFixture.OPPORTUNITY, SnapshotFixture.SNAPSHOT)))
+                .hasSize(1);
+    }
+
     @Test
     void aSucceededAnalysisIsReusedWithoutCallingTheModelAgain() {
         model.thenText(pause());
@@ -546,7 +598,7 @@ class AgentRuntimeSafetyTest {
 
     @Test
     void switchedOffAgentNeverCallsAModel() {
-        settings = new AgentSettings(false, List.of(PRIMARY.toString()), "low", 1500,
+        settings = new AgentSettings(false, List.of(PRIMARY.toString()), "low",
                 new AgentSettings.PriceListSettings("test-1", Map.of()));
         assertThat(proposer().propose(scope, SnapshotFixture.OPPORTUNITY, snapshot)).isEmpty();
         assertThat(model.requests()).isEmpty();

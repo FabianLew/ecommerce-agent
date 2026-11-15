@@ -11,6 +11,7 @@ import java.util.Map;
 
 import com.ecommerceagent.automation.guardian.InventoryProtectionPolicy;
 import com.ecommerceagent.decisions.RiskDetectorSettings;
+import com.ecommerceagent.intelligence.inventory.InventoryAgentRunPolicy;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Binder;
 
@@ -24,7 +25,9 @@ class ParameterSetVersionTest {
             "inventory-risk/2",
             "e0ec74d8372c9feacf426b342a81012478f6cf132e07a8ec6d3ff99285fc573c",
             "inventory-protection@1.1.0",
-            "ff9b88ec7c30fc6fd17603a85728dd49dcf67a20b6e66f18ca3ebf5797b6c11c");
+            "ff9b88ec7c30fc6fd17603a85728dd49dcf67a20b6e66f18ca3ebf5797b6c11c",
+            "inventory-agent-run/1",
+            "f990175a0d3dc623a2fdcee5a5a95954fb0c7b8606269b54c08b59df4a3b41a6");
 
     @Test
     void theDefaultsOfTheDetectorMatchTheirVersion() {
@@ -42,6 +45,14 @@ class ParameterSetVersionTest {
         assertThat(defaults.version()).isEqualTo(InventoryProtectionPolicy.DEFAULT_VERSION);
         assertThat(hash(defaults.parameters())).as("hash of %s", defaults.ref())
                 .isEqualTo(PINNED.get(defaults.ref()));
+    }
+
+    @Test
+    void theDefaultsOfTheAgentRunPolicyMatchTheirVersion() {
+        InventoryAgentRunPolicy defaults = InventoryAgentRunPolicy.defaults();
+        assertThat(defaults.version()).isEqualTo(InventoryAgentRunPolicy.DEFAULT_VERSION);
+        assertThat(hash(defaults.parameters())).as("hash of %s", defaults.version())
+                .isEqualTo(PINNED.get(defaults.version()));
     }
 
     /** SHA-256 of the parameters in their fixed order, as {@code key=value} lines. */

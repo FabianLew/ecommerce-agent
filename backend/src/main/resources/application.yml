@@ -171,7 +171,12 @@ operator:
       - anthropic/claude-opus-5-5
       - anthropic/claude-sonnet-5-5
     effort: low
-    max-output-tokens-per-call: 1500
+    # Run limits are versioned policies (ADR-0027 section 5); the defaults are in InventoryAgentRunPolicy. An
+    # override needs its own version (inventory-agent-run/N), which the cloud profile checks.
+    # run-policies:
+    #   inventory-agent:
+    #     version: inventory-agent-run/2
+    #     max-run-cost-usd: "0.08"
     # USD per million tokens. Check against the provider before switching the agent on; change the version with it.
     price-list:
       version: anthropic-2026-11
