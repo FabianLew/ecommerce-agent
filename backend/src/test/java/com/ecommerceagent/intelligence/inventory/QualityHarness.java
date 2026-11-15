@@ -108,8 +108,8 @@ final class QualityHarness {
                 InMemoryAiGovernance governance = new InMemoryAiGovernance();
                 AgentRuntime runtime = new AgentRuntime(new GovernedModelGateway(gateways, governance, governance,
                         governance, checked -> { }, governance, clock), registry, runs, List.of(), settings, clock);
-                return new InventoryAgentProposer(runtime, runs, settings, InventoryAgentRunPolicy.defaults(), knowledge,
-                        registry, clock)
+                return new InventoryAgentProposer(runtime, runs, settings, InventoryAgentRunPolicy.defaults(),
+                        com.ecommerceagent.aigovernance.AiAdmissionSettings.defaults(), knowledge, registry, clock)
                         .propose(scope, snapshot.opportunityId(), snapshot);
             }
         };

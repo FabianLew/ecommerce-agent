@@ -54,6 +54,9 @@ class AiAdmissionTest {
     JdbcClient jdbc;
 
     @Autowired
+    AiGovernanceSettings settings;
+
+    @Autowired
     FixtureDb fixtures;
 
     UUID organization;
@@ -162,6 +165,70 @@ class AiAdmissionTest {
         assertThat(inScope(storeA, () -> acquire(a, 5, global))).isEqualTo("GRANTED");
         assertThat(inScope(storeB, () -> acquire(b, 5, global))).isEqualTo("GLOBAL_LIMIT");
         release(storeA, a);
+    }
+
+    /**
+     * E-54.4, reserved slots: a standard automation fills only its share of the platform's runs, and the slots above
+     * it stay free for critical work. Other tests' open leases count too, so the limit is set above them.
+     */
+    @Test
+    void aLowerPriorityLeavesTheReservedSlotsToCriticalWork() {
+        fixtures.registerAutomations("test-critical", "test-standard");
+        int open = fixtures.sql("SELECT count(*) FROM ai_run_lease WHERE released_at IS NULL AND expires_at > now()")
+                .query(Integer.class).single();
+        int max = 2 * (open + 1);
+        AiAdmissionSettings priorities = new AiAdmissionSettings("ai-admission/9",
+                AiAdmissionSettings.Priority.STANDARD,
+                java.util.Map.of("test-critical", AiAdmissionSettings.Priority.CRITICAL), 50, 50,
+                Duration.ofMinutes(2), Duration.ofSeconds(5), Duration.ofSeconds(30), 0);
+        AiAdmission shares = new PostgresAiAdmission(jdbc, new AiGovernanceSettings(settings.inputTokenMargin(),
+                settings.priceMaxVerificationAge(), settings.reservationTimeout(), settings.sweepInterval(),
+                settings.sweepBatchSize(), settings.unknownConservativeSettlementEnabled(),
+                settings.unknownConservativeSettlementAfter(), max, settings.reconciliationInterval(),
+                settings.reconciliationBatchSize(), settings.reconciliationTimeLimit(), settings.budgetAlertInterval()),
+                priorities, new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+        UUID standard = run(storeA, opportunityA);
+        UUID secondStandard = run(storeB, opportunityB);
+        UUID critical = run(storeB, opportunityB);
+
+        assertThat(inScope(storeA, () -> shares.admit(scope(storeA), standard, "test-standard", 5, TTL)))
+                .isEqualTo(Admission.GRANTED);
+        assertThat(inScope(storeB, () -> shares.admit(scope(storeB), secondStandard, "test-standard", 5, TTL)))
+                .as("half of %s runs are taken", max).isEqualTo(Admission.GLOBAL_LIMIT);
+        assertThat(inScope(storeB, () -> shares.admit(scope(storeB), critical, "test-critical", 5, TTL)))
+                .as("a reserved slot").isEqualTo(Admission.GRANTED);
+        release(storeA, standard);
+        release(storeB, critical);
+    }
+
+    @Test
+    void theSharesOfThePrioritiesComeFromTheVersionedParameterSet() {
+        AiAdmissionSettings defaults = AiAdmissionSettings.defaults();
+        assertThat(defaults.priorityOf("inventory-agent")).isEqualTo(AiAdmissionSettings.Priority.CRITICAL);
+        assertThat(defaults.priorityOf("anything-else")).isEqualTo(AiAdmissionSettings.Priority.STANDARD);
+        assertThat(defaults.capacity(AiAdmissionSettings.Priority.CRITICAL, 8)).isEqualTo(8);
+        assertThat(defaults.capacity(AiAdmissionSettings.Priority.STANDARD, 8)).isEqualTo(6);
+        assertThat(defaults.capacity(AiAdmissionSettings.Priority.BACKGROUND, 8)).isEqualTo(4);
+        assertThat(defaults.capacity(AiAdmissionSettings.Priority.BACKGROUND, 1)).as("at least one").isEqualTo(1);
+        assertThatThrownBy(() -> new AiAdmissionSettings("ai-admission/2", AiAdmissionSettings.Priority.STANDARD,
+                null, 50, 75, Duration.ofMinutes(2), Duration.ofSeconds(5), Duration.ofSeconds(30), 20))
+                .as("background above standard").isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new AiAdmissionSettings("admission-2", AiAdmissionSettings.Priority.STANDARD,
+                null, 75, 50, Duration.ofMinutes(2), Duration.ofSeconds(5), Duration.ofSeconds(30), 20))
+                .isInstanceOf(IllegalArgumentException.class);
+        AiAdmissionSettings noWaiting = new AiAdmissionSettings("ai-admission/2", AiAdmissionSettings.Priority.STANDARD,
+                null, 75, 50, Duration.ZERO, Duration.ofSeconds(5), Duration.ofSeconds(30), 0);
+        assertThat(noWaiting.nextWait(Duration.ZERO, new java.util.Random(1))).isEmpty();
+        AiAdmissionSettings exact = new AiAdmissionSettings("ai-admission/2", AiAdmissionSettings.Priority.STANDARD,
+                null, 75, 50, Duration.ofMinutes(2), Duration.ofSeconds(5), Duration.ofSeconds(30), 0);
+        java.util.List<Long> steps = new ArrayList<>();
+        Duration waited = Duration.ZERO;
+        for (var next = exact.nextWait(waited, new java.util.Random(1)); next.isPresent();
+                next = exact.nextWait(waited, new java.util.Random(1))) {
+            steps.add(next.get().toSeconds());
+            waited = waited.plus(next.get());
+        }
+        assertThat(steps).as("doubling, capped per step and in total").containsExactly(5L, 5L, 10L, 20L, 30L, 30L);
     }
 
     @Test

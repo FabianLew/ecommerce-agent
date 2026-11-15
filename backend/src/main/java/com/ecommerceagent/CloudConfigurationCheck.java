@@ -7,6 +7,7 @@ import java.util.Map;
 
 import com.ecommerceagent.automation.guardian.InventoryProtectionPolicy;
 import com.ecommerceagent.decisions.RiskDetectorSettings;
+import com.ecommerceagent.aigovernance.AiAdmissionSettings;
 import com.ecommerceagent.aigovernance.AiBudgetAlertSettings;
 import com.ecommerceagent.aigovernance.ProviderRateLimits;
 import com.ecommerceagent.intelligence.inventory.InventoryAgentRunPolicy;
@@ -141,6 +142,14 @@ public class CloudConfigurationCheck implements ApplicationListener<ApplicationE
             if (overridden(alerts.parameters(), alertDefaults.parameters())
                     && alerts.version().equals(alertDefaults.version())) {
                 problems.add(AiBudgetAlertSettings.PREFIX + " differs from the defaults of " + alertDefaults.version()
+                        + "; set its own version");
+            }
+            AiAdmissionSettings admission = binder.bindOrCreate(AiAdmissionSettings.PREFIX,
+                    AiAdmissionSettings.class);
+            AiAdmissionSettings admissionDefaults = AiAdmissionSettings.defaults();
+            if (overridden(admission.parameters(), admissionDefaults.parameters())
+                    && admission.version().equals(admissionDefaults.version())) {
+                problems.add(AiAdmissionSettings.PREFIX + " differs from the defaults of " + admissionDefaults.version()
                         + "; set its own version");
             }
             ApiRateLimits api = binder.bindOrCreate(ApiRateLimits.PREFIX, ApiRateLimits.class);

@@ -810,7 +810,7 @@ below.
   frees its slot. A run that is not admitted ends `LIMIT_EXCEEDED` with `AI_GOVERNANCE:STORE_LIMIT` or
   `GLOBAL_LIMIT` before anything is reserved, and the fallback model is not tried. The store limit keeps one store
   from taking the platform pool (criterion 24). Not yet: provider RPM/TPM, priorities and queue length (section 6.2);
-  at pilot scale the per-run limits and the concurrency bound them.
+  at pilot scale the per-run limits and the concurrency bound them (closed in stage 2 by E-54.3 and E-54.4).
 - Gap 9 is closed. `ai_platform_stop_change` is an append-only log of stop decisions written by operations with the
   administration role; the runtime cannot change it. The database enforces it: no run is admitted while it is on, and
   `ai_mark_sent` refuses a call reserved before the stop and releases its reservation (`SendDecision.STOPPED`), so the
@@ -937,3 +937,21 @@ after a stream started and for calls that were never sent.
   currency (USD) with their ISO code in every API answer; the frontend formats any currency
   (`formatMoney`, tested with USD, EUR and PLN), never assuming PLN. New definer functions:
   `ai_record_budget_alerts`, `ai_budget_alerts`.
+- **E-54.4, priorities, reserved slots and bounded waiting.** The versioned parameter set `ai-admission/1`
+  (`operator.ai-admission`) gives every registered automation a priority (`CRITICAL`, `STANDARD` by default,
+  `BACKGROUND`; the Inventory Guardian's `inventory-agent` is `CRITICAL`, since it protects stock that is running
+  out). A priority may fill a share of the platform's concurrent runs: `CRITICAL` all of them, `STANDARD` 75 percent,
+  `BACKGROUND` 50 percent, at least one run each. Admission passes that share to `ai_acquire_run_lease` as the
+  platform limit, so the slots above it stay free for higher priorities and a burst of lower-priority work never
+  takes the last slots from critical work; the per-store limit still keeps one store from starving the others. No
+  migration was needed. A run refused a slot before anything was sent (`STORE_LIMIT`, `GLOBAL_LIMIT`, or a provider
+  limit with nothing charged) uses no model attempt: the proposer asks the same model again with the next attempt
+  number, and a budget refusal, a stop or a paid call never waits. The queue is the episode's Temporal workflow:
+  version 2 of the `agent-proposer` change calls `proposeAndPersistOrWait`, which stores nothing while it may wait
+  and answers how long; the workflow sleeps on a durable timer (no thread or connection is held) and asks again.
+  The waits start at 5 seconds and grow with the time already waited, at most 30 seconds each, minus up to 20
+  percent of jitter, and stop after 2 minutes in total; then the baseline answers as before. The queue length is
+  bounded by the open episodes (one workflow per episode) and each one's wait by `max-wait`. Metrics
+  `operator_ai_admissions_total{priority}` and `operator_ai_admission_waits_total{reason,outcome}`, alert
+  `AiAdmissionWaitExhausted`. Histories of version 1 and earlier replay unchanged; a recorded version 2 history is
+  replayed in `InventoryGuardianWorkflowTest`.

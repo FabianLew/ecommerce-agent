@@ -1,6 +1,7 @@
 package com.ecommerceagent.intelligence.inventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -104,7 +105,8 @@ class AgentRuntimeSafetyTest {
     }
 
     InventoryAgentProposer proposer(InventoryAgentRunPolicy policy) {
-        return new InventoryAgentProposer(runtime(), runs, settings, policy, knowledge, registry, clock);
+        return new InventoryAgentProposer(runtime(), runs, settings, policy,
+                com.ecommerceagent.aigovernance.AiAdmissionSettings.defaults(), knowledge, registry, clock);
     }
 
     static InventoryAgentRunPolicy policy(String version, int maxModelCalls, int maxOutputTokensPerCall,
@@ -624,6 +626,61 @@ class AgentRuntimeSafetyTest {
         AgentRun run = runs.only();
         assertThat(run.status()).isEqualTo(AgentRunStatus.LIMIT_EXCEEDED);
         assertThat(run.stopReason()).isEqualTo("AI_GOVERNANCE:STORE_LIMIT");
+    }
+
+    /**
+     * ADR-0027 section 6.2 (E-54.4): a run refused a slot before anything was sent uses no model attempt. The
+     * decision may wait, for a bounded time, and the next run asks the same model with the next attempt number.
+     */
+    @Test
+    void aRunRefusedASlotUsesNoModelAttemptAndMayWaitForABoundedTime() {
+        governance.admission(com.ecommerceagent.aigovernance.AiAdmission.Admission.GLOBAL_LIMIT);
+        InventoryAgentProposer proposer = proposer();
+
+        var refused = proposer.decide(scope, SnapshotFixture.OPPORTUNITY, snapshot);
+
+        assertThat(refused.waitable()).isTrue();
+        assertThat(refused.fallback()).isEqualTo("AI_GOVERNANCE:GLOBAL_LIMIT");
+        assertThat(proposer.nextWait(refused, Duration.ZERO)).get()
+                .satisfies(wait -> assertThat(wait).isBetween(Duration.ofSeconds(4), Duration.ofSeconds(5)));
+        assertThat(proposer.nextWait(refused, Duration.ofSeconds(40))).get()
+                .satisfies(wait -> assertThat(wait).isBetween(Duration.ofSeconds(24), Duration.ofSeconds(30)));
+        assertThat(proposer.nextWait(refused, Duration.ofSeconds(100))).as("the wait is bounded by max-wait")
+                .isEmpty();
+        assertThat(model.requests()).isEmpty();
+
+        governance.admission(com.ecommerceagent.aigovernance.AiAdmission.Admission.GRANTED);
+        model.thenText(pause());
+        var admitted = proposer.decide(scope, SnapshotFixture.OPPORTUNITY, snapshot);
+
+        assertThat(admitted.proposal()).isPresent();
+        assertThat(admitted.waitable()).isFalse();
+        assertThat(model.requests()).extracting(ModelRequest::model).as("the primary model, not the fallback")
+                .containsExactly(PRIMARY);
+        assertThat(runs.attempts(scope,
+                InventoryAgentProposer.analysisKey(SnapshotFixture.OPPORTUNITY, SnapshotFixture.SNAPSHOT)))
+                .extracting(AgentRun::attempt, AgentRun::model, AgentRun::status)
+                .containsExactly(tuple(1, PRIMARY.name(), AgentRunStatus.LIMIT_EXCEEDED),
+                        tuple(2, PRIMARY.name(), AgentRunStatus.SUCCEEDED));
+    }
+
+    /** A refused budget, a stop or a paid call never waits: only a slot can free up on its own. */
+    @Test
+    void aBudgetRefusalOrAStopNeverWaits() {
+        governance.deny("BUDGET_EXHAUSTED:STORE:MONTHLY");
+        InventoryAgentProposer proposer = proposer();
+
+        var exhausted = proposer.decide(scope, SnapshotFixture.OPPORTUNITY, snapshot);
+
+        assertThat(exhausted.fallback()).isEqualTo("AI_GOVERNANCE:BUDGET_EXHAUSTED:STORE:MONTHLY");
+        assertThat(exhausted.waitable()).isFalse();
+        assertThat(proposer.nextWait(exhausted, Duration.ZERO)).isEmpty();
+
+        governance.admission(com.ecommerceagent.aigovernance.AiAdmission.Admission.STORE_STOPPED);
+        var stopped = proposer().decide(scope, UUID.randomUUID(), snapshot);
+        assertThat(stopped.fallback()).isEqualTo("AI_GOVERNANCE:STORE_STOPPED");
+        assertThat(stopped.waitable()).isFalse();
+        assertThat(model.requests()).isEmpty();
     }
 
     /** Every admitted run asks with its policy's store limit and gives its lease back, also when it fails. */

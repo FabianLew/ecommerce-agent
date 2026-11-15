@@ -241,6 +241,9 @@ class InventoryGuardianWorkflowTest {
                 InventoryGuardianWorkflowImpl.class);
         WorkflowReplayer.replayWorkflowExecutionFromResource("temporal/inventory-guardian-v2.json",
                 InventoryGuardianWorkflowImpl.class);
+        // v3: proposeAndPersistOrWait, an agent that waited for a slot (ADR-0027 section 6.2).
+        WorkflowReplayer.replayWorkflowExecutionFromResource("temporal/inventory-guardian-v3-wait.json",
+                InventoryGuardianWorkflowImpl.class);
     }
 
     private InventoryGuardianWorkflow start(Opportunity episode) {

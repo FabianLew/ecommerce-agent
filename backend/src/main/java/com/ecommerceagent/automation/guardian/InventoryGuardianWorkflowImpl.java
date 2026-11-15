@@ -20,7 +20,10 @@ import org.slf4j.Logger;
 @WorkflowImpl(taskQueues = TaskQueues.MAIN)
 public class InventoryGuardianWorkflowImpl implements InventoryGuardianWorkflow {
 
-    /** Episodes started before ADR-0016 replay with the baseline-only steps. */
+    /**
+     * Episodes started before ADR-0016 replay with the baseline-only steps; version 1 asks the agent once, version 2
+     * also waits for an AI slot (ADR-0027 section 6.2).
+     */
     static final String AGENT_PROPOSER_CHANGE = "agent-proposer";
     /** Episodes started before ADR-0020 never wait for an approval. */
     static final String APPROVAL_EXECUTION_CHANGE = "approval-execution";
@@ -162,11 +165,25 @@ public class InventoryGuardianWorkflowImpl implements InventoryGuardianWorkflow 
         ContextRef context = activities.buildContext(input.opportunityId());
         analyzedCover = context.daysOfCover();
         ProposalOutcome outcome;
-        if (Workflow.getVersion(AGENT_PROPOSER_CHANGE, Workflow.DEFAULT_VERSION, 1) == Workflow.DEFAULT_VERSION) {
+        int proposer = Workflow.getVersion(AGENT_PROPOSER_CHANGE, Workflow.DEFAULT_VERSION, 2);
+        if (proposer == Workflow.DEFAULT_VERSION) {
             String recommendation = activities.propose(context.snapshotId());
             outcome = activities.validateAndPersist(input.opportunityId(), context.snapshotId(), recommendation);
-        } else {
+        } else if (proposer == 1) {
             outcome = proposing.proposeAndPersist(input.opportunityId(), context.snapshotId());
+            proposerKind = outcome.proposerKind();
+            agentFallback = outcome.agentFallback();
+        } else {
+            // Version 2 (ADR-0027 section 6.2): an agent refused a slot waits on a durable timer, bounded by the
+            // activity, and asks again; the activity answers with a stored proposal once it stops waiting.
+            long waited = 0;
+            outcome = proposing.proposeAndPersistOrWait(input.opportunityId(), context.snapshotId(), waited);
+            while (outcome.waiting()) {
+                agentFallback = outcome.agentFallback();
+                Workflow.sleep(Duration.ofSeconds(outcome.waitSeconds()));
+                waited += outcome.waitSeconds();
+                outcome = proposing.proposeAndPersistOrWait(input.opportunityId(), context.snapshotId(), waited);
+            }
             proposerKind = outcome.proposerKind();
             agentFallback = outcome.agentFallback();
         }
