@@ -168,8 +168,9 @@ class AiAdmissionTest {
     }
 
     /**
-     * E-54.4, reserved slots: a standard automation fills only its share of the platform's runs, and the slots above
-     * it stay free for critical work. Other tests' open leases count too, so the limit is set above them.
+     * E-54.4, reserved slots: a standard automation is admitted only while all active runs of the platform, of every
+     * priority, stay below its share, so the slots above it stay free for critical work, and critical runs count
+     * toward the share too. Other tests' open leases count as well, so the limit is set above them.
      */
     @Test
     void aLowerPriorityLeavesTheReservedSlotsToCriticalWork() {
@@ -190,6 +191,7 @@ class AiAdmissionTest {
         UUID standard = run(storeA, opportunityA);
         UUID secondStandard = run(storeB, opportunityB);
         UUID critical = run(storeB, opportunityB);
+        UUID afterCritical = run(storeA, opportunityA);
 
         assertThat(inScope(storeA, () -> shares.admit(scope(storeA), standard, "test-standard", 5, TTL)))
                 .isEqualTo(Admission.GRANTED);
@@ -198,6 +200,8 @@ class AiAdmissionTest {
         assertThat(inScope(storeB, () -> shares.admit(scope(storeB), critical, "test-critical", 5, TTL)))
                 .as("a reserved slot").isEqualTo(Admission.GRANTED);
         release(storeA, standard);
+        assertThat(inScope(storeA, () -> shares.admit(scope(storeA), afterCritical, "test-standard", 5, TTL)))
+                .as("the critical run counts toward the standard share").isEqualTo(Admission.GLOBAL_LIMIT);
         release(storeB, critical);
     }
 
@@ -209,7 +213,14 @@ class AiAdmissionTest {
         assertThat(defaults.capacity(AiAdmissionSettings.Priority.CRITICAL, 8)).isEqualTo(8);
         assertThat(defaults.capacity(AiAdmissionSettings.Priority.STANDARD, 8)).isEqualTo(6);
         assertThat(defaults.capacity(AiAdmissionSettings.Priority.BACKGROUND, 8)).isEqualTo(4);
-        assertThat(defaults.capacity(AiAdmissionSettings.Priority.BACKGROUND, 1)).as("at least one").isEqualTo(1);
+        // Small platform limits (critical / standard / background): at 1 nothing is reserved, at 2 one slot is kept
+        // for critical work, at 3 one slot above standard and two above background.
+        for (int[] row : new int[][] {{1, 1, 1, 1}, {2, 2, 1, 1}, {3, 3, 2, 1}}) {
+            assertThat(new int[] {defaults.capacity(AiAdmissionSettings.Priority.CRITICAL, row[0]),
+                    defaults.capacity(AiAdmissionSettings.Priority.STANDARD, row[0]),
+                    defaults.capacity(AiAdmissionSettings.Priority.BACKGROUND, row[0])})
+                    .as("shares at a platform limit of %s", row[0]).containsExactly(row[1], row[2], row[3]);
+        }
         assertThatThrownBy(() -> new AiAdmissionSettings("ai-admission/2", AiAdmissionSettings.Priority.STANDARD,
                 null, 50, 75, Duration.ofMinutes(2), Duration.ofSeconds(5), Duration.ofSeconds(30), 20))
                 .as("background above standard").isInstanceOf(IllegalArgumentException.class);

@@ -606,10 +606,15 @@ provider billing.
 - O-07: reconciliation procedure with Anthropic and Bedrock billing reports.
 - O-08: retention of the financial ledger and usage data.
 - O-09: policy for `UNKNOWN` reservations that stay unsettled for a long time.
+- O-10: admission priorities by the urgency of the business situation (for example a stockout within hours against a
+  routine review), not only by automation type. `ai-admission/1` (Inventory Guardian `CRITICAL`, others `STANDARD`;
+  shares 100/75/50 percent) is accepted only for the current single-agent scope of the first pilot (owner decision,
+  2026-11-15). This is a requirement before a multi-agent rollout; admission control is not rebuilt before then.
 
 None of them blocks this decision or stage 2 implementation. O-05 is answered: USD is the technical currency and the
 interface is multi-currency (section 3.2). O-01, O-02, O-04, O-06 are product settings answered before customers;
-O-03, O-07, O-08 and O-09 must be closed before paid AI operations run for customers. (They are
+O-03, O-07, O-08 and O-09 must be closed before paid AI operations run for customers; O-10 before a second agent
+is rolled out. (They are
 numbered within this ADR; they are not the plan's O-xx questions.)
 
 ## 21. Implementation plan
@@ -940,11 +945,17 @@ after a stream started and for calls that were never sent.
 - **E-54.4, priorities, reserved slots and bounded waiting.** The versioned parameter set `ai-admission/1`
   (`operator.ai-admission`) gives every registered automation a priority (`CRITICAL`, `STANDARD` by default,
   `BACKGROUND`; the Inventory Guardian's `inventory-agent` is `CRITICAL`, since it protects stock that is running
-  out). A priority may fill a share of the platform's concurrent runs: `CRITICAL` all of them, `STANDARD` 75 percent,
-  `BACKGROUND` 50 percent, at least one run each. Admission passes that share to `ai_acquire_run_lease` as the
-  platform limit, so the slots above it stay free for higher priorities and a burst of lower-priority work never
-  takes the last slots from critical work; the per-store limit still keeps one store from starving the others. No
-  migration was needed. A run refused a slot before anything was sent (`STORE_LIMIT`, `GLOBAL_LIMIT`, or a provider
+  out). Each priority has a share of the platform limit `operator.ai-governance.max-concurrent-runs`: `CRITICAL` all
+  of it, `STANDARD` 75 percent, `BACKGROUND` 50 percent, rounded down, at least one run. Admission passes that share
+  to `ai_acquire_run_lease` as the platform limit, and the function compares it with all active runs of the
+  platform, of every priority: a run is admitted only while the total occupancy is below its priority's share. The
+  share is therefore a ceiling on total occupancy, not a quota of runs per priority: critical runs count toward the
+  standard share too, and a lower priority is never guaranteed a slot. The slots between a share and the full limit
+  stay free for higher priorities, so a burst of lower-priority work never takes the last slots from critical work;
+  the per-store limit still keeps one store from starving the others. At small limits the shares are (critical /
+  standard / background) 1/1/1 at a limit of 1, where nothing is reserved; 2/1/1 at 2, one slot kept for critical
+  work; 3/2/1 at 3; 8/6/4 at the default of 8. No migration was needed. The priority comes from the automation type
+  only; priorities by the urgency of the business situation are required before more agents are rolled out (O-10). A run refused a slot before anything was sent (`STORE_LIMIT`, `GLOBAL_LIMIT`, or a provider
   limit with nothing charged) uses no model attempt: the proposer asks the same model again with the next attempt
   number, and a budget refusal, a stop or a paid call never waits. The queue is the episode's Temporal workflow:
   version 2 of the `agent-proposer` change calls `proposeAndPersistOrWait`, which stores nothing while it may wait

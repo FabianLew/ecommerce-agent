@@ -19,11 +19,13 @@ import org.springframework.context.annotation.Configuration;
  * waiting for a slot.
  *
  * <p>Each automation has a priority ({@code priorities}, by registered automation type; any other automation has
- * {@code defaultPriority}). A priority may fill a share of the platform's concurrent runs
+ * {@code defaultPriority}). Each priority has a share of the platform's concurrent runs
  * ({@code operator.ai-governance.max-concurrent-runs}): {@code CRITICAL} all of it, {@code STANDARD}
- * {@code standardCapacityPercent}, {@code BACKGROUND} {@code backgroundCapacityPercent}, at least one run each. The
- * slots above a share stay free for the higher priorities, so a burst of lower-priority work never takes the last
- * slots from critical work. The per-store limit applies to every priority alike.
+ * {@code standardCapacityPercent}, {@code BACKGROUND} {@code backgroundCapacityPercent}, rounded down, at least one
+ * run. A run is admitted only while all active runs of the platform, of every priority, are below its share: the share
+ * caps total occupancy, it is not a quota per priority. The slots above a share stay free for the higher priorities,
+ * so a burst of lower-priority work never takes the last slots from critical work; at a platform limit of 1 nothing
+ * is reserved. The per-store limit applies to every priority alike.
  *
  * <p>A run refused for a full store or platform waits in its workflow (a durable Temporal timer, no thread is held)
  * and asks again: first after {@code initialWait}, then after as long as it has already waited, at most
