@@ -65,6 +65,18 @@ public class StoreAccess {
     }
 
     /**
+     * System scopes of every store, for a job that does its work store by store under row-level security
+     * (ADR-0022 point 4). Use {@link SystemStoreRunner} to bind each one.
+     */
+    public List<TrustedStoreScope> systemScopes(String service) {
+        SystemActor actor = new SystemActor(service);
+        return jdbc.sql("SELECT id, organization_id FROM store ORDER BY organization_id, id")
+                .query((rs, row) -> new TrustedStoreScope(rs.getObject("organization_id", UUID.class),
+                        rs.getObject("id", UUID.class), actor, Set.of(), SYSTEM_PERMISSIONS))
+                .list();
+    }
+
+    /**
      * Re-checks the actor against the database right before a sensitive operation and returns a fresh
      * scope. A scope or approval created earlier never outlives a revoked membership or a changed role.
      *
@@ -90,9 +102,65 @@ public class StoreAccess {
                 .orElseThrow(() -> new StoreAccessDeniedException(scope.storeId(), StorePermission.STORE_READ));
     }
 
+    /** The store's time zone for any trusted scope, user or system (UTC when unset or not valid). */
+    public java.time.ZoneId zone(TrustedStoreScope scope) {
+        String timezone = jdbc.sql("SELECT timezone FROM store WHERE id = :storeId AND organization_id = :organizationId")
+                .param("storeId", scope.storeId())
+                .param("organizationId", scope.organizationId())
+                .query(String.class)
+                .optional()
+                .orElse(null);
+        try {
+            return timezone == null || timezone.isBlank() ? java.time.ZoneOffset.UTC : java.time.ZoneId.of(timezone);
+        } catch (java.time.DateTimeException e) {
+            return java.time.ZoneOffset.UTC;
+        }
+    }
+
     private static TrustedStoreScope userScope(UUID userId, AccessibleStore store) {
         return new TrustedStoreScope(store.organizationId(), store.storeId(), new UserActor(userId), store.roles(),
                 StoreRole.permissionsOf(store.roles()));
+    }
+
+    /**
+     * The people who currently hold the permission in the scope's store, with their e-mail address, for backend
+     * notifications. Never derived from a payload: the store comes from the trusted scope.
+     */
+    public List<RegisteredUser> membersWith(TrustedStoreScope scope, StorePermission permission) {
+        List<String> roles = Arrays.stream(StoreRole.values())
+                .filter(role -> StoreRole.permissionsOf(Set.of(role)).contains(permission))
+                .map(Enum::name)
+                .toList();
+        return jdbc.sql("""
+                        SELECT DISTINCT u.id, u.email, u.display_name
+                        FROM store_membership m
+                        JOIN app_user u ON u.id = m.user_id
+                        WHERE m.organization_id = :organizationId AND m.store_id = :storeId AND m.role IN (:roles)
+                        ORDER BY u.id
+                        """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .param("roles", roles)
+                .query((rs, n) -> new RegisteredUser(rs.getObject("id", UUID.class), rs.getString("email"),
+                        rs.getString("display_name")))
+                .list();
+    }
+
+    /** Members of the store with exactly this role, ordered by id (the alert owners of ADR-0026 point 5). */
+    public List<RegisteredUser> membersWithRole(TrustedStoreScope scope, StoreRole role) {
+        return jdbc.sql("""
+                        SELECT DISTINCT u.id, u.email, u.display_name
+                        FROM store_membership m
+                        JOIN app_user u ON u.id = m.user_id
+                        WHERE m.organization_id = :organizationId AND m.store_id = :storeId AND m.role = :role
+                        ORDER BY u.id
+                        """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .param("role", role.name())
+                .query((rs, n) -> new RegisteredUser(rs.getObject("id", UUID.class), rs.getString("email"),
+                        rs.getString("display_name")))
+                .list();
     }
 
     private boolean storeExists(UUID organizationId, UUID storeId) {

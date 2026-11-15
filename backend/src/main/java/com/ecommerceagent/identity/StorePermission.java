@@ -8,5 +8,7 @@ public enum StorePermission {
     /** Read store data, decisions and reports. */
     STORE_READ,
     /** Change store settings, integrations and memberships. */
-    STORE_MANAGE
+    STORE_MANAGE,
+    /** Approve or reject a proposed action, and stop mutations (ADR-0020). */
+    DECISION_APPROVE
 }

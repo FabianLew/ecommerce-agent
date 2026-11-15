@@ -17,6 +17,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.automation.TaskQueues;
 import com.ecommerceagent.automation.events.EventDispatch;
@@ -56,7 +57,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
@@ -94,7 +94,7 @@ class IncrementalSyncTest {
     @Autowired
     WorkflowClient client;
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
 
     HttpServer woo;
     final List<String> requests = new CopyOnWriteArrayList<>();

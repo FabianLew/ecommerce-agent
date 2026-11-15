@@ -1,33 +1,30 @@
 package com.ecommerceagent.identity;
 
+import org.springframework.jdbc.core.simple.JdbcClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.UUID;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @Import(TestcontainersConfiguration.class)
 class IdentitySchemaTest {
 
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
 
     @Autowired
     AuditTrail audit;
 
-    @Autowired
-    PlatformTransactionManager transactionManager;
 
     @Test
     void auditEventsCannotBeChangedOrDeleted() {
@@ -87,11 +84,9 @@ class IdentitySchemaTest {
 
     @Test
     void compositeKeyGuardDetectsAViolatingTable() {
-        TransactionTemplate tx = new TransactionTemplate(transactionManager);
-        tx.executeWithoutResult(status -> {
-            jdbc.sql("CREATE TABLE guard_probe (organization_id uuid, store_id uuid REFERENCES store (id))").update();
-            assertThat(tablesMissingCompositeStoreKey()).containsExactly("guard_probe");
-            status.setRollbackOnly();
+        jdbc.rolledBack(tx -> {
+            tx.sql("CREATE TABLE guard_probe (organization_id uuid, store_id uuid REFERENCES store (id))").update();
+            assertThat(tablesMissingCompositeStoreKey(tx)).containsExactly("guard_probe");
         });
         assertThat(tablesMissingCompositeStoreKey()).isEmpty();
     }
@@ -108,7 +103,11 @@ class IdentitySchemaTest {
     }
 
     private List<String> tablesMissingCompositeStoreKey() {
-        return jdbc.sql("""
+        return tablesMissingCompositeStoreKey(jdbc.client());
+    }
+
+    private static List<String> tablesMissingCompositeStoreKey(JdbcClient db) {
+        return db.sql("""
                         SELECT c.table_name FROM information_schema.columns c
                         JOIN information_schema.tables t
                           ON t.table_schema = c.table_schema AND t.table_name = c.table_name

@@ -74,6 +74,20 @@ public class Opportunities {
                 .optional();
     }
 
+    /** Episodes about one subject, newest first (analytics drill-down). */
+    public java.util.List<Opportunity> ofSubject(TrustedStoreScope scope, String subjectType, UUID subjectId,
+            int limit) {
+        return jdbc.sql(SELECT + " AND subject_type = :subjectType AND subject_id = :subjectId"
+                        + " ORDER BY opened_at DESC LIMIT :limit")
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .param("subjectType", subjectType)
+                .param("subjectId", subjectId)
+                .param("limit", limit)
+                .query(Opportunities::map)
+                .list();
+    }
+
     public Optional<Opportunity> active(TrustedStoreScope scope, OpportunityCategory category, String subjectType,
             UUID subjectId) {
         return jdbc.sql(SELECT + """
@@ -87,6 +101,19 @@ public class Opportunities {
                 .param("subjectId", subjectId)
                 .query(Opportunities::map)
                 .optional();
+    }
+
+    /** The ids of the store's episodes that are not finished; retention keeps their data (ADR-0022 point 7). */
+    public java.util.List<UUID> unfinishedIds(TrustedStoreScope scope) {
+        return jdbc.sql("""
+                        SELECT id FROM opportunity
+                        WHERE organization_id = :organizationId AND store_id = :storeId
+                          AND status NOT IN ('RESOLVED', 'CLOSED')
+                        """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .query(UUID.class)
+                .list();
     }
 
     /**

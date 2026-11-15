@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.automation.sync.WooImportWorkflow;
 import com.ecommerceagent.automation.temporal.StoreContextPropagator;
@@ -51,7 +52,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
@@ -87,7 +87,7 @@ class SyncRecoveryTest {
     @Autowired
     WorkflowClient client;
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
     @Autowired
     Clock clock;
 

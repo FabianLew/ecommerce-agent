@@ -1,5 +1,8 @@
 package com.ecommerceagent.decisions;
 
+import com.ecommerceagent.FixtureDb;
+import com.ecommerceagent.identity.StoreScopeBinding;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -41,11 +44,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * B-19 (ADR-0011): detector {@code inventory-risk/1} opens an episode only after a series of current risk
+ * B-19 (ADR-0011): detector {@code inventory-risk/2} opens an episode only after a series of current risk
  * observations, and a subject has at most one active episode even under concurrent opening (IG-05).
  *
  * <p>Scenario from 03 §2: 18 sellable units, 49 sold in the 7 full local days before 14.11.2026, so 2.5714
@@ -61,7 +63,8 @@ class InventoryRiskDetectorTest {
     static final Instant AS_OF = Instant.parse("2026-11-14T08:00:30Z");
     /** 07.11.2026 00:00 in Europe/Warsaw. */
     static final Instant WINDOW_FROM = Instant.parse("2026-11-06T23:00:00Z");
-    static final RiskDetectorSettings SETTINGS = new RiskDetectorSettings(new BigDecimal("3"), 2,
+    static final RiskDetectorSettings SETTINGS = new RiskDetectorSettings(
+            RiskDetectorSettings.DEFAULT_VERSION, new BigDecimal("3"), new BigDecimal("5"), 2,
             Duration.ofMinutes(5), Duration.ofSeconds(120));
 
     @Autowired
@@ -79,7 +82,13 @@ class InventoryRiskDetectorTest {
     @Autowired
     TransactionTemplate transactions;
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
+
+    @Autowired
+    JdbcClient appJdbc;
+
+    @Autowired
+    StoreScopeBinding binding;
 
     final TestClock clock = new TestClock(AS_OF);
     InventoryRiskDetector detector;
@@ -98,7 +107,9 @@ class InventoryRiskDetectorTest {
         scopeA = storeAccess.systemScope("risk-test", ORG, STORE_A).orElseThrow();
         scopeB = storeAccess.systemScope("risk-test", ORG, STORE_B).orElseThrow();
         clock.set(AS_OF);
-        detector = new InventoryRiskDetector(metrics, opportunities, SETTINGS, jdbc, clock);
+        // Built by hand for its clock; the binding advisor gives it the store binding a bean has (ADR-0022).
+        detector = (InventoryRiskDetector) binding.postProcessAfterInitialization(
+                new InventoryRiskDetector(metrics, opportunities, SETTINGS, appJdbc, clock), "detector");
 
         catalog.upsertProduct(scopeA, CommerceSource.WOOCOMMERCE,
                 new ProductData("812", "Serum", "SERUM", "variable", "publish", null));
@@ -120,7 +131,7 @@ class InventoryRiskDetectorTest {
         RiskAssessment first = detector.assess(scopeA, serum, null);
         assertThat(first.observation().outcome()).isEqualTo(RiskOutcome.AT_RISK);
         assertThat(first.observation().daysOfCover()).isEqualByComparingTo("2.5714");
-        assertThat(first.observation().detectorVersion()).isEqualTo("inventory-risk/1");
+        assertThat(first.observation().detectorVersion()).isEqualTo("inventory-risk/2");
         assertThat(first.opportunity()).isNull();
         assertThat(first.nextCheckAt()).isEqualTo(AS_OF.plus(Duration.ofMinutes(5)));
 

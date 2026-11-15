@@ -93,7 +93,9 @@ test("a stock drop in WooCommerce becomes a pause proposal waiting for approval 
   await expect(summary.getByText("ad-9001")).toBeVisible();
   await expect(summary.getByText("18", { exact: true })).toBeVisible();
   await expect(summary.getByText("49", { exact: true })).toBeVisible();
-  await expect(page.getByTestId("approval-blocked")).toContainText("Shadow mode");
+  // ADR-0025: the first cap a person can fix is shown; monitoring was not started, and the deployment is in shadow
+  // mode on top (the backend tests cover each cap).
+  await expect(page.getByTestId("approval-blocked")).toContainText("Monitoring has not been started");
   await expect(page.getByRole("button", { name: "Approve" })).toBeDisabled();
 
   const why = page.getByTestId("decision-why");

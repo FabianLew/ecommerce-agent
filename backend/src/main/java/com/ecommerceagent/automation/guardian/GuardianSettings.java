@@ -19,6 +19,14 @@ public record GuardianSettings(
         @DefaultValue("5") int maxReanalyses,
         @DefaultValue("0.5") BigDecimal significantCoverChange) {
 
+    /** Refuses to start with a proposal TTL that would make every proposal expire at once (ADR-0020 point 2). */
+    public GuardianSettings {
+        if (proposalTtl == null || proposalTtl.isNegative() || proposalTtl.isZero()) {
+            throw new IllegalArgumentException(
+                    "operator.inventory-guardian.workflow.proposal-ttl must be positive, was " + proposalTtl);
+        }
+    }
+
     public GuardianInput input(String opportunityId, String variantId) {
         return new GuardianInput(opportunityId, variantId, proposalTtl.toSeconds(), episodeTimeout.toSeconds(),
                 dataRetryDelay.toSeconds(), maxDataRetries, maxReanalyses, significantCoverChange.toPlainString());

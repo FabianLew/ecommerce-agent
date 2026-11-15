@@ -1,6 +1,6 @@
 # ADR-0015: WooCommerce order history import (12 months) in the background
 
-- Status: Proposed
+- Status: Accepted (PR merge, 2026-11-15)
 - Date: 2026-11-14
 - Related: ADR-0008 (initial import, completeness), ADR-0010 (schedules, watermarks, Integration Health), plan
   correction 2 (do not block the Inventory Guardian on the full history), backlog B-13b

@@ -1,0 +1,9 @@
+**/node_modules
+**/.next
+**/build
+**/.gradle
+frontend/playwright-report
+frontend/test-results
+frontend/tsconfig.tsbuildinfo
+spikes
+.git

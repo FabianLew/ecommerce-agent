@@ -53,15 +53,18 @@ class WebhookInboxRepository {
      * Locks the next due item of any store for the caller's transaction (worker side). The item carries its
      * store ids only so that the caller can build a verified system scope from them.
      */
-    Optional<InboxItem> claimNext() {
+    Optional<InboxItem> claimNext(TrustedStoreScope scope) {
         return jdbc.sql("""
                         SELECT id, organization_id, store_id, connection_id, topic, payload::text AS payload, attempts
                         FROM webhook_inbox
-                        WHERE status = 'RECEIVED' AND next_attempt_at <= :now
+                        WHERE organization_id = :organizationId AND store_id = :storeId
+                          AND status = 'RECEIVED' AND next_attempt_at <= :now
                         ORDER BY next_attempt_at, seq
                         LIMIT 1
                         FOR UPDATE SKIP LOCKED
                         """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
                 .param("now", Timestamp.from(clock.instant()))
                 .query((rs, n) -> new InboxItem(rs.getObject("id", UUID.class),
                         rs.getObject("organization_id", UUID.class), rs.getObject("store_id", UUID.class),
@@ -86,14 +89,17 @@ class WebhookInboxRepository {
     }
 
     /** Counts a failed attempt; the item is retried at {@code nextAttemptAt} or fails after the last attempt. */
-    void recordFailure(UUID id, int maxAttempts, Instant nextAttemptAt, String outcome) {
+    void recordFailure(TrustedStoreScope scope, UUID id, int maxAttempts, Instant nextAttemptAt, String outcome) {
         jdbc.sql("""
                         UPDATE webhook_inbox
                         SET attempts = attempts + 1, outcome = :outcome, next_attempt_at = :next,
                             status = CASE WHEN attempts + 1 >= :max THEN 'FAILED' ELSE status END,
                             processed_at = CASE WHEN attempts + 1 >= :max THEN :now ELSE processed_at END
-                        WHERE id = :id AND status = 'RECEIVED'
+                        WHERE id = :id AND organization_id = :organizationId AND store_id = :storeId
+                          AND status = 'RECEIVED'
                         """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
                 .param("outcome", outcome)
                 .param("next", Timestamp.from(nextAttemptAt))
                 .param("max", maxAttempts)

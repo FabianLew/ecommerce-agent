@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import com.ecommerceagent.decisions.ContextSnapshot;
 import com.ecommerceagent.decisions.ContextSnapshots;
 import com.ecommerceagent.decisions.DecisionProposals;
 import com.ecommerceagent.decisions.PauseAd;
@@ -66,6 +67,30 @@ public class PolicyEvaluations {
         }
         InventoryContext context = InventoryContext.of(snapshots.find(scope, stored.proposal().contextSnapshotId())
                 .orElseThrow());
+        return record(scope, stored, pause, context, null);
+    }
+
+    /**
+     * Evaluates the proposal's action again on a fresh snapshot of the same episode (ADR-0020 point 3), before an
+     * authorization is issued. The evaluation is recorded like any other, with the snapshot it used.
+     */
+    @Transactional
+    public PolicyEvaluation recheck(TrustedStoreScope scope, UUID proposalId, ContextSnapshot fresh) {
+        StoredProposal stored = proposals.find(scope, proposalId)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown proposal " + proposalId));
+        if (!(stored.proposal().recommendation().action() instanceof PauseAd pause)) {
+            throw new IllegalArgumentException("Proposal " + proposalId + " has no action to evaluate");
+        }
+        if (!fresh.opportunityId().equals(stored.proposal().subject() instanceof
+                com.ecommerceagent.decisions.OpportunitySubject subject ? subject.opportunityId() : null)) {
+            throw new IllegalArgumentException("Snapshot " + fresh.id() + " belongs to another episode");
+        }
+        return record(scope, stored, pause, InventoryContext.of(fresh), fresh.id());
+    }
+
+    private PolicyEvaluation record(TrustedStoreScope scope, StoredProposal stored, PauseAd pause,
+            InventoryContext context, UUID recheckSnapshotId) {
+        UUID proposalId = stored.proposal().proposalId();
         Instant now = clock.instant();
         PauseAdPolicy.Evaluation result = PauseAdPolicy.evaluate(policy, pause, context, health.status(scope), now);
         PolicyEvaluation evaluation = new PolicyEvaluation(UUID.randomUUID(), proposalId,
@@ -85,7 +110,8 @@ public class PolicyEvaluations {
                 .param("revision", evaluation.revision())
                 .param("key", evaluation.policyKey())
                 .param("version", evaluation.policyVersion())
-                .param("parameters", CanonicalJson.write(parameters()))
+                .param("parameters", CanonicalJson.write(recheckSnapshotId == null ? parameters()
+                        : parameters().put("contextSnapshotId", recheckSnapshotId.toString())))
                 .param("mode", evaluation.mode().name())
                 .param("outcome", evaluation.outcome().name())
                 .param("checks", CanonicalJson.write(checks(evaluation.checks())))
@@ -135,6 +161,8 @@ public class PolicyEvaluations {
         node.put("maxStockAge", policy.maxStockAge().toString());
         node.put("maxAdStateAge", policy.maxAdStateAge().toString());
         node.put("maxVerificationAge", policy.maxVerificationAge().toString());
+        node.put("maxPausesPerStore24h", policy.maxPausesPerStore24h());
+        node.put("cooldownPerAd", policy.cooldownPerAd().toString());
         node.put("autonomy", policy.autonomy().name());
         node.put("l2Enabled", policy.l2Enabled());
         return node;

@@ -1,5 +1,12 @@
 # Test-only settings, merged over src/main/resources/application.yml.
 operator:
+  # Many tests share users and stores within a minute; ApiRateLimitTest sets its own low limits.
+  api-rate-limits:
+    version: api-rate-limits/900
+    work-per-user-per-minute: 100000
+    work-per-store-per-minute: 100000
+    work-per-endpoint-per-minute: 100000
+    webhooks-per-endpoint-key-per-minute: 100000
   sync:
     # Tests call SyncRunReconciler directly instead of waiting for the schedule.
     reconciler-enabled: false
@@ -15,6 +22,9 @@ operator:
       base-url: https://api.example.test
       # Tests drain the inbox explicitly.
       processor-enabled: false
+    meta:
+      # Tests call MetaAdSync directly.
+      poller-enabled: false
   automation:
     # Tests dispatch the outbox explicitly; short delays keep workflow tests fast.
     dispatcher-enabled: false

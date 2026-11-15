@@ -16,7 +16,7 @@ Full reset: `docker compose -f infra/docker-compose.yml down -v`.
 
 | Service | Address | Access |
 | --- | --- | --- |
-| PostgreSQL 17 | `localhost:5432` | database `operator`, user/password `operator`; Keycloak has a separate database `keycloak` |
+| PostgreSQL 17 | `localhost:5432` | database `operator`; superuser `operator`/`operator` (administration only), migrations as `operator_migrator`, the application as `operator_runtime` (passwords equal the names, ADR-0022); Keycloak has a separate database `keycloak` |
 | Temporal (dev server) | `localhost:7233`, UI http://localhost:8233 | no auth |
 | Keycloak 26 | http://localhost:8180 | admin: `admin`/`admin`; realm `operator` |
 | Mailpit | SMTP `localhost:1025`, UI http://localhost:8025 | no auth |
@@ -78,3 +78,10 @@ private addresses in `wp_safe_remote_request`; this setting is for the local sto
 
 Offline installation: set `WOOCOMMERCE_SOURCE` in the `woo-seed` service to the path of a mounted
 `woocommerce.zip` (by default the GitHub release is downloaded).
+
+## Database roles (ADR-0022)
+
+[`postgres/init/02-operator-roles.sql`](postgres/init/02-operator-roles.sql) creates the roles on the first start of
+the volume. The backend migrates as `operator_migrator` and connects as `operator_runtime`, which is subject to
+row-level security. A volume created before this script existed has no such roles: recreate it with
+`docker compose down -v` (local data is lost) or run the script once as the `operator` superuser.

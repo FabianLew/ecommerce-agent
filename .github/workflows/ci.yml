@@ -20,6 +20,19 @@ env:
   ANTHROPIC_API_KEY: ""
 
 jobs:
+  migrations:
+    name: Flyway migrations (unique versions, applied ones unchanged)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Check against the target branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: scripts/check-migrations.sh ${BASE_REF:+origin/$BASE_REF}
+
   backend:
     name: Backend (./gradlew check)
     runs-on: ubuntu-24.04
@@ -182,3 +195,49 @@ jobs:
       - name: Stop environment
         if: always()
         run: docker compose down -v
+
+  terraform:
+    name: Infrastructure code (fmt and validate, no plan)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      TERRAFORM_VERSION: 1.10.5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Terraform (checksum verified)
+        working-directory: ${{ runner.temp }}
+        run: |
+          base="https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}"
+          curl -fsSLO "${base}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+          curl -fsSLO "${base}/terraform_${TERRAFORM_VERSION}_SHA256SUMS"
+          sha256sum -c --ignore-missing "terraform_${TERRAFORM_VERSION}_SHA256SUMS"
+          unzip -q "terraform_${TERRAFORM_VERSION}_linux_amd64.zip" -d bin
+          echo "${RUNNER_TEMP}/bin" >> "$GITHUB_PATH"
+      - name: Format
+        run: terraform -chdir=infra/terraform fmt -check -recursive -diff
+      - name: Validate every environment
+        run: |
+          for env in staging production; do
+            terraform -chdir="infra/terraform/environments/${env}" init -backend=false -input=false
+            terraform -chdir="infra/terraform/environments/${env}" validate
+          done
+
+  images:
+    name: Container images (build only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Backend image (ADR-0023)
+        run: docker build -f backend/Dockerfile -t operator-backend:ci .
+      - name: Frontend image (ADR-0023)
+        run: docker build -f frontend/Dockerfile -t operator-frontend:ci .
+      - name: Backend image refuses a local configuration in profile cloud
+        run: |
+          set +e
+          output="$(docker run --rm -e SPRING_PROFILES_ACTIVE=cloud,api operator-backend:ci 2>&1)"
+          status=$?
+          set -e
+          echo "${output}" | tail -n 5
+          test "${status}" -ne 0
+          echo "${output}" | grep -q "Profile cloud refused"

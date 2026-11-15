@@ -154,14 +154,13 @@ public final class PauseAdPolicy {
         return failed("AD_STATE", PolicyOutcome.DENY, code, facts);
     }
 
+    /** ADR-0026 point 4: L2 is not available in this version, so every action needs a person's approval. */
     private static PolicyCheck autonomy(InventoryProtectionPolicy policy) {
         Map<String, String> facts = Map.of("autonomy", policy.autonomy().name(), "l2Enabled",
                 Boolean.toString(policy.l2Enabled()));
-        if (policy.autonomy() == InventoryProtectionPolicy.Autonomy.L2 && policy.l2Enabled()) {
-            return new PolicyCheck("AUTONOMY", PolicyCheck.Result.PASSED, PolicyOutcome.ALLOW, "AUTONOMY_L2", facts);
-        }
-        return new PolicyCheck("AUTONOMY", PolicyCheck.Result.PASSED, PolicyOutcome.REQUIRE_APPROVAL, "AUTONOMY_L1",
-                facts);
+        String code = policy.autonomy() == InventoryProtectionPolicy.Autonomy.L2 || policy.l2Enabled()
+                ? "L2_NOT_AVAILABLE" : "AUTONOMY_L1";
+        return new PolicyCheck("AUTONOMY", PolicyCheck.Result.PASSED, PolicyOutcome.REQUIRE_APPROVAL, code, facts);
     }
 
     private static Optional<InventoryContext.AdFact> target(PauseAd action, InventoryContext context) {

@@ -19,6 +19,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.automation.guardian.InventoryGuardianWorkflow;
 import com.ecommerceagent.automation.inventory.VariantInventoryStatus;
@@ -56,7 +57,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
@@ -91,7 +91,7 @@ class OutboxDispatchTest {
     @Autowired
     WorkflowClient client;
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
     @Autowired
     OrderRepository orders;
     @Autowired

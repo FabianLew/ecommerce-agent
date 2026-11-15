@@ -2,10 +2,17 @@ package com.ecommerceagent.automation.guardian;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.ecommerceagent.automation.TaskQueues;
 import com.ecommerceagent.automation.temporal.ActivityStoreScope;
+import com.ecommerceagent.automation.execution.ActionOutcomes;
+import com.ecommerceagent.automation.execution.ActionPermissions;
+import com.ecommerceagent.automation.execution.AdPauseExecutor;
+import com.ecommerceagent.automation.execution.ExecutionAuthority;
+import com.ecommerceagent.automation.execution.ExecutionLedger;
+import com.ecommerceagent.automation.execution.ExecutionStatus;
 import com.ecommerceagent.decisions.ContextSnapshot;
 import com.ecommerceagent.decisions.ContextSnapshots;
 import com.ecommerceagent.decisions.DecisionProposals;
@@ -17,11 +24,17 @@ import com.ecommerceagent.decisions.ProposalStatus;
 import com.ecommerceagent.decisions.ProposalSubmission;
 import com.ecommerceagent.decisions.Recommendation;
 import com.ecommerceagent.identity.TrustedStoreScope;
+import com.ecommerceagent.decisions.Proposer;
+import com.ecommerceagent.decisions.StoredProposal;
 import com.ecommerceagent.intelligence.inventory.BaselineProposer;
+import com.ecommerceagent.intelligence.inventory.InventoryAgentProposer;
 import com.ecommerceagent.intelligence.inventory.InventoryContext;
 import com.ecommerceagent.intelligence.inventory.InventoryContextBuilder;
 import com.ecommerceagent.metrics.CanonicalJson;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.temporal.spring.boot.ActivityImpl;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -29,28 +42,51 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ActivityImpl(taskQueues = TaskQueues.MAIN)
 public class GuardianActivitiesImpl implements GuardianActivities {
 
+    private static final Logger log = LoggerFactory.getLogger(GuardianActivitiesImpl.class);
+
     private final Opportunities opportunities;
     private final InventoryContextBuilder contexts;
     private final ContextSnapshots snapshots;
     private final BaselineProposer baseline;
+    private final InventoryAgentProposer agent;
     private final DecisionProposals proposals;
     private final PolicyEvaluations policies;
     private final GuardianSettings settings;
+    private final ActionPermissions permissions;
+    private final DecisionApprovals approvals;
+    private final ExecutionAuthority authority;
+    private final AdPauseExecutor executor;
+    private final ExecutionLedger ledger;
+    private final ActionOutcomes outcomes;
+    private final GuardianNotifications notifications;
     private final TransactionTemplate transactions;
     private final Clock clock;
+    private final MeterRegistry meters;
 
     GuardianActivitiesImpl(Opportunities opportunities, InventoryContextBuilder contexts, ContextSnapshots snapshots,
-            BaselineProposer baseline, DecisionProposals proposals, PolicyEvaluations policies,
-            GuardianSettings settings, TransactionTemplate transactions, Clock clock) {
+            BaselineProposer baseline, InventoryAgentProposer agent, DecisionProposals proposals,
+            PolicyEvaluations policies, GuardianSettings settings, ActionPermissions permissions,
+            DecisionApprovals approvals, ExecutionAuthority authority, AdPauseExecutor executor, ExecutionLedger ledger,
+            ActionOutcomes outcomes, GuardianNotifications notifications, TransactionTemplate transactions,
+            Clock clock, MeterRegistry meters) {
         this.opportunities = opportunities;
         this.contexts = contexts;
         this.snapshots = snapshots;
         this.baseline = baseline;
+        this.agent = agent;
         this.proposals = proposals;
         this.policies = policies;
         this.settings = settings;
+        this.permissions = permissions;
+        this.approvals = approvals;
+        this.authority = authority;
+        this.executor = executor;
+        this.ledger = ledger;
+        this.outcomes = outcomes;
+        this.notifications = notifications;
         this.transactions = transactions;
         this.clock = clock;
+        this.meters = meters;
     }
 
     @Override
@@ -81,11 +117,80 @@ public class GuardianActivitiesImpl implements GuardianActivities {
         if (!submission.accepted()) {
             return new ProposalOutcome(null, null, String.join(",", submission.codes()), null);
         }
-        Recommendation accepted = submission.proposal().proposal().recommendation();
+        return outcome(submission.proposal(), null);
+    }
+
+    @Override
+    public ProposalOutcome proposeAndPersist(String opportunityId, String snapshotId) {
+        return proposeAndPersist(opportunityId, snapshotId, null);
+    }
+
+    @Override
+    public ProposalOutcome proposeAndPersistOrWait(String opportunityId, String snapshotId, long waitedSeconds) {
+        if (waitedSeconds < 0) {
+            throw new IllegalArgumentException("waitedSeconds must not be negative");
+        }
+        return proposeAndPersist(opportunityId, snapshotId, Duration.ofSeconds(waitedSeconds));
+    }
+
+    /** {@code waited} is null when the caller never waits. */
+    private ProposalOutcome proposeAndPersist(String opportunityId, String snapshotId, Duration waited) {
+        TrustedStoreScope scope = ActivityStoreScope.current();
+        UUID opportunity = UUID.fromString(opportunityId);
+        UUID snapshotKey = UUID.fromString(snapshotId);
+        // A retried step finds the proposal it already stored for this snapshot.
+        Optional<StoredProposal> stored = proposals.ofOpportunity(scope, opportunity).stream()
+                .filter(proposal -> proposal.proposal().contextSnapshotId().equals(snapshotKey))
+                .reduce((first, second) -> second);
+        if (stored.isPresent()) {
+            return outcome(stored.get(), null);
+        }
+        ContextSnapshot snapshot = snapshots.find(scope, snapshotKey).orElseThrow();
+        InventoryAgentProposer.AgentDecision decision = agent.decide(scope, opportunity, snapshot);
+        String fallback = decision.fallback();
+        if (waited != null && decision.waitable()) {
+            Optional<Duration> wait = agent.nextWait(decision, waited);
+            meters.counter("operator.ai.admission.waits", "reason", waitReason(fallback), "outcome",
+                    wait.isPresent() ? "WAITING" : "GAVE_UP").increment();
+            if (wait.isPresent()) {
+                return ProposalOutcome.waiting(wait.get().toSeconds(), fallback);
+            }
+            log.info("Episode {} stops waiting for an AI slot after {} ({}, {}); the baseline answers", opportunityId,
+                    waited, fallback, agent.admissionVersion());
+        }
+        Optional<InventoryAgentProposer.AgentProposal> proposal = decision.proposal();
+        if (proposal.isPresent()) {
+            ProposalSubmission submission = proposals.submit(scope, opportunity, snapshotKey,
+                    proposal.get().proposer(), proposal.get().agentRunId(), proposal.get().recommendation(),
+                    settings.proposalTtl());
+            if (submission.accepted()) {
+                return outcome(submission.proposal(), null);
+            }
+            agent.rejected(scope, proposal.get().agentRunId(), submission.codes());
+            fallback = "AGENT_PROPOSAL_REJECTED:" + String.join(",", submission.codes());
+        }
+        Proposer proposer = BaselineProposer.PROPOSER;
+        ProposalSubmission submission = proposals.submit(scope, opportunity, snapshotKey, proposer, null,
+                ProposalJson.write(baseline.propose(InventoryContext.of(snapshot))), settings.proposalTtl());
+        if (!submission.accepted()) {
+            return new ProposalOutcome(null, null, String.join(",", submission.codes()), null,
+                    proposer.kind().name(), fallback);
+        }
+        return outcome(submission.proposal(), fallback);
+    }
+
+    /** The metric tag of a slot refusal, without the provider's details. */
+    private static String waitReason(String fallback) {
+        String reason = fallback.substring(fallback.indexOf(':') + 1);
+        return reason.startsWith("PROVIDER_LIMIT") ? "PROVIDER_LIMIT" : reason;
+    }
+
+    private ProposalOutcome outcome(StoredProposal stored, String fallback) {
+        Recommendation accepted = stored.proposal().recommendation();
         Long review = accepted.monitorPlan() == null ? null
                 : Math.max(1, Duration.between(clock.instant(), accepted.monitorPlan().nextReviewAt()).toSeconds());
-        return new ProposalOutcome(submission.proposal().proposal().proposalId().toString(),
-                accepted.disposition().name(), null, review);
+        return new ProposalOutcome(stored.proposal().proposalId().toString(), accepted.disposition().name(), null,
+                review, stored.proposal().proposer().kind().name(), fallback);
     }
 
     @Override
@@ -102,6 +207,74 @@ public class GuardianActivitiesImpl implements GuardianActivities {
     @Override
     public void expireProposal(String proposalId) {
         proposals.close(ActivityStoreScope.current(), UUID.fromString(proposalId), ProposalStatus.EXPIRED);
+    }
+
+    @Override
+    public boolean awaitsApproval(String proposalId) {
+        // Only a proposal the store and the deployment let a person decide is put to one (ADR-0025 point 3).
+        if (permissions.effective(ActivityStoreScope.current(), ActionPermissions.PAUSE_AD)
+                .refusal(ActionPermissions.DECIDABLE).isPresent()) {
+            return false;
+        }
+        return policies.latest(ActivityStoreScope.current(), UUID.fromString(proposalId))
+                .filter(evaluation -> evaluation.outcome() == PolicyOutcome.REQUIRE_APPROVAL).isPresent();
+    }
+
+    @Override
+    public String approvalDecision(String approvalId, String proposalId) {
+        return approvals.find(ActivityStoreScope.current(), UUID.fromString(approvalId))
+                .filter(approval -> approval.proposalId().toString().equals(proposalId))
+                .map(approval -> approval.decision().name()).orElse(null);
+    }
+
+    @Override
+    public String storedApproval(String proposalId) {
+        return approvals.ofProposal(ActivityStoreScope.current(), UUID.fromString(proposalId))
+                .map(approval -> approval.id().toString()).orElse(null);
+    }
+
+    @Override
+    public ExecutionRef authorizeAndExecute(String approvalId) {
+        TrustedStoreScope scope = ActivityStoreScope.current();
+        UUID id = UUID.fromString(approvalId);
+        // A retried step continues its authorization while it is valid, or once its write has started: an expired
+        // authorization still reconciles its own attempt, it only cannot start a new one (ADR-0020 point 6).
+        ExecutionAuthority.Authorization authorization = authority.latest(scope, id)
+                .filter(action -> action.validAt(clock.instant()) || ledger.byKey(scope, action.idempotencyKey())
+                        .filter(row -> row.status() != ExecutionStatus.PLANNED).isPresent())
+                .map(action -> new ExecutionAuthority.Authorization(action, null))
+                .orElseGet(() -> authority.authorize(scope, id));
+        if (!authorization.issued()) {
+            return new ExecutionRef(null, null, authorization.refusal());
+        }
+        AdPauseExecutor.Outcome outcome = executor.execute(scope, authorization.action().id());
+        if (outcome.retryable()) {
+            throw io.temporal.failure.ApplicationFailure.newFailure("Execution not finished: " + outcome.code(),
+                    "EXECUTION_RETRY");
+        }
+        return new ExecutionRef(outcome.executionId().toString(), outcome.status().name(), outcome.code());
+    }
+
+    @Override
+    public ExecutionRef verifyExecution(String executionId, boolean last) {
+        AdPauseExecutor.Outcome outcome = executor.verify(ActivityStoreScope.current(), UUID.fromString(executionId),
+                last);
+        return new ExecutionRef(executionId, outcome.status().name(), outcome.code());
+    }
+
+    @Override
+    public void recordOutcome(String executionId) {
+        outcomes.record(ActivityStoreScope.current(), UUID.fromString(executionId));
+    }
+
+    @Override
+    public void notifyDecisionNeeded(String proposalId) {
+        notifications.decisionNeeded(ActivityStoreScope.current(), UUID.fromString(proposalId));
+    }
+
+    @Override
+    public void notifyOutcome(String executionId) {
+        notifications.outcome(ActivityStoreScope.current(), UUID.fromString(executionId));
     }
 
     @Override

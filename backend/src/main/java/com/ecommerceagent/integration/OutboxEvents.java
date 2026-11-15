@@ -77,19 +77,22 @@ public class OutboxEvents {
     }
 
     /**
-     * Locks the next due event of any store for the caller's transaction (dispatcher, worker side). The
-     * event carries its store ids only so that the caller can build a verified system scope from them.
+     * Locks the next due event of the store for the caller's transaction (dispatcher, worker side, which walks the
+     * stores under their system scopes, ADR-0022 point 4).
      */
-    public Optional<PendingEvent> claimNext() {
+    public Optional<PendingEvent> claimNext(TrustedStoreScope scope) {
         return jdbc.sql("""
                         SELECT id, organization_id, store_id, event_type, aggregate_type, aggregate_id,
                                payload::text AS payload, dedup_key, created_at, attempts
                         FROM outbox_event
-                        WHERE dispatched_at IS NULL AND next_attempt_at <= :now
+                        WHERE organization_id = :organizationId AND store_id = :storeId
+                          AND dispatched_at IS NULL AND next_attempt_at <= :now
                         ORDER BY next_attempt_at, created_at
                         LIMIT 1
                         FOR UPDATE SKIP LOCKED
                         """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
                 .param("now", Timestamp.from(clock.instant()))
                 .query((rs, n) -> new PendingEvent(rs.getObject("organization_id", UUID.class),
                         rs.getObject("store_id", UUID.class), rs.getInt("attempts"),
@@ -99,19 +102,27 @@ public class OutboxEvents {
                 .optional();
     }
 
-    public void markDispatched(UUID eventId) {
-        jdbc.sql("UPDATE outbox_event SET dispatched_at = :now, attempts = attempts + 1 WHERE id = :id")
+    public void markDispatched(TrustedStoreScope scope, UUID eventId) {
+        jdbc.sql("""
+                        UPDATE outbox_event SET dispatched_at = :now, attempts = attempts + 1
+                        WHERE id = :id AND organization_id = :organizationId AND store_id = :storeId
+                        """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
                 .param("now", Timestamp.from(clock.instant()))
                 .param("id", eventId)
                 .update();
     }
 
     /** Counts a failed dispatch; the event is retried at {@code nextAttemptAt}. */
-    public void recordFailure(UUID eventId, Instant nextAttemptAt) {
+    public void recordFailure(TrustedStoreScope scope, UUID eventId, Instant nextAttemptAt) {
         jdbc.sql("""
                         UPDATE outbox_event SET attempts = attempts + 1, next_attempt_at = :next
-                        WHERE id = :id AND dispatched_at IS NULL
+                        WHERE id = :id AND organization_id = :organizationId AND store_id = :storeId
+                          AND dispatched_at IS NULL
                         """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
                 .param("next", Timestamp.from(nextAttemptAt))
                 .param("id", eventId)
                 .update();

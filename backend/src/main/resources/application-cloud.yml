@@ -1,0 +1,47 @@
+# Profile "cloud" (ADR-0023): staging and production in the EU, together with "api" or "worker".
+# Every address and secret comes from the environment; CloudConfigurationCheck refuses local defaults.
+spring:
+  datasource:
+    # The runtime role (ADR-0022); the migration credentials go only to the migration step (ADR-0023).
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+  flyway:
+    # Never in the API or the worker: SchemaVersionCheck only verifies that the schema is current.
+    enabled: false
+    user: ""
+    password: ""
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OIDC_ISSUER_URI}
+  temporal:
+    connection:
+      # Temporal Cloud: <namespace>.<account>.tmprl.cloud:7233 or the regional endpoint for API keys.
+      target: ${TEMPORAL_ADDRESS}
+      api-key: ${TEMPORAL_API_KEY}
+      enable-https: true
+    namespace: ${TEMPORAL_NAMESPACE}
+
+operator:
+  integration:
+    webhooks:
+      base-url: ${WEBHOOK_BASE_URL}
+  notifications:
+    app-base-url: ${OPERATOR_APP_BASE_URL}
+
+management:
+  otlp:
+    metrics:
+      export:
+        enabled: ${OTEL_METRICS_EXPORT_ENABLED:true}
+        url: ${OTEL_EXPORTER_OTLP_METRICS_ENDPOINT:http://localhost:4318/v1/metrics}
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:0.1}
+    export:
+      otlp:
+        enabled: ${OTEL_EXPORT_ENABLED:true}

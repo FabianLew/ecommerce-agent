@@ -15,7 +15,28 @@ public enum MetricDefinition {
     SALES_VELOCITY_7_FULL_LOCAL_DAYS("sales_velocity_7_full_local_days", 1, "units/day"),
 
     /** Available-to-sell stock divided by SALES_VELOCITY_7_FULL_LOCAL_DAYS v1. */
-    DAYS_OF_COVER("days_of_cover", 1, "days");
+    DAYS_OF_COVER("days_of_cover", 1, "days"),
+
+    /** Qualifying orders in the store currency: total - tax - shipping; refunds not included (ADR-0019). */
+    NET_SALES("net_sales", 1, "currency"),
+
+    /** Number of qualifying orders in the store currency placed in the window (ADR-0019). */
+    QUALIFYING_ORDERS("qualifying_orders", 1, "orders"),
+
+    /** NET_SALES v1 / QUALIFYING_ORDERS v1 on the same window (ADR-0019). */
+    AOV("aov", 1, "currency"),
+
+    /** Sum of a variant's line totals (after discounts, without tax) in qualifying orders (ADR-0019). */
+    VARIANT_NET_SALES("variant_net_sales", 1, "currency"),
+
+    /** Spend reported by Meta for the store's ad account; unavailable until insights are imported. */
+    META_SPEND("meta_spend", 1, "currency"),
+
+    /** Contribution margin after known costs (01 §6 U-02); unavailable until costs per product exist (F5). */
+    CONTRIBUTION_MARGIN_KNOWN_COSTS("contribution_margin_known_costs", 1, "currency");
+
+    /** Decimal places of amounts. */
+    public static final int MONEY_SCALE = 2;
 
     /**
      * Order statuses counted as demand in v1. Stock already reflects these statuses in WooCommerce

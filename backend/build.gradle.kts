@@ -20,6 +20,8 @@ repositories {
 }
 
 val springModulithVersion = "2.1.2"
+// Spring AI is the ModelGateway adapter only; the runtime owns the tool loop (ADR-0002, ADR-0016).
+val springAiVersion = "2.0.2"
 val temporalVersion = "1.40.0"
 // OpenAPI contract for the generated frontend client (B-09, ADR-0006).
 val springdocVersion = "3.1.1"
@@ -29,6 +31,7 @@ val jsonSchemaValidatorVersion = "3.0.1"
 dependencies {
     implementation(platform(SpringBootPlugin.BOM_COORDINATES))
     implementation(platform("org.springframework.modulith:spring-modulith-bom:$springModulithVersion"))
+    implementation(platform("org.springframework.ai:spring-ai-bom:$springAiVersion"))
 
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -40,6 +43,9 @@ dependencies {
     implementation("io.temporal:temporal-spring-boot-starter:$temporalVersion")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-api:$springdocVersion")
     implementation("com.networknt:json-schema-validator:$jsonSchemaValidatorVersion")
+    implementation("org.springframework.ai:spring-ai-starter-model-anthropic")
+    // Skill manifests (knowledge/skills/*/manifest.yaml, ADR-0016).
+    implementation("tools.jackson.dataformat:jackson-dataformat-yaml")
     runtimeOnly("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
 
@@ -62,6 +68,13 @@ tasks.processResources {
     from("../knowledge/schemas") {
         include("*.schema.json")
         into("schemas")
+    }
+    // Approved skill packages and prompts, hashed and pinned by every agent run (ADR-0016).
+    from("../knowledge/skills") {
+        into("knowledge/skills")
+    }
+    from("../knowledge/prompts") {
+        into("knowledge/prompts")
     }
 }
 

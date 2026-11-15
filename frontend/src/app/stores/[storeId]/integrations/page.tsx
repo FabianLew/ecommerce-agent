@@ -10,20 +10,22 @@ import { storePath } from "@/lib/store-path";
 
 import { checkConnection, startSync } from "./actions";
 import { formatInstant, type Integration, syncHelp } from "./labels";
+import { MetaAdsCard } from "./MetaAdsCard";
 import { RefreshWhileRunning } from "./RefreshWhileRunning";
 import { WebhookSetup } from "./WebhookSetup";
 import { WooCommerceForm } from "./WooCommerceForm";
 
 export const dynamic = "force-dynamic";
 
-/** Integrations (04 §10): WooCommerce card. Secrets are masked and never returned by the backend. */
+/** Integrations (04 §10): WooCommerce and Meta Ads cards. Secrets are masked and never returned by the backend. */
 export default async function IntegrationsPage({ params }: { params: Promise<{ storeId: string }> }) {
   const { storeId } = await params;
   const path = storePath(storeId, "integrations");
   const api = await backend(path);
-  const [store, integrations, locale, messages] = await Promise.all([
+  const [store, integrations, meta, locale, messages] = await Promise.all([
     api.GET("/api/v1/stores/{storeId}", { params: { path: { storeId } } }),
     api.GET("/api/v1/stores/{storeId}/integrations", { params: { path: { storeId } } }),
+    api.GET("/api/v1/stores/{storeId}/meta-connection", { params: { path: { storeId } } }),
     getLocale(),
     getMessages(),
   ]);
@@ -93,6 +95,16 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ s
           />
         )}
       </section>
+      {meta.data ? (
+        <MetaAdsCard
+          storeId={storeId}
+          envelope={meta.data}
+          timezone={store.data.timezone}
+          locale={locale}
+          t={messages.meta}
+          mappingLink={messages.adMappings.openFromMeta}
+        />
+      ) : null}
     </>
   );
 }

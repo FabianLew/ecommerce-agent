@@ -143,6 +143,29 @@ class IntegrationConnectionRepository {
         }
     }
 
+    /**
+     * Replaces a value sealed with a previous key by the same value under the current key (ADR-0022 point 4); a
+     * value saved meanwhile under another key is left alone.
+     */
+    void reseal(TrustedStoreScope scope, UUID connectionId, String name, SecretCipher.Sealed sealed,
+            String previousKeyId) {
+        jdbc.sql("""
+                        UPDATE integration_credential
+                        SET ciphertext = :ciphertext, nonce = :nonce, key_id = :keyId
+                        WHERE connection_id = :connectionId AND name = :name AND key_id = :previousKeyId
+                          AND organization_id = :organizationId AND store_id = :storeId
+                        """)
+                .param("ciphertext", sealed.ciphertext())
+                .param("nonce", sealed.nonce())
+                .param("keyId", sealed.keyId())
+                .param("connectionId", connectionId)
+                .param("name", name)
+                .param("previousKeyId", previousKeyId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .update();
+    }
+
     Optional<SecretCipher.Sealed> credential(TrustedStoreScope scope, UUID connectionId, String name) {
         return jdbc.sql("""
                         SELECT ciphertext, nonce, key_id FROM integration_credential
@@ -201,12 +224,10 @@ class IntegrationConnectionRepository {
      * scope: the caller is the shop, and the result is used only to build a system scope for that store.
      */
     Optional<WebhookEndpoint> webhookEndpoint(String endpointKey) {
-        return jdbc.sql("""
-                        SELECT id, organization_id, store_id, provider FROM integration_connection
-                        WHERE webhook_endpoint_key = :key
-                        """)
+        // The store is not known yet, so the lookup is the reviewed definer function (ADR-0022 point 4).
+        return jdbc.sql("SELECT connection_id, organization_id, store_id, provider FROM webhook_endpoint(:key)")
                 .param("key", endpointKey)
-                .query((rs, n) -> new WebhookEndpoint(rs.getObject("id", UUID.class),
+                .query((rs, n) -> new WebhookEndpoint(rs.getObject("connection_id", UUID.class),
                         rs.getObject("organization_id", UUID.class), rs.getObject("store_id", UUID.class),
                         IntegrationProvider.valueOf(rs.getString("provider"))))
                 .optional();

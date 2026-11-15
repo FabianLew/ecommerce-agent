@@ -19,5 +19,17 @@ public enum MetricReason {
     /** No stock reading inside the window: it is unknown whether the variant was sellable all the time. */
     STOCK_HISTORY_UNVERIFIED,
     /** Backorders are allowed, so stock can go below zero and cover is only indicative. */
-    BACKORDERS_ALLOWED
+    BACKORDERS_ALLOWED,
+    /** Refunds are not imported yet, so net sales may be overstated (ADR-0019). */
+    REFUNDS_NOT_INCLUDED,
+    /** Orders in another currency than the store's were left out; no conversion in v1. */
+    OTHER_CURRENCY_EXCLUDED,
+    /** Only part of the window is inside the imported order history. */
+    SALES_HISTORY_PARTIAL,
+    /** No qualifying orders in the window, so an average has no denominator. */
+    NO_ORDERS_IN_WINDOW,
+    /** Meta spend insights are not imported yet. */
+    META_INSIGHTS_NOT_IMPORTED,
+    /** Costs per product are not configured, so no margin can be computed. */
+    COSTS_MISSING
 }

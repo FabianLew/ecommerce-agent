@@ -15,6 +15,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.automation.TaskQueues;
 import com.ecommerceagent.automation.events.EventDispatch;
@@ -62,7 +63,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -104,7 +104,7 @@ class InventoryGuardianWorkflowTest {
     @Autowired
     StoreAccess storeAccess;
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
     @Autowired
     Clock clock;
 
@@ -179,7 +179,7 @@ class InventoryGuardianWorkflowTest {
                 .isEqualTo(proposal.proposal().createdAt().plus(settings.proposalTtl()));
 
         PolicyEvaluation evaluation = policies.latest(scope, proposal.proposal().proposalId()).orElseThrow();
-        assertThat(evaluation.policyKey() + "@" + evaluation.policyVersion()).isEqualTo("inventory-protection@1.0.0");
+        assertThat(evaluation.policyKey() + "@" + evaluation.policyVersion()).isEqualTo("inventory-protection@1.1.0");
         assertThat(evaluation.mode()).isEqualTo(InventoryProtectionPolicy.Mode.EVALUATION_ONLY);
         assertThat(evaluation.outcome()).isEqualTo(PolicyOutcome.REQUIRE_APPROVAL);
         assertThat(evaluation.checks()).allMatch(check -> check.result() == PolicyCheck.Result.PASSED);
@@ -211,7 +211,7 @@ class InventoryGuardianWorkflowTest {
         WorkflowReplayer.replayWorkflowExecution(history, InventoryGuardianWorkflowImpl.class);
         // ./gradlew test -PrecordTemporalFixtures refreshes the fixture after an intentional, versioned change.
         if (Boolean.getBoolean("recordTemporalFixtures")) {
-            Files.writeString(Path.of("src/test/resources/temporal/inventory-guardian-v1.json"),
+            Files.writeString(Path.of("src/test/resources/temporal/inventory-guardian-v2-baseline.json"),
                     history.toJson(true));
         }
     }
@@ -233,7 +233,16 @@ class InventoryGuardianWorkflowTest {
 
     @Test
     void recordedGuardianHistoryStillReplays() throws Exception {
+        // v1: before the agent proposer (ADR-0016) — replays on the baseline-only steps.
         WorkflowReplayer.replayWorkflowExecutionFromResource("temporal/inventory-guardian-v1.json",
+                InventoryGuardianWorkflowImpl.class);
+        // v2: proposeAndPersist, with the agent off and with the agent on.
+        WorkflowReplayer.replayWorkflowExecutionFromResource("temporal/inventory-guardian-v2-baseline.json",
+                InventoryGuardianWorkflowImpl.class);
+        WorkflowReplayer.replayWorkflowExecutionFromResource("temporal/inventory-guardian-v2.json",
+                InventoryGuardianWorkflowImpl.class);
+        // v3: proposeAndPersistOrWait, an agent that waited for a slot (ADR-0027 section 6.2).
+        WorkflowReplayer.replayWorkflowExecutionFromResource("temporal/inventory-guardian-v3-wait.json",
                 InventoryGuardianWorkflowImpl.class);
     }
 

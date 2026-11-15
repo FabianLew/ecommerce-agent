@@ -11,15 +11,19 @@ import java.util.UUID;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.metrics.InventoryCoverage;
 import com.ecommerceagent.metrics.InventoryMetrics;
+import com.ecommerceagent.metrics.CanonicalJson;
 import com.ecommerceagent.metrics.MetricValue;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.node.JsonNodeFactory;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Inventory risk detector {@code inventory-risk/1} (B-19, ADR-0011). Every run records an observation; a
+ * Inventory risk detector {@code inventory-risk} (B-19, ADR-0011). Every run records an observation with the
+ * version and the parameters of the detector (ADR-0026 point 6); a
  * series of current risk observations long enough opens an episode. A run on a variant with an active episode
  * attaches the observation to it.
  */
@@ -94,7 +98,7 @@ public class InventoryRiskDetector {
         }
 
         RiskObservation observation = new RiskObservation(UUID.randomUUID(), variantId, now, stockConfirmedAt,
-                available, cover.value(), outcome, reason, settings.thresholdDays(), RiskDetectorSettings.VERSION,
+                available, cover.value(), outcome, reason, settings.thresholdDays(), settings.version(),
                 active.map(Opportunity::id).orElse(null));
         record(scope, observation);
         return new RiskAssessment(observation, active.orElse(null), opened, nextCheckAt);
@@ -128,9 +132,10 @@ public class InventoryRiskDetector {
                         INSERT INTO inventory_risk_observation (id, organization_id, store_id, variant_id, observed_at,
                                                                 stock_confirmed_at, available_to_sell, days_of_cover,
                                                                 outcome, reason, threshold_days, detector_version,
-                                                                opportunity_id)
+                                                                detector_parameters, opportunity_id)
                         VALUES (:id, :organizationId, :storeId, :variantId, :observedAt, :confirmedAt, :available,
-                                :cover, :outcome, :reason, :threshold, :version, :opportunityId)
+                                :cover, :outcome, :reason, :threshold, :version, CAST(:parameters AS jsonb),
+                                :opportunityId)
                         """)
                 .param("id", observation.id())
                 .param("organizationId", scope.organizationId())
@@ -145,8 +150,15 @@ public class InventoryRiskDetector {
                 .param("reason", observation.reason())
                 .param("threshold", observation.thresholdDays())
                 .param("version", observation.detectorVersion())
+                .param("parameters", CanonicalJson.write(parametersNode()))
                 .param("opportunityId", observation.opportunityId())
                 .update();
+    }
+
+    private ObjectNode parametersNode() {
+        ObjectNode node = JsonNodeFactory.instance.objectNode();
+        settings.parameters().forEach(node::put);
+        return node;
     }
 
     /** Observations of a variant, newest first (UI, tests). */

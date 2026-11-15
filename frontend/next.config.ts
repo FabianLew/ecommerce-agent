@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // A self-contained server for the container image (ADR-0023); `next start` keeps working locally.
+  output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
   async headers() {

@@ -1,6 +1,67 @@
 {
   "components" : {
     "schemas" : {
+      "ActionPermissionRequest" : {
+        "properties" : {
+          "level" : {
+            "enum" : [ "OFF", "PROPOSE_ONLY", "APPROVAL_REQUIRED" ],
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Required when raising the level, at most 500 characters",
+            "type" : "string"
+          }
+        },
+        "required" : [ "level" ],
+        "type" : "object"
+      },
+      "ActionPermissionResponse" : {
+        "properties" : {
+          "actionType" : {
+            "type" : "string"
+          },
+          "canLower" : {
+            "type" : "boolean"
+          },
+          "canRaise" : {
+            "type" : "boolean"
+          },
+          "caps" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CapResponse"
+            },
+            "type" : "array"
+          },
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changedBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "effectiveLevel" : {
+            "description" : "The lowest of the store's level and every cap",
+            "enum" : [ "OFF", "PROPOSE_ONLY", "APPROVAL_REQUIRED" ],
+            "type" : "string"
+          },
+          "level" : {
+            "description" : "The store's own level",
+            "enum" : [ "OFF", "PROPOSE_ONLY", "APPROVAL_REQUIRED" ],
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "version" : {
+            "description" : "0 until the first change",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "actionType", "canLower", "canRaise", "caps", "effectiveLevel", "level", "version" ],
+        "type" : "object"
+      },
       "ActionRef" : {
         "properties" : {
           "desiredStatus" : {
@@ -24,6 +85,28 @@
           }
         },
         "required" : [ "desiredStatus", "targetId", "targetType", "type" ],
+        "type" : "object"
+      },
+      "ActivityDetailResponse" : {
+        "properties" : {
+          "activity" : {
+            "$ref" : "#/components/schemas/ActivitySummary"
+          },
+          "executionId" : {
+            "description" : "The execution the event concerns, when there is one",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/ReadMeta"
+          },
+          "proposalId" : {
+            "description" : "The decision the event concerns, when there is one",
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "activity", "meta" ],
         "type" : "object"
       },
       "ActivityListResponse" : {
@@ -76,7 +159,7 @@
             "type" : "string"
           },
           "type" : {
-            "enum" : [ "DETECTION", "RECOMMENDATION", "POLICY", "INTEGRATION" ],
+            "enum" : [ "DETECTION", "RECOMMENDATION", "POLICY", "ACTION", "INTEGRATION", "SETTINGS" ],
             "type" : "string"
           }
         },
@@ -101,6 +184,207 @@
           }
         },
         "required" : [ "type" ],
+        "type" : "object"
+      },
+      "AdResponse" : {
+        "properties" : {
+          "accountExternalId" : {
+            "type" : "string"
+          },
+          "allowedActions" : {
+            "items" : {
+              "enum" : [ "CONFIRM_MAPPING", "REVOKE_MAPPING" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "effectiveStatus" : {
+            "type" : "string"
+          },
+          "externalId" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "mapping" : {
+            "$ref" : "#/components/schemas/MappingResponse"
+          },
+          "mappingState" : {
+            "enum" : [ "NONE", "UNVERIFIED", "VERIFIED", "CREATIVE_CHANGED", "REVOKED" ],
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "observedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "ownStatus" : {
+            "enum" : [ "ACTIVE", "PAUSED", "ARCHIVED", "DELETED" ],
+            "type" : "string"
+          },
+          "source" : {
+            "enum" : [ "FIXTURE", "META_API" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "accountExternalId", "allowedActions", "effectiveStatus", "externalId", "id", "mappingState", "name", "observedAt", "ownStatus", "source" ],
+        "type" : "object"
+      },
+      "AiStopChangeResponse" : {
+        "properties" : {
+          "changed" : {
+            "description" : "false when the target was already in that state; nothing was recorded",
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "changed" ],
+        "type" : "object"
+      },
+      "AiStopDto" : {
+        "properties" : {
+          "automationType" : {
+            "type" : "string"
+          },
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changedBy" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "level" : {
+            "description" : "STORE, AUTOMATION or STORE_AUTOMATION",
+            "type" : "string"
+          },
+          "organizationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "stopped" : {
+            "type" : "boolean"
+          },
+          "storeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "changedAt", "changedBy", "id", "level", "reason", "stopped" ],
+        "type" : "object"
+      },
+      "AiStopRequest" : {
+        "properties" : {
+          "automationType" : {
+            "description" : "The automation; null for every automation of the store",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Why, 1 to 500 characters",
+            "type" : "string"
+          },
+          "stopped" : {
+            "description" : "true stops AI, false resumes it",
+            "type" : "boolean"
+          },
+          "storeId" : {
+            "description" : "The store; null for an automation on every store",
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "reason", "stopped" ],
+        "type" : "object"
+      },
+      "AlertSettingRequest" : {
+        "properties" : {
+          "deputyUserId" : {
+            "description" : "A member who may approve decisions; null clears the deputy",
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AlertSettingResponse" : {
+        "properties" : {
+          "canChange" : {
+            "type" : "boolean"
+          },
+          "candidates" : {
+            "description" : "Members who may approve decisions and are not owners",
+            "items" : {
+              "$ref" : "#/components/schemas/CandidateResponse"
+            },
+            "type" : "array"
+          },
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changedBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "deputyActive" : {
+            "description" : "False when the deputy lost the permission or the membership",
+            "type" : "boolean"
+          },
+          "deputyUserId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "version" : {
+            "description" : "0 until the first change",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "canChange", "candidates", "deputyActive", "version" ],
+        "type" : "object"
+      },
+      "AnalyticsMeta" : {
+        "properties" : {
+          "computedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "coveredFrom" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "coveredUntil" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "from" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "fullyCovered" : {
+            "type" : "boolean"
+          },
+          "timezone" : {
+            "type" : "string"
+          },
+          "to" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "required" : [ "computedAt", "currency", "from", "fullyCovered", "timezone", "to" ],
         "type" : "object"
       },
       "ApiError" : {
@@ -128,6 +412,130 @@
           }
         },
         "required" : [ "code", "message", "retryable" ]
+      },
+      "ApproveRequest" : {
+        "properties" : {
+          "expectedRevision" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "expectedRevision" ],
+        "type" : "object"
+      },
+      "AttentionItem" : {
+        "properties" : {
+          "at" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "code" : {
+            "description" : "A status, error code or onboarding step",
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "DECISION_TO_APPROVE", "INTEGRATION_UNHEALTHY", "META_ERROR", "ONBOARDING_INCOMPLETE" ],
+            "type" : "string"
+          },
+          "resourceId" : {
+            "description" : "Proposal, connection or null for onboarding",
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "summary" : {
+            "description" : "Business summary of a decision",
+            "type" : "string"
+          }
+        },
+        "required" : [ "kind" ],
+        "type" : "object"
+      },
+      "BudgetAlertDto" : {
+        "properties" : {
+          "amountLimit" : {
+            "description" : "Decimal string",
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "currency" : {
+            "description" : "ISO 4217 code",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "level" : {
+            "description" : "PLATFORM, ORGANIZATION, STORE or AUTOMATION",
+            "type" : "string"
+          },
+          "organizationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "periodEnd" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "periodStart" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "periodType" : {
+            "description" : "MONTHLY or DAILY",
+            "type" : "string"
+          },
+          "scopeKey" : {
+            "type" : "string"
+          },
+          "storeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "thresholdPercent" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "usedAmount" : {
+            "description" : "Reserved plus spent when the threshold was reached; decimal string",
+            "type" : "string"
+          }
+        },
+        "required" : [ "amountLimit", "createdAt", "currency", "id", "level", "periodEnd", "periodStart", "periodType", "scopeKey", "thresholdPercent", "usedAmount" ],
+        "type" : "object"
+      },
+      "CandidateResponse" : {
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "userId" ],
+        "type" : "object"
+      },
+      "CapResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "level" : {
+            "enum" : [ "OFF", "PROPOSE_ONLY", "APPROVAL_REQUIRED" ],
+            "type" : "string"
+          },
+          "source" : {
+            "enum" : [ "MONITORING", "STORE", "DEPLOYMENT", "META", "MUTATION_STOP" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "code", "level", "source" ],
+        "type" : "object"
       },
       "CheckRef" : {
         "properties" : {
@@ -184,6 +592,24 @@
         "required" : [ "checkedAt", "integration", "status", "warnings" ],
         "type" : "object"
       },
+      "ComparisonDto" : {
+        "properties" : {
+          "absoluteDifference" : {
+            "type" : "string"
+          },
+          "baseValue" : {
+            "type" : "string"
+          },
+          "percentDifference" : {
+            "type" : "string"
+          },
+          "percentUnavailableReason" : {
+            "description" : "Why there is no percentage",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "CreateConnectionRequest" : {
         "properties" : {
           "provider" : {
@@ -196,6 +622,127 @@
           }
         },
         "required" : [ "provider", "storeUrl" ],
+        "type" : "object"
+      },
+      "CreateMetaConnectionRequest" : {
+        "properties" : {
+          "accountId" : {
+            "example" : "act_1234567890",
+            "type" : "string"
+          }
+        },
+        "required" : [ "accountId" ],
+        "type" : "object"
+      },
+      "DashboardMeta" : {
+        "properties" : {
+          "computedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "from" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "timezone" : {
+            "type" : "string"
+          },
+          "to" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "required" : [ "computedAt", "currency", "from", "timezone", "to" ],
+        "type" : "object"
+      },
+      "DashboardResponse" : {
+        "properties" : {
+          "attentionItems" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AttentionItem"
+            },
+            "type" : "array"
+          },
+          "decisionsToApprove" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "integrationHealth" : {
+            "items" : {
+              "$ref" : "#/components/schemas/HealthItem"
+            },
+            "type" : "array"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/DashboardMeta"
+          },
+          "metrics" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MetricDto"
+            },
+            "type" : "array"
+          },
+          "onboardingNextStep" : {
+            "description" : "The next unfinished setup step; null when setup is done",
+            "type" : "string"
+          },
+          "recentActivities" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ActivitySummary"
+            },
+            "type" : "array"
+          },
+          "salesTrend" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SeriesPoint"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "attentionItems", "decisionsToApprove", "integrationHealth", "meta", "metrics", "recentActivities", "salesTrend" ],
+        "type" : "object"
+      },
+      "DecisionCommandResponse" : {
+        "properties" : {
+          "approvalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "decidedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "decision" : {
+            "enum" : [ "APPROVED", "REJECTED" ],
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "operationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "proposalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "replayed" : {
+            "type" : "boolean"
+          },
+          "revision" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "statusUrl" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "approvalId", "decidedAt", "decision", "expiresAt", "operationId", "proposalId", "replayed", "revision", "statusUrl" ],
         "type" : "object"
       },
       "DecisionEvidenceResponse" : {
@@ -289,7 +836,8 @@
             "type" : "array"
           },
           "execution" : {
-            "description" : "Execution state; always null in the pilot's shadow mode."
+            "$ref" : "#/components/schemas/ExecutionView",
+            "description" : "The person's decision and what followed; null until someone decides."
           },
           "expiresAt" : {
             "format" : "date-time",
@@ -429,6 +977,69 @@
         "required" : [ "businessSummary", "createdAt", "disposition", "expiresAt", "group", "openedAt", "opportunityId", "opportunityStatus", "proposalId", "reasonCodes", "revision", "status", "subject" ],
         "type" : "object"
       },
+      "DomainResponse" : {
+        "properties" : {
+          "detail" : {
+            "type" : "string"
+          },
+          "domain" : {
+            "enum" : [ "COMMERCE", "ADS", "AD_MAPPINGS", "PROFILE" ],
+            "type" : "string"
+          },
+          "readiness" : {
+            "enum" : [ "READY", "IN_PROGRESS", "NOT_STARTED", "SKIPPED", "ERROR" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "domain", "readiness" ],
+        "type" : "object"
+      },
+      "DraftRequest" : {
+        "properties" : {
+          "expectedRevision" : {
+            "description" : "Draft revision seen; 0 for a new draft",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "goal" : {
+            "enum" : [ "PROFITABILITY", "GROWTH", "BALANCED" ],
+            "type" : "string"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "plannedAdSpendMinor" : {
+            "description" : "Planned ad spend for the month, minor units of the store currency",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "plannedAdSpendPeriod" : {
+            "example" : "2026-12",
+            "type" : "string"
+          },
+          "planningHorizonDays" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "priorities" : {
+            "items" : {
+              "enum" : [ "INVENTORY_CONTINUITY", "CONTRIBUTION_MARGIN", "CASH_PRESERVATION", "CUSTOMER_ACQUISITION" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "riskPreference" : {
+            "enum" : [ "LOW", "MEDIUM", "HIGH" ],
+            "type" : "string"
+          },
+          "taxBasis" : {
+            "enum" : [ "EX_TAX", "INC_TAX" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "expectedRevision" ],
+        "type" : "object"
+      },
       "EvidenceItem" : {
         "properties" : {
           "availableAt" : {
@@ -504,6 +1115,53 @@
         "required" : [ "adId", "reason" ],
         "type" : "object"
       },
+      "ExecutionView" : {
+        "properties" : {
+          "approvalExpiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "attempts" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "authorizedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "decidedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "decision" : {
+            "enum" : [ "APPROVED", "REJECTED" ],
+            "type" : "string"
+          },
+          "executionId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "outcome" : {
+            "$ref" : "#/components/schemas/OutcomeView"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "status" : {
+            "description" : "PLANNED, IN_PROGRESS, APPLIED, VERIFIED, NOOP, UNKNOWN, FAILED or CONFLICT",
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "approvalExpiresAt", "attempts", "decidedAt", "decision" ],
+        "type" : "object"
+      },
       "FieldError" : {
         "properties" : {
           "code" : {
@@ -534,6 +1192,34 @@
           }
         },
         "required" : [ "completed", "monitoring", "toApprove" ],
+        "type" : "object"
+      },
+      "HealthItem" : {
+        "properties" : {
+          "connectionId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "dataUntil" : {
+            "description" : "Orders complete until (WooCommerce) or the last ad sync (Meta)",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "reasons" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "source" : {
+            "enum" : [ "WOOCOMMERCE", "META" ],
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "connectionId", "reasons", "source", "status" ],
         "type" : "object"
       },
       "HealthResponse" : {
@@ -771,6 +1457,106 @@
         },
         "type" : "object"
       },
+      "LinkedAd" : {
+        "properties" : {
+          "adId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "externalId" : {
+            "type" : "string"
+          },
+          "mappingScope" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "ownStatus" : {
+            "type" : "string"
+          },
+          "verifiedForCurrentCreative" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "adId", "externalId", "mappingScope", "name", "ownStatus", "verifiedForCurrentCreative" ],
+        "type" : "object"
+      },
+      "LinkedDecision" : {
+        "properties" : {
+          "latestProposalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "openedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "opportunityId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "openedAt", "opportunityId", "status" ],
+        "type" : "object"
+      },
+      "ListResponseAdResponse" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AdResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "hasMore", "items" ],
+        "type" : "object"
+      },
+      "ListResponseAiStopDto" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AiStopDto"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "hasMore", "items" ],
+        "type" : "object"
+      },
+      "ListResponseBudgetAlertDto" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/BudgetAlertDto"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "hasMore", "items" ],
+        "type" : "object"
+      },
       "ListResponseIntegrationResponse" : {
         "properties" : {
           "hasMore" : {
@@ -779,6 +1565,24 @@
           "items" : {
             "items" : {
               "$ref" : "#/components/schemas/IntegrationResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "hasMore", "items" ],
+        "type" : "object"
+      },
+      "ListResponseProfileResponse" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ProfileResponse"
             },
             "type" : "array"
           },
@@ -807,6 +1611,100 @@
         "required" : [ "hasMore", "items" ],
         "type" : "object"
       },
+      "ListResponseUncertainReservationDto" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/UncertainReservationDto"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "hasMore", "items" ],
+        "type" : "object"
+      },
+      "ListResponseVariantResponse" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/VariantResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "hasMore", "items" ],
+        "type" : "object"
+      },
+      "MappingRequest" : {
+        "properties" : {
+          "expectedVersion" : {
+            "description" : "The version seen; 0 without a mapping",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "scope" : {
+            "enum" : [ "SINGLE_VARIANT", "MULTI_PRODUCT" ],
+            "type" : "string"
+          },
+          "variantIds" : {
+            "items" : {
+              "format" : "uuid",
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "verified" : {
+            "description" : "Confirm for the ad's current creative",
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "expectedVersion", "scope", "variantIds", "verified" ],
+        "type" : "object"
+      },
+      "MappingResponse" : {
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "scope" : {
+            "enum" : [ "SINGLE_VARIANT", "MULTI_PRODUCT" ],
+            "type" : "string"
+          },
+          "variants" : {
+            "items" : {
+              "$ref" : "#/components/schemas/VariantResponse"
+            },
+            "type" : "array"
+          },
+          "verification" : {
+            "enum" : [ "VERIFIED", "UNVERIFIED", "REVOKED" ],
+            "type" : "string"
+          },
+          "verifiedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "id", "scope", "variants", "verification", "version" ],
+        "type" : "object"
+      },
       "MeResponse" : {
         "properties" : {
           "displayName" : {
@@ -821,6 +1719,449 @@
           }
         },
         "required" : [ "userId" ],
+        "type" : "object"
+      },
+      "MetaConnectionEnvelope" : {
+        "properties" : {
+          "canCreate" : {
+            "type" : "boolean"
+          },
+          "connection" : {
+            "$ref" : "#/components/schemas/MetaConnectionResponse"
+          }
+        },
+        "required" : [ "canCreate" ],
+        "type" : "object"
+      },
+      "MetaConnectionResponse" : {
+        "properties" : {
+          "accountId" : {
+            "description" : "Ad account id without act_",
+            "type" : "string"
+          },
+          "accountName" : {
+            "type" : "string"
+          },
+          "adsSeen" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "allowedActions" : {
+            "items" : {
+              "enum" : [ "SAVE_TOKEN", "RUN_CHECK" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "canWrite" : {
+            "description" : "The token may pause ads",
+            "type" : "boolean"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "lastCheckAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "lastErrorCode" : {
+            "type" : "string"
+          },
+          "lastSuccessAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "lastSyncAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "lastSyncError" : {
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "PENDING_CREDENTIALS", "CHECK_REQUIRED", "CONNECTED", "ERROR" ],
+            "type" : "string"
+          },
+          "tokenHint" : {
+            "description" : "Last 4 characters of the token",
+            "type" : "string"
+          }
+        },
+        "required" : [ "accountId", "adsSeen", "allowedActions", "canWrite", "id", "status" ],
+        "type" : "object"
+      },
+      "MetaTokenRequest" : {
+        "properties" : {
+          "token" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "token" ],
+        "type" : "object"
+      },
+      "MetricDto" : {
+        "properties" : {
+          "comparison" : {
+            "$ref" : "#/components/schemas/ComparisonDto"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "definitionVersion" : {
+            "type" : "string"
+          },
+          "key" : {
+            "type" : "string"
+          },
+          "missingComponents" : {
+            "description" : "Why the value is missing or limited",
+            "items" : {
+              "enum" : [ "SALES_HISTORY_INCOMPLETE", "NO_SALES_IN_WINDOW", "STOCK_NOT_TRACKED", "SHARED_STOCK_NOT_SUPPORTED", "NO_STOCK_OBSERVATION", "AVAILABLE_STOCK_UNKNOWN", "STOCKOUT_IN_WINDOW", "STOCK_HISTORY_UNVERIFIED", "BACKORDERS_ALLOWED", "REFUNDS_NOT_INCLUDED", "OTHER_CURRENCY_EXCLUDED", "SALES_HISTORY_PARTIAL", "NO_ORDERS_IN_WINDOW", "META_INSIGHTS_NOT_IMPORTED", "COSTS_MISSING" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "observedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "period" : {
+            "$ref" : "#/components/schemas/PeriodDto"
+          },
+          "quality" : {
+            "enum" : [ "CONFIRMED", "ESTIMATED", "UNAVAILABLE" ],
+            "type" : "string"
+          },
+          "sourceRefs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "unit" : {
+            "type" : "string"
+          },
+          "value" : {
+            "description" : "Decimal string; null when quality is UNAVAILABLE",
+            "type" : "string"
+          }
+        },
+        "required" : [ "definitionVersion", "key", "missingComponents", "observedAt", "period", "quality", "sourceRefs", "unit" ],
+        "type" : "object"
+      },
+      "MonitoringResponse" : {
+        "properties" : {
+          "ads" : {
+            "description" : "Effective level of ad pauses for the store (ADR-0025 point 3)",
+            "enum" : [ "OFF", "PROPOSE_ONLY", "APPROVAL_REQUIRED" ],
+            "type" : "string"
+          },
+          "adsCaps" : {
+            "description" : "Each source that keeps ad pauses below APPROVAL_REQUIRED",
+            "items" : {
+              "$ref" : "#/components/schemas/CapResponse"
+            },
+            "type" : "array"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "startedBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "ads", "adsCaps" ],
+        "type" : "object"
+      },
+      "MonitoringStartRequest" : {
+        "properties" : {
+          "expectedVersion" : {
+            "description" : "Onboarding version seen; 0 if none",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "expectedVersion" ],
+        "type" : "object"
+      },
+      "MutationStopRequest" : {
+        "properties" : {
+          "reason" : {
+            "description" : "Required when stopping, at most 500 characters",
+            "type" : "string"
+          },
+          "stopped" : {
+            "description" : "true stops writes, false resumes them",
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "stopped" ],
+        "type" : "object"
+      },
+      "MutationStopResponse" : {
+        "properties" : {
+          "canResume" : {
+            "type" : "boolean"
+          },
+          "canStop" : {
+            "type" : "boolean"
+          },
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changedBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "globallyStopped" : {
+            "description" : "Operators stopped all writes; the store cannot resume them",
+            "type" : "boolean"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "stopped" : {
+            "type" : "boolean"
+          },
+          "version" : {
+            "description" : "0 until the first change",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "canResume", "canStop", "globallyStopped", "stopped", "version" ],
+        "type" : "object"
+      },
+      "NotificationListResponse" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/NotificationResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          },
+          "unreadCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "hasMore", "items", "unreadCount" ],
+        "type" : "object"
+      },
+      "NotificationResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "executionId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "STOCK_WARNING", "DECISION_NEEDED", "ACTION_VERIFIED", "ACTION_NOOP", "ACTION_UNKNOWN", "ACTION_FAILED", "ACTION_CONFLICT" ],
+            "type" : "string"
+          },
+          "opportunityId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "parameters" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "description" : "Backend-set values the UI renders: adExternalId, adName, sku, variantName",
+            "type" : "object"
+          },
+          "proposalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "read" : {
+            "type" : "boolean"
+          },
+          "severity" : {
+            "enum" : [ "INFO", "WARNING", "CRITICAL" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "createdAt", "id", "kind", "parameters", "read", "severity" ],
+        "type" : "object"
+      },
+      "ObservationView" : {
+        "properties" : {
+          "checkpoint" : {
+            "type" : "string"
+          },
+          "dueAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "limitations" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "observedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "status" : {
+            "description" : "PENDING, OBSERVED or INCONCLUSIVE",
+            "type" : "string"
+          },
+          "values" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          }
+        },
+        "required" : [ "checkpoint", "dueAt", "limitations", "status", "values" ],
+        "type" : "object"
+      },
+      "OnboardingRequest" : {
+        "properties" : {
+          "acknowledgements" : {
+            "items" : {
+              "enum" : [ "SKIP_META", "MAPPINGS_LATER" ],
+              "type" : "string"
+            },
+            "type" : "array",
+            "uniqueItems" : true
+          },
+          "currentStep" : {
+            "enum" : [ "CONNECT_STORE", "CONNECT_TOOLS", "BUSINESS_DATA", "START_MONITORING" ],
+            "type" : "string"
+          },
+          "expectedVersion" : {
+            "description" : "Version seen; 0 if none",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "currentStep", "expectedVersion" ],
+        "type" : "object"
+      },
+      "OnboardingResponse" : {
+        "properties" : {
+          "acknowledgements" : {
+            "items" : {
+              "enum" : [ "SKIP_META", "MAPPINGS_LATER" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "canEdit" : {
+            "type" : "boolean"
+          },
+          "currentStep" : {
+            "enum" : [ "CONNECT_STORE", "CONNECT_TOOLS", "BUSINESS_DATA", "START_MONITORING" ],
+            "type" : "string"
+          },
+          "domains" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DomainResponse"
+            },
+            "type" : "array"
+          },
+          "monitoring" : {
+            "$ref" : "#/components/schemas/MonitoringResponse"
+          },
+          "nextStep" : {
+            "enum" : [ "CONNECT_STORE", "CONNECT_TOOLS", "BUSINESS_DATA", "START_MONITORING" ],
+            "type" : "string"
+          },
+          "steps" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StepResponse"
+            },
+            "type" : "array"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "acknowledgements", "canEdit", "currentStep", "domains", "monitoring", "nextStep", "steps", "version" ],
+        "type" : "object"
+      },
+      "OutcomeView" : {
+        "properties" : {
+          "authorship" : {
+            "description" : "OPERATOR, UNCERTAIN or NONE",
+            "type" : "string"
+          },
+          "observations" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ObservationView"
+            },
+            "type" : "array"
+          },
+          "recordedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "verifiedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "authorship", "observations", "recordedAt" ],
+        "type" : "object"
+      },
+      "PeriodDto" : {
+        "properties" : {
+          "from" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "timezone" : {
+            "type" : "string"
+          },
+          "toExclusive" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "from", "timezone", "toExclusive" ],
+        "type" : "object"
+      },
+      "PlannedAdSpendResponse" : {
+        "properties" : {
+          "amountMinor" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "period" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "amountMinor", "currency", "period" ],
         "type" : "object"
       },
       "PolicyRef" : {
@@ -856,6 +2197,186 @@
           }
         },
         "required" : [ "checks", "evaluatedAt", "evaluationId", "mode", "outcome", "policyKey", "policyVersion" ],
+        "type" : "object"
+      },
+      "ProductDetailResponse" : {
+        "properties" : {
+          "ads" : {
+            "items" : {
+              "$ref" : "#/components/schemas/LinkedAd"
+            },
+            "type" : "array"
+          },
+          "availableToSell" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "daily" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SeriesPoint"
+            },
+            "type" : "array"
+          },
+          "daysOfCover" : {
+            "$ref" : "#/components/schemas/MetricDto"
+          },
+          "decisions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/LinkedDecision"
+            },
+            "type" : "array"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/AnalyticsMeta"
+          },
+          "salesVelocity" : {
+            "$ref" : "#/components/schemas/MetricDto"
+          },
+          "stock" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StockPoint"
+            },
+            "type" : "array"
+          },
+          "variant" : {
+            "$ref" : "#/components/schemas/VariantRef"
+          }
+        },
+        "required" : [ "ads", "daily", "daysOfCover", "decisions", "meta", "salesVelocity", "stock", "variant" ],
+        "type" : "object"
+      },
+      "ProductRowResponse" : {
+        "properties" : {
+          "availableToSell" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "daysOfCover" : {
+            "$ref" : "#/components/schemas/MetricDto"
+          },
+          "netSales" : {
+            "type" : "string"
+          },
+          "units" : {
+            "description" : "Null when the period is not covered",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "variant" : {
+            "$ref" : "#/components/schemas/VariantRef"
+          }
+        },
+        "required" : [ "daysOfCover", "variant" ],
+        "type" : "object"
+      },
+      "ProductsResponse" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ProductRowResponse"
+            },
+            "type" : "array"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/AnalyticsMeta"
+          },
+          "offset" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "hasMore", "items", "meta", "offset", "total" ],
+        "type" : "object"
+      },
+      "ProfileResponse" : {
+        "properties" : {
+          "approvedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "effectiveFrom" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "goal" : {
+            "enum" : [ "PROFITABILITY", "GROWTH", "BALANCED" ],
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "missingFields" : {
+            "items" : {
+              "enum" : [ "GOAL", "PLANNING_HORIZON", "RISK_PREFERENCE", "PLANNED_AD_SPEND", "ECONOMIC_MODEL", "MAX_ACCEPTABLE_ACQUISITION_LOSS" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "note" : {
+            "type" : "string"
+          },
+          "plannedAdSpend" : {
+            "$ref" : "#/components/schemas/PlannedAdSpendResponse"
+          },
+          "planningHorizonDays" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "priorities" : {
+            "items" : {
+              "enum" : [ "INVENTORY_CONTINUITY", "CONTRIBUTION_MARGIN", "CASH_PRESERVATION", "CUSTOMER_ACQUISITION" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "reference" : {
+            "type" : "string"
+          },
+          "revision" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "riskPreference" : {
+            "enum" : [ "LOW", "MEDIUM", "HIGH" ],
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "DRAFT", "APPROVED", "SUPERSEDED" ],
+            "type" : "string"
+          },
+          "taxBasis" : {
+            "enum" : [ "EX_TAX", "INC_TAX" ],
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "id", "missingFields", "priorities", "reference", "revision", "status", "taxBasis", "version" ],
+        "type" : "object"
+      },
+      "ProfileStateResponse" : {
+        "properties" : {
+          "approved" : {
+            "$ref" : "#/components/schemas/ProfileResponse"
+          },
+          "canEdit" : {
+            "type" : "boolean"
+          },
+          "draft" : {
+            "$ref" : "#/components/schemas/ProfileResponse"
+          }
+        },
+        "required" : [ "canEdit" ],
         "type" : "object"
       },
       "ProposerRef" : {
@@ -907,6 +2428,91 @@
         "required" : [ "asOf", "completeness", "generatedAt", "timezone", "warnings" ],
         "type" : "object"
       },
+      "ReconciliationRequest" : {
+        "properties" : {
+          "cost" : {
+            "description" : "The confirmed amount in the reservation's currency; required for CHARGED only",
+            "type" : "number"
+          },
+          "outcome" : {
+            "description" : "NOT_CHARGED, CHARGED or CONSERVATIVE (CONSERVATIVE only for an UNKNOWN call)",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "What the provider shows, 1 to 500 characters",
+            "type" : "string"
+          }
+        },
+        "required" : [ "outcome", "reason" ],
+        "type" : "object"
+      },
+      "ReconciliationResponse" : {
+        "properties" : {
+          "cost" : {
+            "type" : "number"
+          },
+          "delta" : {
+            "description" : "Change of every charged budget, for a correction",
+            "type" : "number"
+          },
+          "outcome" : {
+            "type" : "string"
+          },
+          "repeated" : {
+            "description" : "The same decision was already recorded; nothing changed",
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "cost", "outcome", "repeated" ],
+        "type" : "object"
+      },
+      "RejectionRequest" : {
+        "properties" : {
+          "reason" : {
+            "description" : "Why the proposal is rejected; at most 1000 characters",
+            "type" : "string"
+          },
+          "revision" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "revision" ],
+        "type" : "object"
+      },
+      "RetentionHoldRequest" : {
+        "properties" : {
+          "reason" : {
+            "description" : "1 to 500 characters",
+            "type" : "string"
+          }
+        },
+        "required" : [ "reason" ],
+        "type" : "object"
+      },
+      "RetentionHoldResponse" : {
+        "properties" : {
+          "canChange" : {
+            "type" : "boolean"
+          },
+          "held" : {
+            "type" : "boolean"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "setAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "setBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "canChange", "held" ],
+        "type" : "object"
+      },
       "RevisionRef" : {
         "properties" : {
           "createdAt" : {
@@ -929,6 +2535,70 @@
         "required" : [ "createdAt", "proposalId", "revision", "status" ],
         "type" : "object"
       },
+      "RevisionRequest" : {
+        "properties" : {
+          "revision" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "revision" ],
+        "type" : "object"
+      },
+      "RevokeRequest" : {
+        "properties" : {
+          "expectedVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "expectedVersion" ],
+        "type" : "object"
+      },
+      "SalesResponse" : {
+        "properties" : {
+          "meta" : {
+            "$ref" : "#/components/schemas/AnalyticsMeta"
+          },
+          "metrics" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MetricDto"
+            },
+            "type" : "array"
+          },
+          "otherCurrencyOrders" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "series" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SeriesPoint"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "meta", "metrics", "otherCurrencyOrders", "series" ],
+        "type" : "object"
+      },
+      "SeriesPoint" : {
+        "properties" : {
+          "count" : {
+            "description" : "Orders (sales) or units (product); null when not covered",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "day" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "netSales" : {
+            "description" : "Null when the day is outside the imported history",
+            "type" : "string"
+          }
+        },
+        "required" : [ "day" ],
+        "type" : "object"
+      },
       "SnapshotRef" : {
         "properties" : {
           "asOf" : {
@@ -949,6 +2619,42 @@
         "required" : [ "asOf", "contentHash", "contentSchema", "id" ],
         "type" : "object"
       },
+      "StepResponse" : {
+        "properties" : {
+          "blockers" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "complete" : {
+            "type" : "boolean"
+          },
+          "step" : {
+            "enum" : [ "CONNECT_STORE", "CONNECT_TOOLS", "BUSINESS_DATA", "START_MONITORING" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "blockers", "complete", "step" ],
+        "type" : "object"
+      },
+      "StockPoint" : {
+        "properties" : {
+          "availableToSell" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "observedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "stockStatus" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "observedAt", "stockStatus" ],
+        "type" : "object"
+      },
       "StoreResponse" : {
         "properties" : {
           "currency" : {
@@ -966,7 +2672,7 @@
           },
           "permissions" : {
             "items" : {
-              "enum" : [ "STORE_READ", "STORE_MANAGE" ],
+              "enum" : [ "STORE_READ", "STORE_MANAGE", "DECISION_APPROVE" ],
               "type" : "string"
             },
             "type" : "array",
@@ -1070,6 +2776,102 @@
           }
         },
         "required" : [ "id", "startedAt", "status", "windowFrom", "windowUntil" ],
+        "type" : "object"
+      },
+      "UncertainReservationDto" : {
+        "properties" : {
+          "automationType" : {
+            "type" : "string"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "model" : {
+            "type" : "string"
+          },
+          "organizationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "provider" : {
+            "type" : "string"
+          },
+          "providerRequestId" : {
+            "type" : "string"
+          },
+          "recordedCost" : {
+            "type" : "number"
+          },
+          "reservationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "reservedAmount" : {
+            "type" : "number"
+          },
+          "sentAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "settledAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "state" : {
+            "description" : "UNKNOWN or RECONCILED_CONSERVATIVE",
+            "type" : "string"
+          },
+          "stateReason" : {
+            "type" : "string"
+          },
+          "storeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "unknownAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "automationType", "currency", "model", "organizationId", "provider", "reservationId", "reservedAmount", "state", "storeId" ],
+        "type" : "object"
+      },
+      "VariantRef" : {
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "sku" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "name", "productName" ],
+        "type" : "object"
+      },
+      "VariantResponse" : {
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "sku" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "name", "productName" ],
         "type" : "object"
       },
       "WebhookReceiptResponse" : {
@@ -1179,6 +2981,286 @@
         "tags" : [ "identity-controller" ]
       }
     },
+    "/api/v1/platform/ai/budget-alerts" : {
+      "get" : {
+        "operationId" : "budgetAlerts",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "since",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 100,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseBudgetAlertDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
+      }
+    },
+    "/api/v1/platform/ai/reservations/uncertain" : {
+      "get" : {
+        "operationId" : "uncertainReservations",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 100,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseUncertainReservationDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
+      }
+    },
+    "/api/v1/platform/ai/reservations/{reservationId}/correction" : {
+      "post" : {
+        "operationId" : "correctReservation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "reservationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReconciliationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReconciliationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
+      }
+    },
+    "/api/v1/platform/ai/reservations/{reservationId}/reconciliation" : {
+      "post" : {
+        "operationId" : "reconcileReservation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "reservationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReconciliationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReconciliationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
+      }
+    },
+    "/api/v1/platform/ai/stops" : {
+      "get" : {
+        "operationId" : "activeAiStops",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseAiStopDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
+      },
+      "post" : {
+        "operationId" : "changeAiStop",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AiStopRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AiStopChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
+      }
+    },
+    "/api/v1/platform/ai/stops/history" : {
+      "get" : {
+        "operationId" : "aiStopHistory",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 100,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseAiStopDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
+      }
+    },
     "/api/v1/stores" : {
       "get" : {
         "operationId" : "stores",
@@ -1264,6 +3346,149 @@
         "tags" : [ "identity-controller" ]
       }
     },
+    "/api/v1/stores/{storeId}/action-permissions/{actionType}" : {
+      "get" : {
+        "operationId" : "actionPermission",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "actionType",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ActionPermissionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "action-permission-controller" ]
+      },
+      "put" : {
+        "operationId" : "changeActionPermission",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "actionType",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ActionPermissionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ActionPermissionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "action-permission-controller" ]
+      }
+    },
     "/api/v1/stores/{storeId}/activities" : {
       "get" : {
         "operationId" : "list_2",
@@ -1341,6 +3566,1027 @@
           }
         },
         "tags" : [ "activity-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/activities/{activityId}" : {
+      "get" : {
+        "operationId" : "detail_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "activityId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ActivityDetailResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "activity-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/ads" : {
+      "get" : {
+        "operationId" : "ads",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseAdResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "ad-mapping-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/ads/{adId}" : {
+      "get" : {
+        "operationId" : "ad",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "adId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "ad-mapping-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/ads/{adId}/mapping" : {
+      "put" : {
+        "operationId" : "confirm",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "adId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MappingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "ad-mapping-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/ads/{adId}/mapping/revocation" : {
+      "post" : {
+        "operationId" : "revoke",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "adId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RevokeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "ad-mapping-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/alert-settings" : {
+      "get" : {
+        "operationId" : "alertSettings",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertSettingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "alert-setting-controller" ]
+      },
+      "put" : {
+        "operationId" : "changeAlertSettings",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AlertSettingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AlertSettingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "alert-setting-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/analytics/products" : {
+      "get" : {
+        "operationId" : "products",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "default" : "NET_SALES",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "offset",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 50,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProductsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/analytics/products/{variantId}" : {
+      "get" : {
+        "operationId" : "product",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "variantId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProductDetailResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/analytics/sales" : {
+      "get" : {
+        "operationId" : "sales",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "compare",
+          "required" : false,
+          "schema" : {
+            "default" : "PREVIOUS_PERIOD",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SalesResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/business-profile" : {
+      "get" : {
+        "operationId" : "profile",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfileStateResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "business-profile-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/business-profile/draft" : {
+      "put" : {
+        "operationId" : "saveDraft",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DraftRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfileResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "business-profile-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/business-profile/draft/approval" : {
+      "post" : {
+        "operationId" : "approve_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ApproveRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfileResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "business-profile-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/business-profile/versions" : {
+      "get" : {
+        "operationId" : "versions",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseProfileResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "business-profile-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/dashboard" : {
+      "get" : {
+        "operationId" : "get_2",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DashboardResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "dashboard-controller" ]
       }
     },
     "/api/v1/stores/{storeId}/decisions" : {
@@ -1493,6 +4739,94 @@
         "tags" : [ "decision-controller" ]
       }
     },
+    "/api/v1/stores/{storeId}/decisions/{proposalId}/approvals" : {
+      "post" : {
+        "operationId" : "approve",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "proposalId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RevisionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DecisionCommandResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "decision-controller" ]
+      }
+    },
     "/api/v1/stores/{storeId}/decisions/{proposalId}/evidence" : {
       "get" : {
         "operationId" : "evidence",
@@ -1557,9 +4891,97 @@
         "tags" : [ "decision-controller" ]
       }
     },
+    "/api/v1/stores/{storeId}/decisions/{proposalId}/rejections" : {
+      "post" : {
+        "operationId" : "reject",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "proposalId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "Idempotency-Key",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RejectionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DecisionCommandResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "decision-controller" ]
+      }
+    },
     "/api/v1/stores/{storeId}/integration-connections" : {
       "post" : {
-        "operationId" : "create",
+        "operationId" : "create_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "storeId",
@@ -1831,7 +5253,7 @@
     },
     "/api/v1/stores/{storeId}/integrations/{integrationId}" : {
       "get" : {
-        "operationId" : "get",
+        "operationId" : "get_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "integrationId",
@@ -1895,7 +5317,7 @@
     },
     "/api/v1/stores/{storeId}/integrations/{integrationId}/checks" : {
       "post" : {
-        "operationId" : "check",
+        "operationId" : "check_1",
         "parameters" : [ {
           "in" : "path",
           "name" : "integrationId",
@@ -2100,6 +5522,947 @@
           }
         },
         "tags" : [ "integration-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/meta-connection" : {
+      "get" : {
+        "operationId" : "get",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MetaConnectionEnvelope"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "meta-connection-controller" ]
+      },
+      "post" : {
+        "operationId" : "create",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateMetaConnectionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MetaConnectionResponse"
+                }
+              }
+            },
+            "description" : "Created"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "meta-connection-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/meta-connection/{connectionId}/checks" : {
+      "post" : {
+        "operationId" : "check",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "connectionId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MetaConnectionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "meta-connection-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/meta-connection/{connectionId}/token" : {
+      "post" : {
+        "operationId" : "token",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "connectionId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MetaTokenRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MetaConnectionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "meta-connection-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/mutation-stop" : {
+      "get" : {
+        "operationId" : "mutationStop",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MutationStopResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "mutation-stop-controller" ]
+      },
+      "post" : {
+        "operationId" : "changeMutationStop",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MutationStopRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MutationStopResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "mutation-stop-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/notifications" : {
+      "get" : {
+        "operationId" : "notifications",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "cursor",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NotificationListResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "notification-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/notifications/{notificationId}/read" : {
+      "post" : {
+        "operationId" : "markRead",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "notificationId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "notification-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/onboarding" : {
+      "get" : {
+        "operationId" : "onboarding",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "business-profile-controller" ]
+      },
+      "patch" : {
+        "operationId" : "updateOnboarding",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OnboardingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "business-profile-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/onboarding/monitoring-start" : {
+      "post" : {
+        "operationId" : "startMonitoring",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MonitoringStartRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "business-profile-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/retention-hold" : {
+      "delete" : {
+        "operationId" : "releaseRetentionHold",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RetentionHoldResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "retention-hold-controller" ]
+      },
+      "get" : {
+        "operationId" : "retentionHold",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RetentionHoldResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "retention-hold-controller" ]
+      },
+      "put" : {
+        "operationId" : "setRetentionHold",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RetentionHoldRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "retention-hold-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/variants" : {
+      "get" : {
+        "operationId" : "variants",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseVariantResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "ad-mapping-controller" ]
       }
     },
     "/api/v1/webhooks/woocommerce/{endpointKey}" : {

@@ -10,8 +10,8 @@ import java.util.Set;
  * role can read the store and only {@link #OWNER} can manage it (ADR-0004).
  */
 public enum StoreRole {
-    OWNER(StorePermission.STORE_READ, StorePermission.STORE_MANAGE),
-    DECISION_OPERATOR(StorePermission.STORE_READ),
+    OWNER(StorePermission.STORE_READ, StorePermission.STORE_MANAGE, StorePermission.DECISION_APPROVE),
+    DECISION_OPERATOR(StorePermission.STORE_READ, StorePermission.DECISION_APPROVE),
     SUPPORT_OPERATOR(StorePermission.STORE_READ),
     ANALYST(StorePermission.STORE_READ);
 

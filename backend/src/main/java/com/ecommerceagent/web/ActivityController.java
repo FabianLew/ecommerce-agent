@@ -13,6 +13,7 @@ import com.ecommerceagent.identity.TrustedStoreScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,7 +30,9 @@ class ActivityController {
         DETECTION,
         RECOMMENDATION,
         POLICY,
-        INTEGRATION
+        ACTION,
+        INTEGRATION,
+        SETTINGS
     }
 
     enum ActorType {
@@ -45,13 +48,30 @@ class ActivityController {
             Map.entry("PROPOSAL_INVALID", ActivityType.RECOMMENDATION),
             Map.entry("PROPOSAL_STATUS_CHANGED", ActivityType.RECOMMENDATION),
             Map.entry("POLICY_EVALUATED", ActivityType.POLICY),
+            Map.entry("DECISION_APPROVED", ActivityType.RECOMMENDATION),
+            Map.entry("DECISION_REJECTED", ActivityType.RECOMMENDATION),
+            Map.entry("ACTION_AUTHORIZED", ActivityType.ACTION),
+            Map.entry("ACTION_EXECUTED", ActivityType.ACTION),
+            Map.entry("ACTION_VERIFIED", ActivityType.ACTION),
+            Map.entry("ACTION_OUTCOME_RECORDED", ActivityType.ACTION),
+            Map.entry("MUTATIONS_STOPPED", ActivityType.SETTINGS),
+            Map.entry("MUTATIONS_RESUMED", ActivityType.SETTINGS),
+            Map.entry("MONITORING_STARTED", ActivityType.SETTINGS),
             Map.entry("INTEGRATION_CONNECTION_CREATED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_CREDENTIALS_UPDATED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_CHECK_COMPLETED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_SYNC_STARTED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_SYNC_FINISHED", ActivityType.INTEGRATION),
             Map.entry("INTEGRATION_HISTORY_COMPLETED", ActivityType.INTEGRATION),
-            Map.entry("INTEGRATION_WEBHOOK_SECRET_UPDATED", ActivityType.INTEGRATION));
+            Map.entry("INTEGRATION_WEBHOOK_SECRET_UPDATED", ActivityType.INTEGRATION),
+            Map.entry("META_CONNECTION_CREATED", ActivityType.INTEGRATION),
+            Map.entry("META_TOKEN_UPDATED", ActivityType.INTEGRATION),
+            Map.entry("META_CHECK_COMPLETED", ActivityType.INTEGRATION),
+            Map.entry("AD_MAPPING_SAVED", ActivityType.SETTINGS),
+            Map.entry("AD_MAPPING_VERIFIED", ActivityType.SETTINGS),
+            Map.entry("AD_MAPPING_REVOKED", ActivityType.SETTINGS),
+            Map.entry("BUSINESS_PROFILE_DRAFT_SAVED", ActivityType.SETTINGS),
+            Map.entry("BUSINESS_PROFILE_APPROVED", ActivityType.SETTINGS));
 
     private final AuditTrail audit;
     private final StoreAccess storeAccess;
@@ -85,7 +105,36 @@ class ActivityController {
                         storeAccess.store(scope).timezone()));
     }
 
-    private static ActivitySummary summary(AuditRecord record) {
+    /** Activity Detail (04 §9): the event with links to the decision and execution it concerns. */
+    @GetMapping("/{activityId}")
+    ActivityDetailResponse detail(TrustedStoreScope scope, HttpServletRequest request,
+            @PathVariable String activityId) {
+        UUID id;
+        try {
+            id = UUID.fromString(activityId);
+        } catch (IllegalArgumentException e) {
+            throw new ResourceNotFoundException();
+        }
+        AuditRecord record = audit.find(scope, TYPES.keySet(), id).orElseThrow(ResourceNotFoundException::new);
+        Map<String, String> details = record.details();
+        String proposalId = details.getOrDefault("proposalId",
+                "decision_proposal".equals(record.resourceType()) ? record.resourceId() : null);
+        String executionId = "action_execution".equals(record.resourceType()) ? record.resourceId()
+                : details.get("executionId");
+        return new ActivityDetailResponse(summary(record), uuid(proposalId), uuid(executionId),
+                ReadMeta.live(RequestCorrelationFilter.requestId(request), clock.instant(),
+                        storeAccess.store(scope).timezone()));
+    }
+
+    private static UUID uuid(String value) {
+        try {
+            return value == null ? null : UUID.fromString(value);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    static ActivitySummary summary(AuditRecord record) {
         Actor actor = record.actorUserId() != null
                 ? new Actor(ActorType.USER, record.actorUserId(), record.actorDisplayName(), null)
                 : new Actor(ActorType.SYSTEM, null, null, record.actorService());
@@ -120,6 +169,13 @@ class ActivityController {
             String resourceType,
             String resourceId,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Map<String, String> details) {
+    }
+
+    record ActivityDetailResponse(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ActivitySummary activity,
+            @Schema(description = "The decision the event concerns, when there is one") UUID proposalId,
+            @Schema(description = "The execution the event concerns, when there is one") UUID executionId,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ReadMeta meta) {
     }
 
     record Actor(

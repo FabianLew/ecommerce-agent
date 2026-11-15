@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.Map;
 import java.util.UUID;
 
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.identity.StorePermission;
 import com.ecommerceagent.identity.TrustedStoreScope;
@@ -19,7 +20,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -60,7 +60,7 @@ class StoreIsolationTest {
     MockMvc mvc;
 
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
 
     @BeforeEach
     void tenants() {
@@ -174,7 +174,7 @@ class StoreIsolationTest {
     @Test
     void storeDetailsExposeCurrentPermissions() throws Exception {
         mvc.perform(get("/api/v1/stores/{id}", STORE_A).with(user("subject-a")))
-                .andExpect(jsonPath("$.permissions.length()").value(2))
+                .andExpect(jsonPath("$.permissions.length()").value(3))
                 .andExpect(jsonPath("$.permissions[1]").value("STORE_MANAGE"));
         mvc.perform(get("/api/v1/stores/{id}", STORE_A).with(user("subject-b")))
                 .andExpect(jsonPath("$.permissions.length()").value(1))

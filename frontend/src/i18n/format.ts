@@ -16,3 +16,28 @@ export function formatNumber(value: number | undefined | null, locale: Locale, d
   }
   return new Intl.NumberFormat(INTL_TAGS[locale], { maximumFractionDigits: digits }).format(value);
 }
+
+/**
+ * A money amount in its own currency (ISO 4217), never converted: store figures in the store's currency, AI costs and
+ * budgets in the technical settlement currency (USD, ADR-0027 section 3.2). The API sends exact decimal strings, which
+ * are formatted without passing through a binary float; very small AI costs keep up to six fraction digits.
+ */
+export function formatMoney(amount: string | number | undefined | null, currency: string | undefined | null,
+                            locale: Locale): string {
+  if (amount === undefined || amount === null || amount === "" || !currency) {
+    return "—";
+  }
+  const text = String(amount);
+  if (!/^-?\d+(\.\d+)?$/.test(text)) {
+    return "—";
+  }
+  const fraction = text.split(".")[1]?.replace(/0+$/, "").length ?? 0;
+  const format = new Intl.NumberFormat(INTL_TAGS[locale], {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: Math.min(Math.max(fraction, 2), 6),
+  });
+  // Intl formats decimal strings exactly (ES2023); the cast keeps the older lib types satisfied.
+  return format.format(text as unknown as number);
+}

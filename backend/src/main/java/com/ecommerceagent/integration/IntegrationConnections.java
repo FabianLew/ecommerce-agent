@@ -116,7 +116,18 @@ public class IntegrationConnections {
         SecretCipher.Sealed sealed = repository.credential(scope, connectionId, name)
                 .orElseThrow(() -> new InvalidIntegrationRequestException("credentials", "CREDENTIALS_MISSING",
                         "Save the API key and secret first"));
-        return cipher.open(sealed, associatedData(scope, connectionId, name));
+        return openAndRefresh(repository, cipher, scope, connectionId, name, sealed);
+    }
+
+    /** Opens a stored value and, when it was sealed with a previous key, reseals it with the current one. */
+    static String openAndRefresh(IntegrationConnectionRepository repository, SecretCipher cipher,
+            TrustedStoreScope scope, UUID connectionId, String name, SecretCipher.Sealed sealed) {
+        String associatedData = associatedData(scope, connectionId, name);
+        String value = cipher.open(sealed, associatedData);
+        if (!cipher.current(sealed)) {
+            repository.reseal(scope, connectionId, name, cipher.seal(value, associatedData), sealed.keyId());
+        }
+        return value;
     }
 
     static String associatedData(TrustedStoreScope scope, UUID connectionId, String name) {

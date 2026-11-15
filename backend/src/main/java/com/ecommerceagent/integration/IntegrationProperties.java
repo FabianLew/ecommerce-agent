@@ -1,20 +1,23 @@
 package com.ecommerceagent.integration;
 
 import java.time.Duration;
+import java.util.Map;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 /**
  * Integration settings (ADR-0007). {@code secretsKey} is a base64 AES-256 key; the application does not
- * start without it. The WooCommerce flags relax the address policy and are enabled only in profile
+ * start without it; {@code previousSecretsKeys} ({@code keyId → base64}) only open values during a rotation
+ * (ADR-0022). The WooCommerce flags relax the address policy and are enabled only in profile
  * {@code local}.
  */
 @ConfigurationProperties("operator.integration")
-record IntegrationProperties(String secretsKey, @DefaultValue("v1") String secretsKeyId, WooCommerce woocommerce,
-        Webhooks webhooks) {
+record IntegrationProperties(String secretsKey, @DefaultValue("v1") String secretsKeyId,
+        Map<String, String> previousSecretsKeys, WooCommerce woocommerce, Webhooks webhooks) {
 
     IntegrationProperties {
+        previousSecretsKeys = previousSecretsKeys == null ? Map.of() : Map.copyOf(previousSecretsKeys);
         if (woocommerce == null) {
             woocommerce = new WooCommerce(false, false, Duration.ofSeconds(5), Duration.ofSeconds(30), 5_000_000);
         }

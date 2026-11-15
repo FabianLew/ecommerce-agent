@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.UUID;
 
 import com.ecommerceagent.Correlation;
+import com.ecommerceagent.FixtureDb;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.automation.diagnostics.ScopeCheckWorkflow;
 import com.ecommerceagent.automation.diagnostics.ScopeCheckWorkflowImpl;
@@ -30,7 +31,6 @@ import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
@@ -54,7 +54,7 @@ class WorkflowStoreScopeTest {
     WorkflowClient client;
 
     @Autowired
-    JdbcClient jdbc;
+    FixtureDb jdbc;
 
     @Autowired
     StoreAccess storeAccess;

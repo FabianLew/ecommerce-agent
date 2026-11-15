@@ -8,4 +8,8 @@ public class IntegrationConflictException extends RuntimeException {
     public IntegrationConflictException(IntegrationProvider provider) {
         super("The store already has a " + provider + " connection");
     }
+
+    public IntegrationConflictException(String message) {
+        super(message);
+    }
 }
