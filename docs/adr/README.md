@@ -33,5 +33,6 @@ Statuses: `Proposed` → `Accepted` (after the owner accepts it in a PR) → opt
 | [0024](0024-operational-metrics-alerts-and-runbooks.md) | Operational metrics, alerts and runbooks | Proposed |
 | [0025](0025-monitoring-start-and-the-pilot-gate.md) | Monitoring start, per-store action permission and the pilot gate | Proposed |
 | [0026](0026-inventory-protection-levels-parameters-and-alert-recipients.md) | Inventory protection levels, versioned parameters and alert recipients | Proposed |
+| [0027](0027-ai-cost-governance-budgets-and-abuse-protection.md) | AI cost governance, budget enforcement and abuse protection | Proposed |
 
 Template: [0000-template.md](0000-template.md).

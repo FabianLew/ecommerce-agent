@@ -6,6 +6,8 @@
 - Related: document 02 §3–8 and §12, document 03 §4–6 and §12 (IG-07, IG-11, IG-22, IG-24, IG-28), ADR-0002 (the tool
   loop belongs to the runtime), ADR-0011 (evidence, snapshot), ADR-0012 (DecisionProposal v1, baseline, workflow),
   backlog B-26..B-30
+- Extended by: ADR-0027 (AI cost governance: budgets above the run, persisted reservations, `UNKNOWN` outcomes,
+  governed gateway); its section 22 lists what changes in this runtime
 
 ## Context
 
