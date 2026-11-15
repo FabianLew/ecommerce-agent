@@ -9,6 +9,8 @@ import com.ecommerceagent.automation.execution.MutationStopException;
 import com.ecommerceagent.automation.guardian.ApprovalException;
 import com.ecommerceagent.businessprofile.BusinessProfileException;
 import com.ecommerceagent.commerce.AdMappingException;
+import com.ecommerceagent.aigovernance.AiReconciliationException;
+import com.ecommerceagent.identity.PlatformOperatorDeniedException;
 import com.ecommerceagent.identity.StoreAccessDeniedException;
 import com.ecommerceagent.integration.IntegrationConflictException;
 import com.ecommerceagent.integration.IntegrationNotFoundException;
@@ -177,6 +179,24 @@ class ApiExceptionHandler {
                     "The webhook signature does not match the saved secret.", false);
             case PAYLOAD_TOO_LARGE -> error(request, HttpStatus.CONTENT_TOO_LARGE, "PAYLOAD_TOO_LARGE",
                     "The webhook body is too large.", false);
+        };
+    }
+
+    @ExceptionHandler(PlatformOperatorDeniedException.class)
+    ResponseEntity<ApiError> notPlatformOperator(HttpServletRequest request) {
+        return error(request, HttpStatus.FORBIDDEN, "FORBIDDEN",
+                "You do not have permission to perform this operation.", false);
+    }
+
+    @ExceptionHandler(AiReconciliationException.class)
+    ResponseEntity<ApiError> aiReconciliation(AiReconciliationException exception, HttpServletRequest request) {
+        return switch (exception.kind()) {
+            case NOT_FOUND -> error(request, HttpStatus.NOT_FOUND, "NOT_FOUND",
+                    "The resource does not exist or is not available.", false);
+            case CONFLICT -> error(request, HttpStatus.CONFLICT, "RECONCILIATION_CONFLICT",
+                    "The call is not open for this decision, or a different one was already recorded.", false);
+            case INVALID -> error(request, HttpStatus.UNPROCESSABLE_CONTENT, "VALIDATION_FAILED",
+                    "Give an outcome, a reason of 1 to 500 characters, and a cost only for CHARGED.", false);
         };
     }
 

@@ -1447,6 +1447,24 @@
         "required" : [ "hasMore", "items" ],
         "type" : "object"
       },
+      "ListResponseUncertainReservationDto" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/UncertainReservationDto"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "hasMore", "items" ],
+        "type" : "object"
+      },
       "ListResponseVariantResponse" : {
         "properties" : {
           "hasMore" : {
@@ -2246,6 +2264,44 @@
         "required" : [ "asOf", "completeness", "generatedAt", "timezone", "warnings" ],
         "type" : "object"
       },
+      "ReconciliationRequest" : {
+        "properties" : {
+          "cost" : {
+            "description" : "The confirmed amount in the reservation's currency; required for CHARGED only",
+            "type" : "number"
+          },
+          "outcome" : {
+            "description" : "NOT_CHARGED, CHARGED or CONSERVATIVE (CONSERVATIVE only for an UNKNOWN call)",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "What the provider shows, 1 to 500 characters",
+            "type" : "string"
+          }
+        },
+        "required" : [ "outcome", "reason" ],
+        "type" : "object"
+      },
+      "ReconciliationResponse" : {
+        "properties" : {
+          "cost" : {
+            "type" : "number"
+          },
+          "delta" : {
+            "description" : "Change of every charged budget, for a correction",
+            "type" : "number"
+          },
+          "outcome" : {
+            "type" : "string"
+          },
+          "repeated" : {
+            "description" : "The same decision was already recorded; nothing changed",
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "cost", "outcome", "repeated" ],
+        "type" : "object"
+      },
       "RejectionRequest" : {
         "properties" : {
           "reason" : {
@@ -2558,6 +2614,64 @@
         "required" : [ "id", "startedAt", "status", "windowFrom", "windowUntil" ],
         "type" : "object"
       },
+      "UncertainReservationDto" : {
+        "properties" : {
+          "automationType" : {
+            "type" : "string"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "model" : {
+            "type" : "string"
+          },
+          "organizationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "provider" : {
+            "type" : "string"
+          },
+          "providerRequestId" : {
+            "type" : "string"
+          },
+          "recordedCost" : {
+            "type" : "number"
+          },
+          "reservationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "reservedAmount" : {
+            "type" : "number"
+          },
+          "sentAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "settledAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "state" : {
+            "description" : "UNKNOWN or RECONCILED_CONSERVATIVE",
+            "type" : "string"
+          },
+          "stateReason" : {
+            "type" : "string"
+          },
+          "storeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "unknownAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "automationType", "currency", "model", "organizationId", "provider", "reservationId", "reservedAmount", "state", "storeId" ],
+        "type" : "object"
+      },
       "VariantRef" : {
         "properties" : {
           "id" : {
@@ -2701,6 +2815,138 @@
           }
         },
         "tags" : [ "identity-controller" ]
+      }
+    },
+    "/api/v1/platform/ai/reservations/uncertain" : {
+      "get" : {
+        "operationId" : "uncertainReservations",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 100,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseUncertainReservationDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
+      }
+    },
+    "/api/v1/platform/ai/reservations/{reservationId}/correction" : {
+      "post" : {
+        "operationId" : "correctReservation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "reservationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReconciliationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReconciliationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
+      }
+    },
+    "/api/v1/platform/ai/reservations/{reservationId}/reconciliation" : {
+      "post" : {
+        "operationId" : "reconcileReservation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "reservationId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReconciliationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReconciliationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
       }
     },
     "/api/v1/stores" : {

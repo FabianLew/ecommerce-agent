@@ -896,3 +896,21 @@ after a stream started and for calls that were never sent.
   start of the same inventory episode is rejected by its workflow id, so a duplicated delivery never starts a second
   paid analysis (`InventoryGuardianAgentTest`). Metrics `operator_api_rate_limited_total` and
   `operator_api_idempotent_replays_total`, alert `ApiRateLimited`.
+- **E-54.6, reconciliation of uncertain calls.** Platform operators are the users listed in `platform_operator`
+  (V37), which only reviewed changes with the administration role write; a revoked entry counts as absent and every
+  decision re-checks it. They list the uncertain calls of every store (`GET /api/v1/platform/ai/reservations/uncertain`:
+  `UNKNOWN`, and conservative reconciliations of the last 90 days not yet corrected), close an `UNKNOWN` one
+  (`POST .../{id}/reconciliation`: `NOT_CHARGED`, `CHARGED` with the confirmed amount, or `CONSERVATIVE`) and correct
+  a conservative one when the provider's data arrives (`POST .../{id}/correction`). A correction is an append-only
+  adjustment entry (`ai_usage_adjustment`, one per reservation): the usage ledger row stays, the entry records the
+  previous and corrected cost, the difference and who decided, and every balance the reservation charged moves by
+  the difference. Each decision is recorded as `PLATFORM_OPERATOR:<user id>` and audited in its store
+  (`AI_RESERVATION_RECONCILED`, `AI_USAGE_CORRECTED`). Store members get 403. The provider's request id is kept on
+  an `UNKNOWN` reservation when the provider answered with one (`ai_mark_unknown` with three arguments). A worker job
+  (`AiUnknownReconciler`, every 15 minutes, at most 100 calls and 30 seconds per run) looks up such calls with the
+  provider's `ProviderUsageSource`, matched by request id only: a confirmed charge is settled from the provider's
+  usage at the reservation's price, a confirmed non-charge returns the reservation, anything else stays `UNKNOWN`.
+  No provider has a source yet (the Anthropic API does not report a single request's billing), so today the job does
+  nothing and uncertain calls wait for an operator or the conservative settlement after 24 hours; the escalation is
+  the existing `AiReservationUnknown` alert. New definer functions (ADR-0022 point 4): `ai_mark_unknown` (three
+  arguments), `ai_reservation_location`, `ai_uncertain_reservations`, `ai_adjust_reconciliation`.

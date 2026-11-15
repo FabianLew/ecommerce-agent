@@ -473,6 +473,9 @@ class AgentRuntimeSafetyTest {
             assertThat(reservation.state).isEqualTo("UNKNOWN");
             assertThat(reservation.reason).isEqualTo("MODEL_FAILURE:TIMEOUT");
         });
+        // E-54.6: the provider's request id stays with the uncertain call, to match it with the provider later.
+        assertThat(governance.events()).anyMatch(event -> event.startsWith("UNKNOWN:")
+                && event.endsWith(":MODEL_FAILURE:TIMEOUT:req-failed"));
         // Not zero any more (ADR-0027 section 22, gap 1): the next attempt starts with this cost spent.
         assertThat(result.estimatedCostUsd()).isPositive();
         assertThat(runs.only().usageComplete()).isFalse();

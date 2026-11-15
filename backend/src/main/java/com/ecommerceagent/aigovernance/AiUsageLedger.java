@@ -3,6 +3,7 @@ package com.ecommerceagent.aigovernance;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+import com.ecommerceagent.identity.PlatformOperator;
 import com.ecommerceagent.identity.TrustedStoreScope;
 
 /**
@@ -25,7 +26,15 @@ public interface AiUsageLedger {
     Settlement settle(TrustedStoreScope scope, UUID reservationId, ProviderUsage usage);
 
     /** The call was sent and its result is unknown; the reservation keeps counting until it is reconciled. */
-    void markUnknown(TrustedStoreScope scope, UUID reservationId, String reason);
+    default void markUnknown(TrustedStoreScope scope, UUID reservationId, String reason) {
+        markUnknown(scope, reservationId, reason, null);
+    }
+
+    /**
+     * As {@link #markUnknown(TrustedStoreScope, UUID, String)}, keeping the provider's request id when the provider
+     * answered with one, so the call can be looked up and matched by it (ADR-0027 section 4.5).
+     */
+    void markUnknown(TrustedStoreScope scope, UUID reservationId, String reason, String providerRequestId);
 
     /**
      * Closes an {@code UNKNOWN} reservation, recorded with the scope's actor. {@code cost} is required for
@@ -34,4 +43,17 @@ public interface AiUsageLedger {
      */
     Settlement reconcile(TrustedStoreScope scope, UUID reservationId, ReconciliationOutcome outcome, BigDecimal cost,
             String reason);
+
+    /** As {@link #reconcile(TrustedStoreScope, UUID, ReconciliationOutcome, BigDecimal, String)}, decided by a platform operator. */
+    Settlement reconcile(TrustedStoreScope scope, PlatformOperator operator, UUID reservationId,
+            ReconciliationOutcome outcome, BigDecimal cost, String reason);
+
+    /**
+     * Corrects a conservative reconciliation once the provider's data is known: {@link ReconciliationOutcome#NOT_CHARGED}
+     * or {@link ReconciliationOutcome#CHARGED} with the confirmed amount. The usage ledger row stays; an adjustment
+     * entry records the difference and the balances move by it. Repeating the same correction changes nothing; a
+     * different second one is refused.
+     */
+    Adjustment adjust(TrustedStoreScope scope, PlatformOperator operator, UUID reservationId,
+            ReconciliationOutcome outcome, BigDecimal cost, String reason);
 }

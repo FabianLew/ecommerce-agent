@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 import com.ecommerceagent.identity.Actor;
+import com.ecommerceagent.identity.PlatformOperator;
 import com.ecommerceagent.identity.StoreRowGuard;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -46,21 +47,56 @@ class PostgresAiUsageLedger implements AiUsageLedger {
     }
 
     @Override
-    public void markUnknown(TrustedStoreScope scope, UUID reservationId, String reason) {
+    public void markUnknown(TrustedStoreScope scope, UUID reservationId, String reason, String providerRequestId) {
         requireBound(scope);
-        jdbc.sql("SELECT ai_mark_unknown(?::uuid, ?)").params(reservationId, reason).query(String.class).single();
+        String requestId = providerRequestId == null || providerRequestId.isBlank() || providerRequestId.length() > 200
+                ? null : providerRequestId;
+        jdbc.sql("SELECT ai_mark_unknown(?::uuid, ?, ?)").params(reservationId, reason, requestId)
+                .query(String.class).single();
     }
 
     @Override
     public Settlement reconcile(TrustedStoreScope scope, UUID reservationId, ReconciliationOutcome outcome,
             BigDecimal cost, String reason) {
+        return reconcile(scope, recordedBy(scope.actor()), reservationId, outcome, cost, reason);
+    }
+
+    @Override
+    public Settlement reconcile(TrustedStoreScope scope, PlatformOperator operator, UUID reservationId,
+            ReconciliationOutcome outcome, BigDecimal cost, String reason) {
+        return reconcile(scope, operator.recordedAs(), reservationId, outcome, cost, reason);
+    }
+
+    @Override
+    public Adjustment adjust(TrustedStoreScope scope, PlatformOperator operator, UUID reservationId,
+            ReconciliationOutcome outcome, BigDecimal cost, String reason) {
+        requireBound(scope);
+        Objects.requireNonNull(outcome, "outcome");
+        if (outcome == ReconciliationOutcome.CONSERVATIVE) {
+            throw new IllegalArgumentException("A correction is NOT_CHARGED or CHARGED");
+        }
+        return jdbc.sql("""
+                        SELECT outcome, cost, delta
+                        FROM ai_adjust_reconciliation(?::uuid, ?, ?, ?, ?)
+                        """)
+                .params(reservationId, outcome.name(), cost, operator.recordedAs(), reason)
+                .query((rs, n) -> {
+                    boolean repeated = "DUPLICATE".equals(rs.getString("outcome"));
+                    return new Adjustment(repeated ? "CORRECTED_" + outcome.name() : rs.getString("outcome"),
+                            rs.getBigDecimal("cost"), rs.getBigDecimal("delta"), repeated);
+                })
+                .single();
+    }
+
+    private Settlement reconcile(TrustedStoreScope scope, String recordedBy, UUID reservationId,
+            ReconciliationOutcome outcome, BigDecimal cost, String reason) {
         requireBound(scope);
         Objects.requireNonNull(outcome, "outcome");
         return jdbc.sql("""
                         SELECT outcome, cost, overrun
                         FROM ai_reconcile(?::uuid, ?, ?, ?, ?)
                         """)
-                .params(reservationId, outcome.name(), cost, recordedBy(scope.actor()), reason)
+                .params(reservationId, outcome.name(), cost, recordedBy, reason)
                 .query((rs, n) -> settlement(rs.getString("outcome"), rs.getBigDecimal("cost"),
                         rs.getBigDecimal("overrun"), "RECONCILED_" + outcome.name()))
                 .single();
