@@ -132,6 +132,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stores/{storeId}/analytics/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["products"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stores/{storeId}/analytics/products/{variantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["product"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stores/{storeId}/analytics/sales": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["sales"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stores/{storeId}/business-profile": {
         parameters: {
             query?: never;
@@ -528,6 +576,21 @@ export interface components {
             /** @enum {string} */
             source: "FIXTURE" | "META_API";
         };
+        AnalyticsMeta: {
+            /** Format: date-time */
+            computedAt: string;
+            /** Format: date-time */
+            coveredFrom?: string;
+            /** Format: date-time */
+            coveredUntil?: string;
+            currency: string;
+            /** Format: date */
+            from: string;
+            fullyCovered: boolean;
+            timezone: string;
+            /** Format: date */
+            to: string;
+        };
         ApiError: {
             code: string;
             currentVersion?: string;
@@ -559,6 +622,13 @@ export interface components {
             /** @enum {string} */
             status: "PENDING_CREDENTIALS" | "CHECK_REQUIRED" | "CONNECTED" | "ERROR";
             warnings: ("CURRENCY_MISMATCH" | "CURRENCY_UNKNOWN")[];
+        };
+        ComparisonDto: {
+            absoluteDifference?: string;
+            baseValue?: string;
+            percentDifference?: string;
+            /** @description Why there is no percentage */
+            percentUnavailableReason?: string;
         };
         CreateConnectionRequest: {
             /** @enum {string} */
@@ -820,6 +890,24 @@ export interface components {
             textual?: boolean;
             valueNode?: boolean;
         };
+        LinkedAd: {
+            /** Format: uuid */
+            adId: string;
+            externalId: string;
+            mappingScope: string;
+            name: string;
+            ownStatus: string;
+            verifiedForCurrentCreative: boolean;
+        };
+        LinkedDecision: {
+            /** Format: uuid */
+            latestProposalId?: string;
+            /** Format: date-time */
+            openedAt: string;
+            /** Format: uuid */
+            opportunityId: string;
+            status: string;
+        };
         ListResponseAdResponse: {
             hasMore: boolean;
             items: components["schemas"]["AdResponse"][];
@@ -908,6 +996,23 @@ export interface components {
         MetaTokenRequest: {
             token: string;
         };
+        MetricDto: {
+            comparison?: components["schemas"]["ComparisonDto"];
+            currency?: string;
+            definitionVersion: string;
+            key: string;
+            /** @description Why the value is missing or limited */
+            missingComponents: ("SALES_HISTORY_INCOMPLETE" | "NO_SALES_IN_WINDOW" | "STOCK_NOT_TRACKED" | "SHARED_STOCK_NOT_SUPPORTED" | "NO_STOCK_OBSERVATION" | "AVAILABLE_STOCK_UNKNOWN" | "STOCKOUT_IN_WINDOW" | "STOCK_HISTORY_UNVERIFIED" | "BACKORDERS_ALLOWED" | "REFUNDS_NOT_INCLUDED" | "OTHER_CURRENCY_EXCLUDED" | "SALES_HISTORY_PARTIAL" | "NO_ORDERS_IN_WINDOW")[];
+            /** Format: date-time */
+            observedAt: string;
+            period: components["schemas"]["PeriodDto"];
+            /** @enum {string} */
+            quality: "CONFIRMED" | "ESTIMATED" | "UNAVAILABLE";
+            sourceRefs: string[];
+            unit: string;
+            /** @description Decimal string; null when quality is UNAVAILABLE */
+            value?: string;
+        };
         OnboardingRequest: {
             acknowledgements?: ("SKIP_META" | "MAPPINGS_LATER")[];
             /** @enum {string} */
@@ -930,6 +1035,13 @@ export interface components {
             /** Format: int32 */
             version: number;
         };
+        PeriodDto: {
+            /** Format: date-time */
+            from: string;
+            timezone: string;
+            /** Format: date-time */
+            toExclusive: string;
+        };
         PlannedAdSpendResponse: {
             /** Format: int64 */
             amountMinor: number;
@@ -947,6 +1059,39 @@ export interface components {
             outcome: string;
             policyKey: string;
             policyVersion: string;
+        };
+        ProductDetailResponse: {
+            ads: components["schemas"]["LinkedAd"][];
+            /** Format: int32 */
+            availableToSell?: number;
+            daily: components["schemas"]["SeriesPoint"][];
+            daysOfCover: components["schemas"]["MetricDto"];
+            decisions: components["schemas"]["LinkedDecision"][];
+            meta: components["schemas"]["AnalyticsMeta"];
+            salesVelocity: components["schemas"]["MetricDto"];
+            stock: components["schemas"]["StockPoint"][];
+            variant: components["schemas"]["VariantRef"];
+        };
+        ProductRowResponse: {
+            /** Format: int32 */
+            availableToSell?: number;
+            daysOfCover: components["schemas"]["MetricDto"];
+            netSales?: string;
+            /**
+             * Format: int64
+             * @description Null when the period is not covered
+             */
+            units?: number;
+            variant: components["schemas"]["VariantRef"];
+        };
+        ProductsResponse: {
+            hasMore: boolean;
+            items: components["schemas"]["ProductRowResponse"][];
+            meta: components["schemas"]["AnalyticsMeta"];
+            /** Format: int32 */
+            offset: number;
+            /** Format: int32 */
+            total: number;
         };
         ProfileResponse: {
             /** Format: date-time */
@@ -1012,6 +1157,24 @@ export interface components {
             /** Format: int32 */
             expectedVersion: number;
         };
+        SalesResponse: {
+            meta: components["schemas"]["AnalyticsMeta"];
+            metrics: components["schemas"]["MetricDto"][];
+            /** Format: int64 */
+            otherCurrencyOrders: number;
+            series: components["schemas"]["SeriesPoint"][];
+        };
+        SeriesPoint: {
+            /**
+             * Format: int64
+             * @description Orders (sales) or units (product); null when not covered
+             */
+            count?: number;
+            /** Format: date */
+            day: string;
+            /** @description Null when the day is outside the imported history */
+            netSales?: string;
+        };
         SnapshotRef: {
             /** Format: date-time */
             asOf: string;
@@ -1025,6 +1188,13 @@ export interface components {
             complete: boolean;
             /** @enum {string} */
             step: "CONNECT_STORE" | "CONNECT_TOOLS" | "BUSINESS_DATA" | "START_MONITORING";
+        };
+        StockPoint: {
+            /** Format: int32 */
+            availableToSell?: number;
+            /** Format: date-time */
+            observedAt: string;
+            stockStatus: string;
         };
         StoreResponse: {
             currency: string;
@@ -1072,6 +1242,13 @@ export interface components {
             windowFrom: string;
             /** Format: date-time */
             windowUntil: string;
+        };
+        VariantRef: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            productName: string;
+            sku?: string;
         };
         VariantResponse: {
             /** Format: uuid */
@@ -1447,6 +1624,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    products: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                sort?: string;
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductsResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    product: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                variantId: string;
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProductDetailResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    sales: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                compare?: string;
+            };
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesResponse"];
                 };
             };
             /** @description Missing or invalid access token */

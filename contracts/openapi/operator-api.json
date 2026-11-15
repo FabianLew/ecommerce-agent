@@ -151,6 +151,41 @@
         "required" : [ "accountExternalId", "allowedActions", "effectiveStatus", "externalId", "id", "mappingState", "name", "observedAt", "ownStatus", "source" ],
         "type" : "object"
       },
+      "AnalyticsMeta" : {
+        "properties" : {
+          "computedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "coveredFrom" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "coveredUntil" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "from" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "fullyCovered" : {
+            "type" : "boolean"
+          },
+          "timezone" : {
+            "type" : "string"
+          },
+          "to" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        },
+        "required" : [ "computedAt", "currency", "from", "fullyCovered", "timezone", "to" ],
+        "type" : "object"
+      },
       "ApiError" : {
         "properties" : {
           "code" : {
@@ -240,6 +275,24 @@
           }
         },
         "required" : [ "checkedAt", "integration", "status", "warnings" ],
+        "type" : "object"
+      },
+      "ComparisonDto" : {
+        "properties" : {
+          "absoluteDifference" : {
+            "type" : "string"
+          },
+          "baseValue" : {
+            "type" : "string"
+          },
+          "percentDifference" : {
+            "type" : "string"
+          },
+          "percentUnavailableReason" : {
+            "description" : "Why there is no percentage",
+            "type" : "string"
+          }
+        },
         "type" : "object"
       },
       "CreateConnectionRequest" : {
@@ -902,6 +955,52 @@
         },
         "type" : "object"
       },
+      "LinkedAd" : {
+        "properties" : {
+          "adId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "externalId" : {
+            "type" : "string"
+          },
+          "mappingScope" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "ownStatus" : {
+            "type" : "string"
+          },
+          "verifiedForCurrentCreative" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "adId", "externalId", "mappingScope", "name", "ownStatus", "verifiedForCurrentCreative" ],
+        "type" : "object"
+      },
+      "LinkedDecision" : {
+        "properties" : {
+          "latestProposalId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "openedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "opportunityId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "openedAt", "opportunityId", "status" ],
+        "type" : "object"
+      },
       "ListResponseAdResponse" : {
         "properties" : {
           "hasMore" : {
@@ -1148,6 +1247,56 @@
         "required" : [ "token" ],
         "type" : "object"
       },
+      "MetricDto" : {
+        "properties" : {
+          "comparison" : {
+            "$ref" : "#/components/schemas/ComparisonDto"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "definitionVersion" : {
+            "type" : "string"
+          },
+          "key" : {
+            "type" : "string"
+          },
+          "missingComponents" : {
+            "description" : "Why the value is missing or limited",
+            "items" : {
+              "enum" : [ "SALES_HISTORY_INCOMPLETE", "NO_SALES_IN_WINDOW", "STOCK_NOT_TRACKED", "SHARED_STOCK_NOT_SUPPORTED", "NO_STOCK_OBSERVATION", "AVAILABLE_STOCK_UNKNOWN", "STOCKOUT_IN_WINDOW", "STOCK_HISTORY_UNVERIFIED", "BACKORDERS_ALLOWED", "REFUNDS_NOT_INCLUDED", "OTHER_CURRENCY_EXCLUDED", "SALES_HISTORY_PARTIAL", "NO_ORDERS_IN_WINDOW" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "observedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "period" : {
+            "$ref" : "#/components/schemas/PeriodDto"
+          },
+          "quality" : {
+            "enum" : [ "CONFIRMED", "ESTIMATED", "UNAVAILABLE" ],
+            "type" : "string"
+          },
+          "sourceRefs" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "unit" : {
+            "type" : "string"
+          },
+          "value" : {
+            "description" : "Decimal string; null when quality is UNAVAILABLE",
+            "type" : "string"
+          }
+        },
+        "required" : [ "definitionVersion", "key", "missingComponents", "observedAt", "period", "quality", "sourceRefs", "unit" ],
+        "type" : "object"
+      },
       "OnboardingRequest" : {
         "properties" : {
           "acknowledgements" : {
@@ -1211,6 +1360,23 @@
         "required" : [ "acknowledgements", "canEdit", "currentStep", "domains", "nextStep", "steps", "version" ],
         "type" : "object"
       },
+      "PeriodDto" : {
+        "properties" : {
+          "from" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "timezone" : {
+            "type" : "string"
+          },
+          "toExclusive" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "from", "timezone", "toExclusive" ],
+        "type" : "object"
+      },
       "PlannedAdSpendResponse" : {
         "properties" : {
           "amountMinor" : {
@@ -1260,6 +1426,102 @@
           }
         },
         "required" : [ "checks", "evaluatedAt", "evaluationId", "mode", "outcome", "policyKey", "policyVersion" ],
+        "type" : "object"
+      },
+      "ProductDetailResponse" : {
+        "properties" : {
+          "ads" : {
+            "items" : {
+              "$ref" : "#/components/schemas/LinkedAd"
+            },
+            "type" : "array"
+          },
+          "availableToSell" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "daily" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SeriesPoint"
+            },
+            "type" : "array"
+          },
+          "daysOfCover" : {
+            "$ref" : "#/components/schemas/MetricDto"
+          },
+          "decisions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/LinkedDecision"
+            },
+            "type" : "array"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/AnalyticsMeta"
+          },
+          "salesVelocity" : {
+            "$ref" : "#/components/schemas/MetricDto"
+          },
+          "stock" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StockPoint"
+            },
+            "type" : "array"
+          },
+          "variant" : {
+            "$ref" : "#/components/schemas/VariantRef"
+          }
+        },
+        "required" : [ "ads", "daily", "daysOfCover", "decisions", "meta", "salesVelocity", "stock", "variant" ],
+        "type" : "object"
+      },
+      "ProductRowResponse" : {
+        "properties" : {
+          "availableToSell" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "daysOfCover" : {
+            "$ref" : "#/components/schemas/MetricDto"
+          },
+          "netSales" : {
+            "type" : "string"
+          },
+          "units" : {
+            "description" : "Null when the period is not covered",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "variant" : {
+            "$ref" : "#/components/schemas/VariantRef"
+          }
+        },
+        "required" : [ "daysOfCover", "variant" ],
+        "type" : "object"
+      },
+      "ProductsResponse" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ProductRowResponse"
+            },
+            "type" : "array"
+          },
+          "meta" : {
+            "$ref" : "#/components/schemas/AnalyticsMeta"
+          },
+          "offset" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "total" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "hasMore", "items", "meta", "offset", "total" ],
         "type" : "object"
       },
       "ProfileResponse" : {
@@ -1427,6 +1689,50 @@
         "required" : [ "expectedVersion" ],
         "type" : "object"
       },
+      "SalesResponse" : {
+        "properties" : {
+          "meta" : {
+            "$ref" : "#/components/schemas/AnalyticsMeta"
+          },
+          "metrics" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MetricDto"
+            },
+            "type" : "array"
+          },
+          "otherCurrencyOrders" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "series" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SeriesPoint"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "meta", "metrics", "otherCurrencyOrders", "series" ],
+        "type" : "object"
+      },
+      "SeriesPoint" : {
+        "properties" : {
+          "count" : {
+            "description" : "Orders (sales) or units (product); null when not covered",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "day" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "netSales" : {
+            "description" : "Null when the day is outside the imported history",
+            "type" : "string"
+          }
+        },
+        "required" : [ "day" ],
+        "type" : "object"
+      },
       "SnapshotRef" : {
         "properties" : {
           "asOf" : {
@@ -1464,6 +1770,23 @@
           }
         },
         "required" : [ "blockers", "complete", "step" ],
+        "type" : "object"
+      },
+      "StockPoint" : {
+        "properties" : {
+          "availableToSell" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "observedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "stockStatus" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "observedAt", "stockStatus" ],
         "type" : "object"
       },
       "StoreResponse" : {
@@ -1587,6 +1910,25 @@
           }
         },
         "required" : [ "id", "startedAt", "status", "windowFrom", "windowUntil" ],
+        "type" : "object"
+      },
+      "VariantRef" : {
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "sku" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "name", "productName" ],
         "type" : "object"
       },
       "VariantResponse" : {
@@ -2146,6 +2488,260 @@
           }
         },
         "tags" : [ "ad-mapping-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/analytics/products" : {
+      "get" : {
+        "operationId" : "products",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "default" : "NET_SALES",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "offset",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 50,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProductsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/analytics/products/{variantId}" : {
+      "get" : {
+        "operationId" : "product",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "variantId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProductDetailResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/analytics/sales" : {
+      "get" : {
+        "operationId" : "sales",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "compare",
+          "required" : false,
+          "schema" : {
+            "default" : "PREVIOUS_PERIOD",
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SalesResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
       }
     },
     "/api/v1/stores/{storeId}/business-profile" : {

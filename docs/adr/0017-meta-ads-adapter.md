@@ -35,7 +35,7 @@ and tested against a local stub of the API contract.
    run and the next run waits for the `Retry-After` or a minimum backoff.
 5. **The fixture stays for local development** and is not used once a store has a Meta connection.
 6. **The pause write (B-39).** `POST /{ad-id}` with `status=PAUSED`, after a fresh read of that ad. The executor
-   (ADR-0019) treats a timeout after the write as an uncertain result and reads the ad again; a write is verified
+   (ADR-0020) treats a timeout after the write as an uncertain result and reads the ad again; a write is verified
    only by a read showing `status=PAUSED`. The adapter offers no other write.
 
 ## Alternatives considered

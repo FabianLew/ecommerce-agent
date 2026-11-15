@@ -25,5 +25,6 @@ Statuses: `Proposed` → `Accepted` (after the owner accepts it in a PR) → opt
 | [0016](0016-agent-runtime-model-gateway-tools-knowledge.md) | Agent runtime, ModelGateway, read tools, knowledge registry and the agent proposer | Proposed |
 | [0017](0017-meta-ads-adapter.md) | Meta Ads adapter: connection, ad state polling and the pause write | Proposed |
 | [0018](0018-store-business-profile-and-onboarding.md) | Store Business Profile versions and onboarding progress | Proposed |
+| [0019](0019-sales-and-product-analytics.md) | Sales and product analytics v1: definitions, coverage and the MetricDTO | Proposed |
 
 Template: [0000-template.md](0000-template.md).

@@ -74,6 +74,20 @@ public class Opportunities {
                 .optional();
     }
 
+    /** Episodes about one subject, newest first (analytics drill-down). */
+    public java.util.List<Opportunity> ofSubject(TrustedStoreScope scope, String subjectType, UUID subjectId,
+            int limit) {
+        return jdbc.sql(SELECT + " AND subject_type = :subjectType AND subject_id = :subjectId"
+                        + " ORDER BY opened_at DESC LIMIT :limit")
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .param("subjectType", subjectType)
+                .param("subjectId", subjectId)
+                .param("limit", limit)
+                .query(Opportunities::map)
+                .list();
+    }
+
     public Optional<Opportunity> active(TrustedStoreScope scope, OpportunityCategory category, String subjectType,
             UUID subjectId) {
         return jdbc.sql(SELECT + """
