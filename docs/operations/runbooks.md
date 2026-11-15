@@ -120,6 +120,26 @@ budgets already count it. Look at the event: usage far above `max_output_tokens`
 mean the estimate is wrong for that automation (margin, token limits, or a feature without a price). Fix the estimate
 before the next price or limit change; repeated overruns are a reason to switch the agent off.
 
+### AI stopped
+
+The platform AI stop is on (ADR-0027 section 12): no new agent run is admitted and no reserved call is sent, on
+every instance, without a restart. Calls already sent finish and are settled. The deterministic baseline keeps
+proposing and store monitoring continues; the stop of business mutations (ADR-0020) is separate.
+
+- Stop (provider incident, runaway cost, suspected abuse), with the administration role:
+  `INSERT INTO ai_platform_stop_change (stopped, reason, changed_by) VALUES (true, '<why>', 'ops:<name>')`.
+- Resume the same way with `stopped = false` once the cause is fixed. The table is append-only: every decision stays
+  in the history, and the newest row is the current state.
+- The alert repeats while the stop is on, so a forgotten stop is noticed.
+
+### AI admission denied
+
+Agent runs were not admitted because the store or the platform reached its limit of active runs
+(`STORE_LIMIT`, `GLOBAL_LIMIT` on `operator_ai_admissions_total`). The analysis falls back to the baseline. A few
+are normal during a burst. Many point to runs that do not end (check "Agent failing") or to limits that are too low:
+the store limit is `max-concurrent-runs-per-store` of the agent's run policy (a new policy version), the platform limit
+`operator.ai-governance.max-concurrent-runs`. A lease of a lost worker expires one minute after the run's wall time.
+
 ### API errors
 
 More than 2% of API requests fail. Find the endpoint in the logs (`http.server.requests` with status 5xx) and the

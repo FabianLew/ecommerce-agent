@@ -44,6 +44,30 @@ public record InventoryContext(UUID snapshotId, UUID opportunityId, UUID variant
         }
     }
 
+    /**
+     * The facts whose change makes a new paid analysis worth it inside the cooldown (ADR-0027 section 7): whether the
+     * product is out of stock, which ads are active, and whether replenishment is known. Cover that keeps falling
+     * below the threshold is not a material change by itself; reaching zero stock or an ad changing state is.
+     */
+    public String situation() {
+        boolean outOfStock = (stock.availableToSell() != null && stock.availableToSell() <= 0)
+                || "outofstock".equalsIgnoreCase(stock.stockStatus());
+        String activeAds = ads.stream().filter(AdFact::active).map(ad -> ad.adId().toString()).sorted()
+                .collect(java.util.stream.Collectors.joining(","));
+        String facts = "out-of-stock=" + outOfStock + ";replenishment-known=" + replenishmentKnown + ";active-ads="
+                + activeAds;
+        return "inventory/1:" + java.util.HexFormat.of().formatHex(sha256(facts)).substring(0, 32);
+    }
+
+    private static byte[] sha256(String text) {
+        try {
+            return java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     public static InventoryContext of(ContextSnapshot snapshot) {
         if (!CONTENT_SCHEMA.equals(snapshot.contentSchema())) {
             throw new IllegalArgumentException("Not an inventory context: " + snapshot.contentSchema());

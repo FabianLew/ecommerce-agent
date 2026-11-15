@@ -16,8 +16,10 @@ class AiGovernanceWorker {
 
     private final AiReservationSweeper sweeper;
 
-    AiGovernanceWorker(AiReservationSweeper sweeper, MeterRegistry registry, JdbcClient jdbc) {
+    AiGovernanceWorker(AiReservationSweeper sweeper, MeterRegistry registry, JdbcClient jdbc, AiAdmission admission) {
         this.sweeper = sweeper;
+        io.micrometer.core.instrument.Gauge.builder("operator.ai.stopped", admission, a -> a.stopped() ? 1 : 0)
+                .description("1 while the platform AI stop is on (ADR-0027 section 12)").register(registry);
         new DatabaseGauges(registry, jdbc)
                 .gauge("operator.ai.reservations.unknown", "AI calls whose cost is not confirmed (UNKNOWN)", null)
                 .gauge("operator.ai.reservations.unknown.oldest.age", "Age of the oldest UNKNOWN AI reservation",

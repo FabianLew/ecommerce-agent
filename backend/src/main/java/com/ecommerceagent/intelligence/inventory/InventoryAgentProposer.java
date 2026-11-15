@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -45,16 +46,18 @@ public class InventoryAgentProposer {
     private final AgentRuns runs;
     private final AgentSettings settings;
     private final InventoryAgentRunPolicy policy;
+    private final Clock clock;
     private final SkillPackage skill;
     private final PromptPackage prompts;
     private final String outputSchema;
 
     InventoryAgentProposer(AgentRuntime runtime, AgentRuns runs, AgentSettings settings,
-            InventoryAgentRunPolicy policy, KnowledgeRegistry knowledge, ToolRegistry tools) {
+            InventoryAgentRunPolicy policy, KnowledgeRegistry knowledge, ToolRegistry tools, Clock clock) {
         this.runtime = runtime;
         this.runs = runs;
         this.settings = settings;
         this.policy = policy;
+        this.clock = clock;
         this.skill = knowledge.skill(InventoryAgent.SKILL)
                 .orElseThrow(() -> new IllegalStateException("Missing skill " + InventoryAgent.SKILL));
         this.prompts = knowledge.prompts(InventoryAgent.DEFINITION.systemPromptRef())
@@ -84,41 +87,85 @@ public class InventoryAgentProposer {
         return opportunityId + ":" + snapshotId;
     }
 
+    /**
+     * The outcome of asking the agent: its proposal, or why there is none ({@code fallback}, recorded by the caller
+     * when it uses the baseline): {@code AGENT_DISABLED}, {@code AGENT_COOLDOWN}, {@code AGENT_FAILED},
+     * {@code AGENT_OUTPUT_REJECTED} or the governance reason {@code AI_GOVERNANCE:<reason>}.
+     */
+    public record AgentDecision(Optional<AgentProposal> proposal, String fallback) {
+
+        static AgentDecision of(AgentProposal proposal) {
+            return new AgentDecision(Optional.of(proposal), null);
+        }
+
+        static AgentDecision none(String fallback) {
+            return new AgentDecision(Optional.empty(), fallback);
+        }
+    }
+
     public Optional<AgentProposal> propose(TrustedStoreScope scope, UUID opportunityId, ContextSnapshot snapshot) {
+        return decide(scope, opportunityId, snapshot).proposal();
+    }
+
+    public AgentDecision decide(TrustedStoreScope scope, UUID opportunityId, ContextSnapshot snapshot) {
         if (!enabled()) {
-            return Optional.empty();
+            return AgentDecision.none("AGENT_DISABLED");
         }
         String key = analysisKey(opportunityId, snapshot.id());
         List<AgentRun> earlier = runs.attempts(scope, key);
         for (AgentRun run : earlier) {
             if (run.status() == AgentRunStatus.SUCCEEDED) {
-                return Optional.of(new AgentProposal(run.id(), InventoryAgent.PROPOSER, run.output()));
+                return AgentDecision.of(new AgentProposal(run.id(), InventoryAgent.PROPOSER, run.output()));
             }
             if (run.status() == AgentRunStatus.OUTPUT_REJECTED) {
-                return Optional.empty();
+                return AgentDecision.none("AGENT_OUTPUT_REJECTED");
             }
+        }
+        InventoryContext context = InventoryContext.of(snapshot);
+        String situation = context.situation();
+        if (earlier.isEmpty() && inCooldown(scope, opportunityId, situation)) {
+            return AgentDecision.none("AGENT_COOLDOWN");
         }
         BigDecimal spent = earlier.stream().map(AgentRun::estimatedCostUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
         List<ModelId> models = settings.modelIds();
         int attempts = Math.min(models.size(), policy.maxAttempts());
         RunLimits limits = policy.limits();
-        InventoryContext context = InventoryContext.of(snapshot);
         String system = PromptPackage.fill(prompts.system(), Map.of("skill", skill.instructions()));
         String task = task(context);
+        String fallback = "AGENT_FAILED";
         // A run left RUNNING by a lost worker counts as a used attempt; its cost stays in the shared limit.
         for (int attempt = earlier.size() + 1; attempt <= attempts; attempt++) {
             AgentRunResult result = runtime.run(new AgentRunRequest(scope, opportunityId, snapshot,
-                    InventoryAgent.DEFINITION, limits, skill, prompts, system, task, models.get(attempt - 1), key, attempt,
-                    spent));
+                    InventoryAgent.DEFINITION, limits, skill, prompts, system, task, models.get(attempt - 1), key,
+                    attempt, spent, situation));
             if (result.succeeded()) {
-                return Optional.of(new AgentProposal(result.runId(), InventoryAgent.PROPOSER, result.output()));
+                return AgentDecision.of(new AgentProposal(result.runId(), InventoryAgent.PROPOSER, result.output()));
             }
             spent = spent.add(result.estimatedCostUsd());
             if ("MAX_COST".equals(result.stopReason())) {
                 break;
             }
+            if (result.stopReason() != null && result.stopReason().startsWith("AI_GOVERNANCE:")) {
+                // A stop, a budget or a concurrency limit applies to the fallback model as well.
+                fallback = result.stopReason();
+                break;
+            }
         }
-        return Optional.empty();
+        return AgentDecision.none(fallback);
+    }
+
+    /**
+     * A new snapshot of the opportunity is not analysed again inside the cooldown after a run that may have cost
+     * money, unless the situation changed materially (ADR-0027 section 7). A run recorded without a situation counts
+     * as changed.
+     */
+    private boolean inCooldown(TrustedStoreScope scope, UUID opportunityId, String situation) {
+        if (policy.cooldown().isZero()) {
+            return false;
+        }
+        return runs.latestPaidSince(scope, opportunityId, clock.instant().minus(policy.cooldown()))
+                .map(run -> situation.equals(run.situation()))
+                .orElse(false);
     }
 
     /** The validator rejected the run's proposal: the run is marked, and the analysis falls back to the baseline. */

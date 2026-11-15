@@ -44,6 +44,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Runtime safety suite of the agent (B-36, merge-blocking): it runs the real runtime, dispatcher, read tools and
@@ -88,7 +89,7 @@ class AgentRuntimeSafetyTest {
 
     AgentRuntime runtime() {
         return new AgentRuntime(new GovernedModelGateway(ProviderGateways.of(model, "fake"), governance, governance,
-                clock), registry, runs, hooks, settings, clock);
+                governance, clock), registry, runs, hooks, settings, clock);
     }
 
     InventoryAgentProposer proposer() {
@@ -96,21 +97,21 @@ class AgentRuntimeSafetyTest {
     }
 
     InventoryAgentProposer proposer(InventoryAgentRunPolicy policy) {
-        return new InventoryAgentProposer(runtime(), runs, settings, policy, knowledge, registry);
+        return new InventoryAgentProposer(runtime(), runs, settings, policy, knowledge, registry, clock);
     }
 
     static InventoryAgentRunPolicy policy(String version, int maxModelCalls, int maxOutputTokensPerCall,
             int maxAttempts) {
         return new InventoryAgentRunPolicy(version, maxModelCalls, 8, Duration.ofSeconds(60), 12_000,
-                maxOutputTokensPerCall, 4_000, new BigDecimal("0.10"), 1, maxAttempts);
+                maxOutputTokensPerCall, 4_000, new BigDecimal("0.10"), 1, maxAttempts, 1, Duration.ofMinutes(60));
     }
 
     AgentRunResult run(ModelId modelId, BigDecimal spentBefore) {
         var skill = knowledge.skill(InventoryAgent.SKILL).orElseThrow();
         var prompts = knowledge.prompts("inventory-agent").orElseThrow();
         return runtime().run(new AgentRunRequest(scope, SnapshotFixture.OPPORTUNITY, snapshot,
-                InventoryAgent.DEFINITION, POLICY.limits(), skill, prompts, "system", "Assess the episode.", modelId, "key", 1,
-                spentBefore));
+                InventoryAgent.DEFINITION, POLICY.limits(), skill, prompts, "system", "Assess the episode.", modelId,
+                "key", 1, spentBefore, "test-situation"));
     }
 
     AgentRunResult run() {
@@ -171,7 +172,7 @@ class AgentRuntimeSafetyTest {
         assertThat(run.promptHash()).hasSize(64);
         assertThat(run.toolsHash()).hasSize(64);
         assertThat(run.priceList()).isEqualTo("test-1");
-        assertThat(run.runPolicy()).isEqualTo("inventory-agent-run/1");
+        assertThat(run.runPolicy()).isEqualTo("inventory-agent-run/2");
         assertThat(runs.started.get(run.id()).limits()).isEqualTo(POLICY.limits());
         // The output limit of one call comes from the run policy.
         assertThat(model.requests()).extracting(ModelRequest::maxOutputTokens).containsOnly(1500);
@@ -359,8 +360,8 @@ class AgentRuntimeSafetyTest {
         var skill = knowledge.skill(InventoryAgent.SKILL).orElseThrow();
         var prompts = knowledge.prompts("inventory-agent").orElseThrow();
         AgentRunResult result = runtime().run(new AgentRunRequest(scope, SnapshotFixture.OPPORTUNITY, snapshot,
-                InventoryAgent.DEFINITION, POLICY.limits(), skill, prompts, "x".repeat(40_000), "task", PRIMARY, "key", 1,
-                BigDecimal.ZERO));
+                InventoryAgent.DEFINITION, POLICY.limits(), skill, prompts, "x".repeat(40_000), "task", PRIMARY,
+                "key", 1, BigDecimal.ZERO, "test-situation"));
         assertThat(result.stopReason()).isEqualTo("MAX_INPUT_TOKENS");
         assertThat(model.requests()).isEmpty();
     }
@@ -391,8 +392,8 @@ class AgentRuntimeSafetyTest {
     @Test
     void everyModelCallIsReservedAndMarkedSentBeforeTheProviderSeesItAndSettledAfter() {
         model.then(request -> {
-            assertThat(governance.events()).as("reserved and marked sent before the request")
-                    .containsExactly("RESERVED:" + governance.reservations().getFirst().key,
+            assertThat(governance.events()).as("admitted, reserved and marked sent before the request")
+                    .containsExactly("ADMISSION:GRANTED:1", "RESERVED:" + governance.reservations().getFirst().key,
                             "SENT:" + governance.reservations().getFirst().key);
             return new ModelTurn("", List.of(call("t1", InventoryReadTools.FORECAST,
                     "{\"productVariantId\":\"" + VARIANT + "\"}")), ModelTurn.FinishReason.TOOL_USE,
@@ -567,6 +568,101 @@ class AgentRuntimeSafetyTest {
         assertThat(runs.attempts(scope,
                 InventoryAgentProposer.analysisKey(SnapshotFixture.OPPORTUNITY, SnapshotFixture.SNAPSHOT)))
                 .hasSize(1);
+    }
+
+    /** ADR-0027 section 6.2: a run that is not admitted sends nothing, and the fallback is not tried either. */
+    @Test
+    void aRunOverTheStoreLimitIsNotAdmittedAndNothingIsReserved() {
+        governance.admission(com.ecommerceagent.aigovernance.AiAdmission.Admission.STORE_LIMIT);
+        model.thenText(pause());
+
+        var decision = proposer().decide(scope, SnapshotFixture.OPPORTUNITY, snapshot);
+
+        assertThat(decision.proposal()).isEmpty();
+        assertThat(decision.fallback()).isEqualTo("AI_GOVERNANCE:STORE_LIMIT");
+        assertThat(model.requests()).isEmpty();
+        assertThat(governance.reservations()).isEmpty();
+        AgentRun run = runs.only();
+        assertThat(run.status()).isEqualTo(AgentRunStatus.LIMIT_EXCEEDED);
+        assertThat(run.stopReason()).isEqualTo("AI_GOVERNANCE:STORE_LIMIT");
+    }
+
+    /** Every admitted run asks with its policy's store limit and gives its lease back, also when it fails. */
+    @Test
+    void anAdmittedRunReleasesItsLeaseWhenItEnds() {
+        model.thenFailure(ModelFailure.Type.UNAVAILABLE).thenText(pause());
+
+        assertThat(proposer().propose(scope, SnapshotFixture.OPPORTUNITY, snapshot)).isPresent();
+
+        assertThat(governance.events()).filteredOn(event -> event.startsWith("ADMISSION:"))
+                .containsExactly("ADMISSION:GRANTED:1", "ADMISSION:GRANTED:1");
+        assertThat(governance.events()).filteredOn("LEASE_RELEASED"::equals).hasSize(2);
+        assertThat(governance.leases()).isEmpty();
+    }
+
+    /** ADR-0027 section 12: the stop takes effect before the next call of a running run, without a restart. */
+    @Test
+    void thePlatformStopEndsARunningRunBeforeItsNextCall() {
+        hooks = List.of(new AgentHook() {
+            int calls;
+
+            @Override
+            public void beforeModelCall(AgentRunContext run, ModelRequest request) {
+                if (++calls == 2) {
+                    governance.stop(true);
+                }
+            }
+        });
+        model.thenTools(call("t1", InventoryReadTools.FORECAST, "{\"productVariantId\":\"" + VARIANT + "\"}"))
+                .thenText(pause());
+
+        var decision = proposer().decide(scope, SnapshotFixture.OPPORTUNITY, snapshot);
+
+        assertThat(decision.proposal()).isEmpty();
+        assertThat(decision.fallback()).isEqualTo("AI_GOVERNANCE:AI_STOPPED");
+        assertThat(model.requests()).as("the second call was reserved but never sent").hasSize(1);
+        assertThat(governance.events()).anyMatch(event -> event.startsWith("STOPPED:"));
+        AgentRun run = runs.only();
+        assertThat(run.status()).isEqualTo(AgentRunStatus.STOPPED);
+        assertThat(run.stopReason()).isEqualTo("AI_GOVERNANCE:AI_STOPPED");
+        assertThat(governance.leases()).isEmpty();
+
+        // While the stop is on, a new analysis is not admitted at all.
+        var next = proposer().decide(scope, SnapshotFixture.OPPORTUNITY, snapshot(UUID.randomUUID(), 0));
+        assertThat(next.fallback()).isEqualTo("AI_GOVERNANCE:AI_STOPPED");
+        assertThat(model.requests()).hasSize(1);
+    }
+
+    /** ADR-0027 section 7: a new snapshot inside the cooldown is analysed again only after a material change. */
+    @Test
+    void aNewSnapshotInsideTheCooldownIsAnalysedOnlyAfterAMaterialChange() {
+        model.thenText(pause()).thenText(pause()).thenText(pause());
+        assertThat(proposer().propose(scope, SnapshotFixture.OPPORTUNITY, snapshot)).isPresent();
+
+        clock.advance(Duration.ofMinutes(20));
+        var same = proposer().decide(scope, SnapshotFixture.OPPORTUNITY, snapshot(UUID.randomUUID(), 17));
+        assertThat(same.proposal()).isEmpty();
+        assertThat(same.fallback()).isEqualTo("AGENT_COOLDOWN");
+        assertThat(model.requests()).hasSize(1);
+
+        // Out of stock is a material change: analysed at once.
+        assertThat(proposer().propose(scope, SnapshotFixture.OPPORTUNITY, snapshot(UUID.randomUUID(), 0)))
+                .isPresent();
+        assertThat(model.requests()).hasSize(2);
+
+        // After the cooldown an unchanged situation is analysed again.
+        clock.advance(Duration.ofMinutes(61));
+        assertThat(proposer().propose(scope, SnapshotFixture.OPPORTUNITY, snapshot(UUID.randomUUID(), 0)))
+                .isPresent();
+        assertThat(model.requests()).hasSize(3);
+    }
+
+    /** A new snapshot of the serum with another id and stock. */
+    ContextSnapshot snapshot(UUID id, int availableToSell) {
+        ObjectNode content = (ObjectNode) snapshot.content().deepCopy();
+        ((ObjectNode) content.get("inventory")).put("availableToSell", availableToSell);
+        return new ContextSnapshot(id, snapshot.opportunityId(), snapshot.contentSchema(), snapshot.asOf(), content,
+                CanonicalJson.hash(content), snapshot.evidenceIds(), snapshot.createdAt());
     }
 
     @Test

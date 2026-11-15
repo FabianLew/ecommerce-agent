@@ -23,7 +23,7 @@ public class AgentRuns {
     private static final String SELECT = """
             SELECT id, analysis_key, attempt, opportunity_id, context_snapshot_id, agent_name, agent_version,
                    skill_ref, knowledge_hash, prompt_hash, tools_hash, output_schema_version, model_policy, provider,
-                   model, price_list, run_policy, status, stop_reason, model_calls, tool_calls, repair_calls, input_tokens,
+                   model, price_list, run_policy, situation, status, stop_reason, model_calls, tool_calls, repair_calls, input_tokens,
                    output_tokens, usage_complete, estimated_cost_usd, output, started_at, finished_at
             FROM agent_run
             WHERE organization_id = :organizationId AND store_id = :storeId
@@ -41,7 +41,7 @@ public class AgentRuns {
     /** What a new run pins before its first model call. */
     public record Start(UUID id, String analysisKey, int attempt, UUID opportunityId, UUID contextSnapshotId,
             AgentDefinition agent, String skillRef, String knowledgeHash, String promptHash, String toolsHash,
-            String provider, String model, String priceList, RunLimits limits, Instant startedAt) {
+            String provider, String model, String priceList, RunLimits limits, String situation, Instant startedAt) {
     }
 
     /** Counters and the end of a run. */
@@ -56,11 +56,11 @@ public class AgentRuns {
                                                context_snapshot_id, agent_name, agent_version, skill_ref,
                                                knowledge_hash, prompt_hash, tools_hash, output_schema_version,
                                                model_policy, provider, model, price_list, run_policy, run_limits,
-                                               status, started_at)
+                                               situation, status, started_at)
                         VALUES (:id, :organizationId, :storeId, :analysisKey, :attempt, :opportunityId, :snapshotId,
                                 :agentName, :agentVersion, :skillRef, :knowledgeHash, :promptHash, :toolsHash,
                                 :schemaVersion, :modelPolicy, :provider, :model, :priceList, :runPolicy,
-                                CAST(:runLimits AS jsonb), 'RUNNING', :startedAt)
+                                CAST(:runLimits AS jsonb), :situation, 'RUNNING', :startedAt)
                         """)
                 .param("id", run.id())
                 .param("organizationId", scope.organizationId())
@@ -81,6 +81,7 @@ public class AgentRuns {
                 .param("model", run.model())
                 .param("priceList", run.priceList())
                 .param("runPolicy", run.limits().policy())
+                .param("situation", run.situation())
                 .param("runLimits", CanonicalJson.write(CanonicalJson.valueToTree(run.limits().recorded())))
                 .param("startedAt", Timestamp.from(run.startedAt()))
                 .update();
@@ -165,6 +166,24 @@ public class AgentRuns {
                 .list();
     }
 
+    /**
+     * The newest run of the opportunity started at or after {@code since} that may have cost money: still running,
+     * or with at least one model call. Runs that were never admitted do not count.
+     */
+    public Optional<AgentRun> latestPaidSince(TrustedStoreScope scope, UUID opportunityId, Instant since) {
+        return jdbc.sql(SELECT + """
+                         AND opportunity_id = :opportunityId AND started_at >= :since
+                         AND (status = 'RUNNING' OR model_calls > 0)
+                        ORDER BY started_at DESC LIMIT 1
+                        """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .param("opportunityId", opportunityId)
+                .param("since", Timestamp.from(since))
+                .query(AgentRuns::map)
+                .optional();
+    }
+
     public Optional<AgentRun> find(TrustedStoreScope scope, UUID runId) {
         return jdbc.sql(SELECT + " AND id = :id")
                 .param("organizationId", scope.organizationId())
@@ -209,7 +228,7 @@ public class AgentRuns {
                 rs.getString("agent_name"), rs.getString("agent_version"), rs.getString("skill_ref"),
                 rs.getString("knowledge_hash"), rs.getString("prompt_hash"), rs.getString("tools_hash"),
                 rs.getString("output_schema_version"), rs.getString("model_policy"), rs.getString("provider"),
-                rs.getString("model"), rs.getString("price_list"), rs.getString("run_policy"), AgentRunStatus.valueOf(rs.getString("status")),
+                rs.getString("model"), rs.getString("price_list"), rs.getString("run_policy"), rs.getString("situation"), AgentRunStatus.valueOf(rs.getString("status")),
                 rs.getString("stop_reason"), rs.getInt("model_calls"), rs.getInt("tool_calls"),
                 rs.getInt("repair_calls"), rs.getInt("input_tokens"), rs.getInt("output_tokens"),
                 rs.getBoolean("usage_complete"), rs.getBigDecimal("estimated_cost_usd"),

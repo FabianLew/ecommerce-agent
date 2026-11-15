@@ -62,6 +62,8 @@ public class AgentRuntime {
         this.clock = clock;
     }
 
+    static final java.time.Duration LEASE_MARGIN = java.time.Duration.ofMinutes(1);
+
     public AgentRunResult run(AgentRunRequest request) {
         return new Run(request).execute();
     }
@@ -99,7 +101,18 @@ public class AgentRuntime {
             runs.start(request.scope(), new AgentRuns.Start(id, request.analysisKey(), request.attempt(),
                     request.opportunityId(), request.snapshot().id(), request.agent(), request.skill().reference(),
                     request.skill().hash(), request.prompts().hash(), tools.hash(), request.model().provider(),
-                    request.model().name(), prices.version(), limits, started));
+                    request.model().name(), prices.version(), limits, request.situation(), started));
+            try {
+                // Admission before anything is reserved (ADR-0027 section 6.2); the lease outlives the run's wall
+                // time by a margin, so a lost worker frees the slot on its own.
+                gateway.startRun(request.scope(), id, automationType(), limits.maxConcurrentRunsPerStore(),
+                        limits.maxWallTime().plus(LEASE_MARGIN));
+            } catch (AiCallDenied denied) {
+                return finish(deniedStatus(denied), "AI_GOVERNANCE:" + denied.reason(), null);
+            } catch (RuntimeException e) {
+                log.warn("Agent run {} was not admitted: {}", id, e.toString());
+                return finish(AgentRunStatus.MODEL_FAILED, "AI_GOVERNANCE:ADMISSION_FAILED", null);
+            }
             try {
                 return loop(started);
             } catch (AgentHook.HookVeto veto) {
@@ -107,6 +120,13 @@ public class AgentRuntime {
             } catch (RuntimeException e) {
                 log.warn("Agent run {} failed: {}", id, e.toString());
                 return finish(AgentRunStatus.MODEL_FAILED, "RUNTIME_ERROR", null);
+            } finally {
+                try {
+                    gateway.endRun(request.scope(), id);
+                } catch (RuntimeException e) {
+                    // The lease expires on its own.
+                    log.warn("Agent run {} could not release its lease: {}", id, e.toString());
+                }
             }
         }
 
@@ -158,8 +178,7 @@ public class AgentRuntime {
                     // Nothing was sent: no cost, and the run ends on the governance decision (ADR-0027).
                     step(AgentRunStep.Kind.MODEL_CALL, request.model().toString(), null, "DENIED", denied.reason(),
                             deniedPayload(denied), callStarted);
-                    return finish(denied.budget() ? AgentRunStatus.LIMIT_EXCEEDED : AgentRunStatus.MODEL_FAILED,
-                            "AI_GOVERNANCE:" + denied.reason(), null);
+                    return finish(deniedStatus(denied), "AI_GOVERNANCE:" + denied.reason(), null);
                 } catch (ModelFailure failure) {
                     if (failure instanceof GovernedModelFailure governedFailure && governedFailure.possiblyCharged()) {
                         // The request may have been charged: it counts against the run at its reserved maximum.
@@ -277,6 +296,13 @@ public class AgentRuntime {
             Instant now = clock.instant();
             runs.step(request.scope(), id, new AgentRunStep(++seq, kind, name, toolCallId, status, errorCode, payload,
                     Math.max(0, Duration.between(started, now).toMillis()), now));
+        }
+
+        private static AgentRunStatus deniedStatus(AiCallDenied denied) {
+            if (denied.stopped()) {
+                return AgentRunStatus.STOPPED;
+            }
+            return denied.budget() ? AgentRunStatus.LIMIT_EXCEEDED : AgentRunStatus.MODEL_FAILED;
         }
 
         private AgentRunResult finish(AgentRunStatus status, String stopReason, JsonNode output) {

@@ -747,9 +747,37 @@ below.
 - Tightening a policy: the policy is read at start-up, so a change applies from the next start. A run lasts at most
   `maxRunDuration` and a run lost by a stopped worker counts as a used attempt, so no run continues under an older
   policy after a restart. The global AI stop that applies before the next call without a restart is gap 9.
-- Not in this step, and still open before the agent runs on the pilot store: the per-store and global concurrency
-  admission (gap 8), the runtime AI stop (gap 9) and the cooldown (gap 10). The run's own estimate still uses the
-  configured price list, while the reservation uses the catalog price (`ai_price`); both must be verified together.
+- Not in this step: the concurrency admission (gap 8), the runtime AI stop (gap 9) and the cooldown (gap 10), done in
+  step 5. The run's own estimate still uses the configured price list, while the reservation uses the catalog price
+  (`ai_price`); both must be verified together.
+
+**Stage 1, step 5 (V33): admission, the platform AI stop and the cooldown.**
+
+- Gap 8 is closed. Every agent run holds a lease (`ai_run_lease`) from admission to its end; `ai_acquire_run_lease`
+  admits it only while the store has fewer active leases than `maxConcurrentRunsPerStore` of the run policy (1) and
+  the platform fewer than `operator.ai-governance.max-concurrent-runs` (8). One transaction-scoped advisory lock
+  serialises admissions across all instances; a lease expires one minute after the run's wall time, so a lost worker
+  frees its slot. A run that is not admitted ends `LIMIT_EXCEEDED` with `AI_GOVERNANCE:STORE_LIMIT` or
+  `GLOBAL_LIMIT` before anything is reserved, and the fallback model is not tried. The store limit keeps one store
+  from taking the platform pool (criterion 24). Not yet: provider RPM/TPM, priorities and queue length (section 6.2);
+  at pilot scale the per-run limits and the concurrency bound them.
+- Gap 9 is closed. `ai_platform_stop_change` is an append-only log of stop decisions written by operations with the
+  administration role; the runtime cannot change it. The database enforces it: no run is admitted while it is on, and
+  `ai_mark_sent` refuses a call reserved before the stop and releases its reservation (`SendDecision.STOPPED`), so the
+  stop applies to running runs before their next call and a granted reservation never allows a call after it
+  (criterion 26). The run ends `STOPPED` with `AI_GOVERNANCE:AI_STOPPED`; the baseline proposes. The gauge
+  `operator_ai_stopped` and the alert `AiStopped` make it visible; the runbook has the statements.
+- Gap 10 is closed for the Inventory Guardian. Each run records a fingerprint of the situation it analysed
+  (`agent_run.situation`: out of stock, the active ads, whether replenishment is known). A new snapshot of the same
+  opportunity inside `cooldown` (60 minutes) after a run that may have cost money is not analysed again unless the
+  fingerprint changed; the baseline proposes with the fallback reason `AGENT_COOLDOWN`. Reaching zero stock or an ad
+  changing state is a material change.
+- The run policy is version `inventory-agent-run/2` (the two new parameters); the hash of version 1 stays pinned for
+  the runs that recorded it. The guardian now records why the agent was not used (`AGENT_COOLDOWN`,
+  `AI_GOVERNANCE:<reason>`, `AGENT_OUTPUT_REJECTED`) instead of a generic `AGENT_FAILED`.
+- With steps 1 to 5 the cost safety foundation of stage 1 is in place. The agent stays off
+  (`operator.agent.enabled=false`) until prices are verified in `ai_price`, the platform and store budgets are set,
+  and the provider terms for real data are confirmed.
 
 ### Rollout relative to the pilot
 

@@ -12,5 +12,7 @@ public enum SendDecision {
     /** The reservation expired before it was sent; a new call needs a new reservation. */
     EXPIRED,
     /** The reservation was released; a new call needs a new reservation. */
-    RELEASED
+    RELEASED,
+    /** AI is stopped for the platform (ADR-0027 section 12): nothing is sent, and the reservation was released. */
+    STOPPED
 }

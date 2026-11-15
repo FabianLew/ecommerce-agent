@@ -12,6 +12,7 @@ import com.ecommerceagent.aigovernance.ProviderUsage;
 import com.ecommerceagent.aigovernance.ReservationDecision;
 import com.ecommerceagent.aigovernance.ReservationRequest;
 import com.ecommerceagent.aigovernance.SendDecision;
+import com.ecommerceagent.aigovernance.AiAdmission;
 import com.ecommerceagent.aigovernance.Settlement;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.intelligence.model.provider.ProviderGateways;
@@ -40,14 +41,36 @@ public class GovernedModelGateway {
     private final ProviderGateways providers;
     private final AiBudgetGovernor governor;
     private final AiUsageLedger ledger;
+    private final AiAdmission admission;
     private final Clock clock;
 
     public GovernedModelGateway(ProviderGateways providers, AiBudgetGovernor governor, AiUsageLedger ledger,
-            Clock clock) {
+            AiAdmission admission, Clock clock) {
         this.providers = providers;
         this.governor = governor;
         this.ledger = ledger;
+        this.admission = admission;
         this.clock = clock;
+    }
+
+    /**
+     * Admits an agent run before its first model call (ADR-0027 section 6.2): the run holds a lease until
+     * {@link #endRun} or until {@code ttl} passes.
+     *
+     * @throws AiCallDenied when the run is not admitted ({@code AI_STOPPED}, {@code STORE_LIMIT},
+     *     {@code GLOBAL_LIMIT}, {@code LEASE_ENDED}); nothing was reserved or sent
+     */
+    public void startRun(TrustedStoreScope scope, java.util.UUID runId, String automationType, int maxStoreRuns,
+            java.time.Duration ttl) {
+        AiAdmission.Admission admitted = admission.admit(scope, runId, automationType, maxStoreRuns, ttl);
+        if (!admitted.granted()) {
+            throw new AiCallDenied(admitted.name());
+        }
+    }
+
+    /** Ends the run's lease; safe to call for a run that was never admitted. */
+    public void endRun(TrustedStoreScope scope, java.util.UUID runId) {
+        admission.release(scope, runId);
     }
 
     public ModelCapabilities capabilities(ModelId model) {
@@ -86,6 +109,9 @@ public class GovernedModelGateway {
         }
         ReservationDecision.Reserved reserved = (ReservationDecision.Reserved) decision;
         SendDecision send = ledger.markSent(scope, reserved.reservationId());
+        if (send == SendDecision.STOPPED) {
+            throw new AiCallDenied(AiCallDenied.AI_STOPPED);
+        }
         if (send != SendDecision.SEND) {
             throw new AiCallDenied("NOT_SENDABLE:" + send);
         }

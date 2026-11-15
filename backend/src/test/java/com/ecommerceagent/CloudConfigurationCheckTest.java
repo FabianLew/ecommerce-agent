@@ -88,12 +88,12 @@ class CloudConfigurationCheckTest {
         assertThat(CloudConfigurationCheck.problems(environment)).containsExactly(
                 "operator.agent.max-output-tokens-per-call is no longer read; set"
                         + " operator.agent.run-policies.inventory-agent.max-output-tokens-per-call with its own version",
-                "operator.agent.run-policies.inventory-agent differs from the defaults of inventory-agent-run/1;"
+                "operator.agent.run-policies.inventory-agent differs from the defaults of inventory-agent-run/2;"
                         + " set its own version");
 
         MockEnvironment versioned = cloud()
                 .withProperty("operator.agent.run-policies.inventory-agent.max-run-cost-usd", "0.05")
-                .withProperty("operator.agent.run-policies.inventory-agent.version", "inventory-agent-run/2");
+                .withProperty("operator.agent.run-policies.inventory-agent.version", "inventory-agent-run/3");
         assertThat(CloudConfigurationCheck.problems(versioned)).isEmpty();
     }
 
