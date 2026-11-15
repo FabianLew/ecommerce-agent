@@ -20,14 +20,21 @@ public class AiCallDenied extends RuntimeException {
     }
 
     /**
-     * The run must not go on whatever its limits say: the platform AI stop is on (or was when the run asked for
-     * admission), or the actor's access to the store was revoked.
+     * The run must not go on whatever its limits say: the platform, store or automation AI stop is on (or was when
+     * the run asked for admission), or the actor's access to the store was revoked.
      */
     public boolean stopped() {
-        return reason.equals(AI_STOPPED) || reason.equals(AUTHORIZATION_REVOKED);
+        return reason.equals(AI_STOPPED) || reason.equals(STORE_STOPPED) || reason.equals(AUTOMATION_STOPPED)
+                || reason.equals(AUTHORIZATION_REVOKED);
     }
 
     public static final String AI_STOPPED = "AI_STOPPED";
+
+    /** AI is stopped for the store (independent of the platform stop). */
+    public static final String STORE_STOPPED = "STORE_STOPPED";
+
+    /** AI is stopped for the automation, on every store or on this one. */
+    public static final String AUTOMATION_STOPPED = "AUTOMATION_STOPPED";
 
     /** The actor of the run no longer has access to the store. */
     public static final String AUTHORIZATION_REVOKED = "AUTHORIZATION_REVOKED";

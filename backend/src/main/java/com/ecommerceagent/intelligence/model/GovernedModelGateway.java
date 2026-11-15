@@ -70,7 +70,8 @@ public class GovernedModelGateway {
      * Admits an agent run before its first model call (ADR-0027 section 6.2): the run holds a lease until
      * {@link #endRun} or until {@code ttl} passes.
      *
-     * @throws AiCallDenied when the run is not admitted ({@code AI_STOPPED}, {@code STORE_LIMIT},
+     * @throws AiCallDenied when the run is not admitted ({@code AI_STOPPED}, {@code STORE_STOPPED},
+     *     {@code AUTOMATION_STOPPED}, {@code STORE_LIMIT},
      *     {@code GLOBAL_LIMIT}, {@code LEASE_ENDED}); nothing was reserved or sent
      */
     public void startRun(TrustedStoreScope scope, java.util.UUID runId, String automationType, int maxStoreRuns,
@@ -180,8 +181,8 @@ public class GovernedModelGateway {
             ReservationDecision.Reserved reserved) {
         ModelId model = request.model();
         SendDecision send = ledger.markSent(scope, reserved.reservationId());
-        if (send == SendDecision.STOPPED) {
-            throw new AiCallDenied(AiCallDenied.AI_STOPPED);
+        if (send.stopped()) {
+            throw new AiCallDenied(send == SendDecision.STOPPED ? AiCallDenied.AI_STOPPED : send.name());
         }
         if (send != SendDecision.SEND) {
             throw new AiCallDenied("NOT_SENDABLE:" + send);

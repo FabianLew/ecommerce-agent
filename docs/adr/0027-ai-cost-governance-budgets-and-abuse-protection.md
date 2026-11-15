@@ -914,3 +914,14 @@ after a stream started and for calls that were never sent.
   nothing and uncertain calls wait for an operator or the conservative settlement after 24 hours; the escalation is
   the existing `AiReservationUnknown` alert. New definer functions (ADR-0022 point 4): `ai_mark_unknown` (three
   arguments), `ai_reservation_location`, `ai_uncertain_reservations`, `ai_adjust_reconciliation`.
+- **E-54.8, scoped AI stops.** Next to the platform stop, platform operators stop AI for one store, for one
+  automation on every store, or for one automation on one store (`ai_stop_change`, V38, append-only; per target the
+  newest decision is the state; `POST /api/v1/platform/ai/stops`, audited `AI_STOPPED_SCOPED` and
+  `AI_RESUMED_SCOPED`). The database enforces each one where it enforces the platform stop: `ai_acquire_run_lease`
+  answers `STORE_STOPPED` or `AUTOMATION_STOPPED`, and `ai_mark_sent` refuses a reserved call and releases it, so a
+  running run ends `STOPPED` with `AI_GOVERNANCE:STORE_STOPPED` or `AUTOMATION_STOPPED` before its next paid call.
+  The four stops are checked independently; resuming one never resumes another, a decision that matches the current
+  state writes nothing, and nothing switches a stop on automatically (no latching on cost in the MVP). The stop of
+  everything stays with the administration role. A store reads the decisions about itself. Gauge
+  `operator_ai_stops_active`, alert `AiScopedStopActive` after a day. New definer functions: `ai_change_stop`,
+  `ai_stop_changes`; `ai_acquire_run_lease` and `ai_mark_sent` are replaced with the scoped checks.

@@ -48,4 +48,12 @@ public class PlatformOperators {
         require(operator.userId());
         return storeAccess.systemScope(OPERATIONS_SERVICE, organizationId, storeId);
     }
+
+    /** As {@link #operationsScope(PlatformOperator, UUID, UUID)} for a store known only by its id. */
+    public Optional<TrustedStoreScope> operationsScope(PlatformOperator operator, UUID storeId) {
+        require(operator.userId());
+        return jdbc.sql("SELECT organization_id FROM store WHERE id = ?").param(storeId).query(UUID.class)
+                .optional()
+                .flatMap(organizationId -> storeAccess.systemScope(OPERATIONS_SERVICE, organizationId, storeId));
+    }
 }

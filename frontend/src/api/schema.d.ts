@@ -68,6 +68,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/ai/stops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["activeAiStops"];
+        put?: never;
+        post: operations["changeAiStop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/ai/stops/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["aiStopHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stores": {
         parameters: {
             query?: never;
@@ -846,6 +878,39 @@ export interface components {
             /** @enum {string} */
             source: "FIXTURE" | "META_API";
         };
+        AiStopChangeResponse: {
+            /** @description false when the target was already in that state; nothing was recorded */
+            changed: boolean;
+        };
+        AiStopDto: {
+            automationType?: string;
+            /** Format: date-time */
+            changedAt: string;
+            changedBy: string;
+            /** Format: int64 */
+            id: number;
+            /** @description STORE, AUTOMATION or STORE_AUTOMATION */
+            level: string;
+            /** Format: uuid */
+            organizationId?: string;
+            reason: string;
+            stopped: boolean;
+            /** Format: uuid */
+            storeId?: string;
+        };
+        AiStopRequest: {
+            /** @description The automation; null for every automation of the store */
+            automationType?: string;
+            /** @description Why, 1 to 500 characters */
+            reason: string;
+            /** @description true stops AI, false resumes it */
+            stopped: boolean;
+            /**
+             * Format: uuid
+             * @description The store; null for an automation on every store
+             */
+            storeId?: string;
+        };
         AlertSettingRequest: {
             /**
              * Format: uuid
@@ -1307,6 +1372,11 @@ export interface components {
         ListResponseAdResponse: {
             hasMore: boolean;
             items: components["schemas"]["AdResponse"][];
+            nextCursor?: string;
+        };
+        ListResponseAiStopDto: {
+            hasMore: boolean;
+            items: components["schemas"]["AiStopDto"][];
             nextCursor?: string;
         };
         ListResponseIntegrationResponse: {
@@ -1964,6 +2034,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReconciliationResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    activeAiStops: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListResponseAiStopDto"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    changeAiStop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AiStopRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiStopChangeResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    aiStopHistory: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListResponseAiStopDto"];
                 };
             };
             /** @description Missing or invalid access token */

@@ -234,6 +234,77 @@
         "required" : [ "accountExternalId", "allowedActions", "effectiveStatus", "externalId", "id", "mappingState", "name", "observedAt", "ownStatus", "source" ],
         "type" : "object"
       },
+      "AiStopChangeResponse" : {
+        "properties" : {
+          "changed" : {
+            "description" : "false when the target was already in that state; nothing was recorded",
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "changed" ],
+        "type" : "object"
+      },
+      "AiStopDto" : {
+        "properties" : {
+          "automationType" : {
+            "type" : "string"
+          },
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changedBy" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "level" : {
+            "description" : "STORE, AUTOMATION or STORE_AUTOMATION",
+            "type" : "string"
+          },
+          "organizationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "stopped" : {
+            "type" : "boolean"
+          },
+          "storeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "changedAt", "changedBy", "id", "level", "reason", "stopped" ],
+        "type" : "object"
+      },
+      "AiStopRequest" : {
+        "properties" : {
+          "automationType" : {
+            "description" : "The automation; null for every automation of the store",
+            "type" : "string"
+          },
+          "reason" : {
+            "description" : "Why, 1 to 500 characters",
+            "type" : "string"
+          },
+          "stopped" : {
+            "description" : "true stops AI, false resumes it",
+            "type" : "boolean"
+          },
+          "storeId" : {
+            "description" : "The store; null for an automation on every store",
+            "format" : "uuid",
+            "type" : "string"
+          }
+        },
+        "required" : [ "reason", "stopped" ],
+        "type" : "object"
+      },
       "AlertSettingRequest" : {
         "properties" : {
           "deputyUserId" : {
@@ -1383,6 +1454,24 @@
           "items" : {
             "items" : {
               "$ref" : "#/components/schemas/AdResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "hasMore", "items" ],
+        "type" : "object"
+      },
+      "ListResponseAiStopDto" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AiStopDto"
             },
             "type" : "array"
           },
@@ -2930,6 +3019,108 @@
               "application/json" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ReconciliationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
+      }
+    },
+    "/api/v1/platform/ai/stops" : {
+      "get" : {
+        "operationId" : "activeAiStops",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseAiStopDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
+      },
+      "post" : {
+        "operationId" : "changeAiStop",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AiStopRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AiStopChangeResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
+      }
+    },
+    "/api/v1/platform/ai/stops/history" : {
+      "get" : {
+        "operationId" : "aiStopHistory",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 100,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseAiStopDto"
                 }
               }
             },

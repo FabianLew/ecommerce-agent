@@ -83,7 +83,16 @@ public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedg
     /** Turns the platform AI stop on or off: no run is admitted and no reserved call is sent while it is on. */
     public synchronized void stop(boolean on) {
         this.stopped = on;
+        this.stopDecision = SendDecision.STOPPED;
     }
+
+    /** A scoped stop (store or automation) from now on: {@code decision} is the answer of the next sends. */
+    public synchronized void stop(SendDecision decision) {
+        this.stopped = true;
+        this.stopDecision = decision;
+    }
+
+    private SendDecision stopDecision = SendDecision.STOPPED;
 
     /** The answer for the next admissions (GRANTED by default). */
     public synchronized void admission(Admission answer) {
@@ -99,7 +108,8 @@ public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedg
     public synchronized Admission admit(TrustedStoreScope scope, UUID agentRunId, String automationType,
             int maxStoreRuns, java.time.Duration ttl) {
         failIfBroken("admit");
-        Admission answer = stopped ? Admission.AI_STOPPED : admission;
+        Admission answer = !stopped ? admission
+                : stopDecision == SendDecision.STOPPED ? Admission.AI_STOPPED : Admission.valueOf(stopDecision.name());
         events.add("ADMISSION:" + answer + ":" + maxStoreRuns);
         if (answer.granted()) {
             leases.add(agentRunId);
@@ -212,7 +222,7 @@ public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedg
         if (stopped) {
             reservation.state = "RELEASED";
             events.add("STOPPED:" + reservation.key);
-            return SendDecision.STOPPED;
+            return stopDecision;
         }
         reservation.state = "IN_PROGRESS";
         events.add("SENT:" + reservation.key);

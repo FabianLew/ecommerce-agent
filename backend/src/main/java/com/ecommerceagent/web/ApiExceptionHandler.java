@@ -196,7 +196,8 @@ class ApiExceptionHandler {
             case CONFLICT -> error(request, HttpStatus.CONFLICT, "RECONCILIATION_CONFLICT",
                     "The call is not open for this decision, or a different one was already recorded.", false);
             case INVALID -> error(request, HttpStatus.UNPROCESSABLE_CONTENT, "VALIDATION_FAILED",
-                    "Give an outcome, a reason of 1 to 500 characters, and a cost only for CHARGED.", false);
+                    "The request is not valid: check the outcome or target, the cost and the reason (1 to 500"
+                            + " characters).", false);
         };
     }
 

@@ -1,6 +1,6 @@
 package com.ecommerceagent.aigovernance;
 
-/** A reconciliation or correction that cannot be recorded as asked. */
+/** A platform AI decision (a reconciliation, a correction, a scoped stop) that cannot be recorded as asked. */
 public class AiReconciliationException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
