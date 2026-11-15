@@ -123,6 +123,39 @@ class AiUsageLedgerTest {
                 .isEqualTo("SETTLED:msg_ok_1:40000:500:v1:0.13500000:PROVIDER_USAGE");
     }
 
+    /**
+     * ADR-0027 criterion 14: a new price version applies to new calls only. A call reserved before it is settled at
+     * the price it was reserved with, and costs already recorded never change.
+     */
+    @Test
+    void aNewPriceVersionNeverChangesTheCostOfEarlierCalls() {
+        UUID settled = sent(storeA, "price-1");
+        inScope(storeA, () -> ledger.settle(scope(storeA), settled, ProviderUsage.tokens("msg_price_1", 40_000, 500)));
+        UUID inFlight = sent(storeA, "price-2");
+        fixtures.sql("""
+                        INSERT INTO ai_price (id, provider, model, region, price_version, currency, input_per_mtok,
+                                              output_per_mtok, effective_from, source, verified_at)
+                        VALUES (gen_random_uuid(), 'anthropic', ?, 'global', 'v2', 'USD', 2.00, 20.00,
+                                now() - interval '1 second', 'test fixture', now())
+                        """).param(model).update();
+
+        Settlement late = inScope(storeA, () -> ledger.settle(scope(storeA), inFlight,
+                ProviderUsage.tokens("msg_price_2", 40_000, 500)));
+        UUID next = reserve(storeA, "price-3");
+
+        assertThat(late.cost()).as("reserved at v1, settled at v1").isEqualByComparingTo(ACTUAL);
+        assertThat(fixtures.sql("""
+                        SELECT price_version || ':' || cost FROM ai_usage_event
+                        WHERE reservation_id IN (?, ?) ORDER BY created_at
+                        """).params(settled, inFlight).query(String.class).list())
+                .containsExactly("v1:0.04500000", "v1:0.04500000");
+        assertThat(fixtures.sql("""
+                        SELECT p.price_version FROM ai_budget_reservation r JOIN ai_price p ON p.id = r.price_id
+                        WHERE r.id = ?
+                        """).param(next).query(String.class).single()).as("a new call uses the new version")
+                .isEqualTo("v2");
+    }
+
     @Test
     void cacheAndExtraUnitsArePricedAndUnpricedUsageIsNeverRecordedAsFree() {
         UUID id = sent(storeA, "cache-1");
