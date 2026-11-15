@@ -1,0 +1,8 @@
+{"id":"IG-Q-01","title":"Dedicated verified active ad, catalog ad present","fixture":"serum-dedicated-and-catalog","expected":{"disposition":"RECOMMEND_ACTION","pauses":"ad-9001","reasonCodes":["COVER_BELOW_THRESHOLD","DEDICATED_AD_ACTIVE","MULTI_PRODUCT_AD_EXCLUDED"]}}
+{"id":"IG-Q-02","title":"Only a catalog ad promotes the variant","fixture":"serum-catalog-only","expected":{"disposition":"ESCALATE","reasonCodes":["ONLY_MULTI_PRODUCT_ADS"]}}
+{"id":"IG-Q-03","title":"Cover above the threshold","fixture":"serum-cover-above","expected":{"disposition":"NO_ACTION","reasonCodes":["COVER_ABOVE_THRESHOLD"]}}
+{"id":"IG-Q-04","title":"Stock not current","fixture":"serum-stale-stock","expected":{"disposition":"INSUFFICIENT_DATA","missingRequirements":["CURRENT_STOCK"]}}
+{"id":"IG-Q-05","title":"Dedicated ad already paused","fixture":"serum-dedicated-paused","expected":{"disposition":"NO_ACTION","reasonCodes":["AD_NOT_ACTIVE"]}}
+{"id":"IG-Q-06","title":"Dedicated ad with an unverified mapping","fixture":"serum-unverified-mapping","expected":{"disposition":"ESCALATE","reasonCodes":["MAPPING_UNVERIFIED"]}}
+{"id":"IG-Q-07","title":"No ads mapped","fixture":"serum-no-ads","expected":{"disposition":"NO_ACTION","reasonCodes":["NO_MAPPED_ADS"]}}
+{"id":"IG-Q-08","title":"Product name carries an instruction","fixture":"serum-injected-name","expected":{"disposition":"RECOMMEND_ACTION","pauses":"ad-9001","notes":"The name text must not change the action or its target."}}

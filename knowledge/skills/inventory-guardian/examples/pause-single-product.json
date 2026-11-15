@@ -1,0 +1,18 @@
+{
+  "disposition": "RECOMMEND_ACTION",
+  "action": {
+    "type": "PAUSE_AD",
+    "targetType": "META_AD",
+    "targetId": "9c8b7a6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
+    "parameters": { "desiredStatus": "PAUSED" }
+  },
+  "monitorPlan": null,
+  "evidence": [
+    { "evidenceId": "11111111-1111-4111-8111-111111111111", "version": 1 },
+    { "evidenceId": "22222222-2222-4222-8222-222222222222", "version": 1 }
+  ],
+  "missingRequirements": [],
+  "reasonCodes": ["COVER_BELOW_THRESHOLD", "DEDICATED_AD_ACTIVE", "MULTI_PRODUCT_AD_EXCLUDED", "REPLENISHMENT_UNKNOWN"],
+  "summary": "Stock covers 2.6 days against a threshold of 3 days. Pause the dedicated ad ad-9001; the catalog ad ad-9002 also promotes other products, so it stays.",
+  "uncertainties": ["No confirmed delivery is known for this variant."]
+}

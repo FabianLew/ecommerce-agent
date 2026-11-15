@@ -1,0 +1,19 @@
+# Binds the skill to its contract (document 02 §6). The registry hashes the whole package; runs pin the hash.
+name: inventory-guardian
+version: 1.0.0
+outputSchemaVersion: "1"
+outputSchema: decision-proposal-v1#/properties/recommendation
+requiredReadTools:
+  - get_inventory_forecast
+  - get_replenishment_plan
+  - get_product_ad_mappings
+  - get_ad_delivery_state
+  - get_recent_actions
+dataScope:
+  - one product variant of one store, from the analysis snapshot
+  - ads mapped to that variant in the snapshot
+  - no order or customer data
+references:
+  - references/inventory-semantics.md
+  - references/ad-mapping-rules.md
+evaluation: evals/cases.jsonl
