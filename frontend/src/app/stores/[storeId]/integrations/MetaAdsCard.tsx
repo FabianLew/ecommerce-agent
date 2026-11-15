@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { components } from "@/api/schema";
 import type { Locale } from "@/i18n/locale";
 import type { Messages } from "@/i18n/messages";
@@ -15,12 +17,14 @@ export function MetaAdsCard({
   timezone,
   locale,
   t,
+  mappingLink,
 }: {
   storeId: string;
   envelope: Envelope;
   timezone: string;
   locale: Locale;
   t: Messages["meta"];
+  mappingLink: string;
 }) {
   const connection = envelope.connection;
   const canManage = envelope.canCreate;
@@ -62,6 +66,11 @@ export function MetaAdsCard({
             <dt>{t.adsSeen}</dt>
             <dd data-testid="meta-ads-seen">{connection.adsSeen}</dd>
           </dl>
+          <p>
+            <Link href={`/stores/${encodeURIComponent(storeId)}/integrations/ads`} data-testid="meta-mappings-link">
+              {mappingLink}
+            </Link>
+          </p>
         </>
       ) : (
         <p className="muted">{t.noConnection}</p>

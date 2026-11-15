@@ -103,6 +103,54 @@
         "required" : [ "type" ],
         "type" : "object"
       },
+      "AdResponse" : {
+        "properties" : {
+          "accountExternalId" : {
+            "type" : "string"
+          },
+          "allowedActions" : {
+            "items" : {
+              "enum" : [ "CONFIRM_MAPPING", "REVOKE_MAPPING" ],
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "effectiveStatus" : {
+            "type" : "string"
+          },
+          "externalId" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "mapping" : {
+            "$ref" : "#/components/schemas/MappingResponse"
+          },
+          "mappingState" : {
+            "enum" : [ "NONE", "UNVERIFIED", "VERIFIED", "CREATIVE_CHANGED", "REVOKED" ],
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "observedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "ownStatus" : {
+            "enum" : [ "ACTIVE", "PAUSED", "ARCHIVED", "DELETED" ],
+            "type" : "string"
+          },
+          "source" : {
+            "enum" : [ "FIXTURE", "META_API" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "accountExternalId", "allowedActions", "effectiveStatus", "externalId", "id", "mappingState", "name", "observedAt", "ownStatus", "source" ],
+        "type" : "object"
+      },
       "ApiError" : {
         "properties" : {
           "code" : {
@@ -781,6 +829,24 @@
         },
         "type" : "object"
       },
+      "ListResponseAdResponse" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AdResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "hasMore", "items" ],
+        "type" : "object"
+      },
       "ListResponseIntegrationResponse" : {
         "properties" : {
           "hasMore" : {
@@ -815,6 +881,82 @@
           }
         },
         "required" : [ "hasMore", "items" ],
+        "type" : "object"
+      },
+      "ListResponseVariantResponse" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/VariantResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "hasMore", "items" ],
+        "type" : "object"
+      },
+      "MappingRequest" : {
+        "properties" : {
+          "expectedVersion" : {
+            "description" : "The version seen; 0 without a mapping",
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "scope" : {
+            "enum" : [ "SINGLE_VARIANT", "MULTI_PRODUCT" ],
+            "type" : "string"
+          },
+          "variantIds" : {
+            "items" : {
+              "format" : "uuid",
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "verified" : {
+            "description" : "Confirm for the ad's current creative",
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "expectedVersion", "scope", "variantIds", "verified" ],
+        "type" : "object"
+      },
+      "MappingResponse" : {
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "scope" : {
+            "enum" : [ "SINGLE_VARIANT", "MULTI_PRODUCT" ],
+            "type" : "string"
+          },
+          "variants" : {
+            "items" : {
+              "$ref" : "#/components/schemas/VariantResponse"
+            },
+            "type" : "array"
+          },
+          "verification" : {
+            "enum" : [ "VERIFIED", "UNVERIFIED", "REVOKED" ],
+            "type" : "string"
+          },
+          "verifiedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "version" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "id", "scope", "variants", "verification", "version" ],
         "type" : "object"
       },
       "MeResponse" : {
@@ -1021,6 +1163,16 @@
         "required" : [ "createdAt", "proposalId", "revision", "status" ],
         "type" : "object"
       },
+      "RevokeRequest" : {
+        "properties" : {
+          "expectedVersion" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "expectedVersion" ],
+        "type" : "object"
+      },
       "SnapshotRef" : {
         "properties" : {
           "asOf" : {
@@ -1162,6 +1314,25 @@
           }
         },
         "required" : [ "id", "startedAt", "status", "windowFrom", "windowUntil" ],
+        "type" : "object"
+      },
+      "VariantResponse" : {
+        "properties" : {
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "productName" : {
+            "type" : "string"
+          },
+          "sku" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "name", "productName" ],
         "type" : "object"
       },
       "WebhookReceiptResponse" : {
@@ -1433,6 +1604,275 @@
           }
         },
         "tags" : [ "activity-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/ads" : {
+      "get" : {
+        "operationId" : "ads",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseAdResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "ad-mapping-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/ads/{adId}" : {
+      "get" : {
+        "operationId" : "ad",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "adId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "ad-mapping-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/ads/{adId}/mapping" : {
+      "put" : {
+        "operationId" : "confirm",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "adId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MappingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "ad-mapping-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/ads/{adId}/mapping/revocation" : {
+      "post" : {
+        "operationId" : "revoke",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "adId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RevokeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AdResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "ad-mapping-controller" ]
       }
     },
     "/api/v1/stores/{storeId}/decisions" : {
@@ -2452,6 +2892,63 @@
           }
         },
         "tags" : [ "meta-connection-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/variants" : {
+      "get" : {
+        "operationId" : "variants",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseVariantResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "ad-mapping-controller" ]
       }
     },
     "/api/v1/webhooks/woocommerce/{endpointKey}" : {

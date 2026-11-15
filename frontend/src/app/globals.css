@@ -609,3 +609,42 @@ nav ul {
     display: block;
   }
 }
+
+/* Ad mappings (B-32) */
+.stack {
+  display: grid;
+  gap: 1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.form.compact {
+  margin-top: 0.75rem;
+}
+
+fieldset.field {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.choice {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  font-weight: normal;
+}
+
+.badge-mapping-verified {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.badge-mapping-creative_changed,
+.badge-mapping-revoked {
+  background: var(--warning-soft);
+  color: var(--warning);
+  border-color: var(--warning);
+}

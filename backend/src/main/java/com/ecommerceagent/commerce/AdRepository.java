@@ -153,6 +153,51 @@ public class AdRepository {
         return mappingOfAd(scope, adId).orElseThrow();
     }
 
+    /** All ads of the store, by name. */
+    public List<Ad> ads(TrustedStoreScope scope) {
+        return jdbc.sql(AD_SELECT + " WHERE a.organization_id = :organizationId AND a.store_id = :storeId"
+                        + " ORDER BY a.name, a.external_id")
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .query(AdRepository::ad)
+                .list();
+    }
+
+    /** Locks the ad row for a mapping change, so two operators cannot interleave (B-32). */
+    public Optional<Ad> lockAd(TrustedStoreScope scope, UUID adId) {
+        return jdbc.sql(AD_SELECT + " WHERE a.id = :id AND a.organization_id = :organizationId"
+                        + " AND a.store_id = :storeId FOR UPDATE")
+                .param("id", adId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .query(AdRepository::ad)
+                .optional();
+    }
+
+    /**
+     * Confirms an unchanged verified mapping again for the current creative: only the verification time moves, the
+     * version stays, so an approval of the same mapping version remains valid.
+     */
+    public AdMapping refreshVerification(TrustedStoreScope scope, UUID mappingId, Instant verifiedAt) {
+        jdbc.sql("""
+                        UPDATE ad_mapping SET verified_at = :verifiedAt, updated_at = :now
+                        WHERE id = :id AND organization_id = :organizationId AND store_id = :storeId
+                          AND verification_status = 'VERIFIED'
+                        """)
+                .param("verifiedAt", Timestamp.from(verifiedAt))
+                .param("now", Timestamp.from(clock.instant()))
+                .param("id", mappingId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .update();
+        return jdbc.sql(MAPPING_SELECT + " AND m.id = :id")
+                .param("id", mappingId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .query(AdRepository::mapping)
+                .single();
+    }
+
     public Optional<AdMapping> mappingOfAd(TrustedStoreScope scope, UUID adId) {
         return jdbc.sql(MAPPING_SELECT + " AND m.ad_id = :adId")
                 .param("adId", adId)

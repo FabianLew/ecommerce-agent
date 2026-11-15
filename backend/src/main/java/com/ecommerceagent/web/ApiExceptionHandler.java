@@ -2,6 +2,7 @@ package com.ecommerceagent.web;
 
 import java.util.List;
 
+import com.ecommerceagent.commerce.AdMappingException;
 import com.ecommerceagent.identity.StoreAccessDeniedException;
 import com.ecommerceagent.integration.IntegrationConflictException;
 import com.ecommerceagent.integration.IntegrationNotFoundException;
@@ -50,6 +51,20 @@ class ApiExceptionHandler {
     ResponseEntity<ApiError> conflict(HttpServletRequest request) {
         return error(request, HttpStatus.CONFLICT, "ALREADY_CONNECTED",
                 "This store already has a connection for the provider.", false);
+    }
+
+    @ExceptionHandler(AdMappingException.class)
+    ResponseEntity<ApiError> adMapping(HttpServletRequest request, AdMappingException exception) {
+        return switch (exception.reason()) {
+            case NOT_FOUND -> error(request, HttpStatus.NOT_FOUND, "NOT_FOUND",
+                    "The resource does not exist or is not available.", false);
+            case VERSION_CONFLICT -> error(request, HttpStatus.CONFLICT, "MAPPING_CHANGED",
+                    "The mapping was changed by someone else. Reload and check it again.", false);
+            case INVALID -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(new ApiError(
+                    "VALIDATION_FAILED", "Correct the highlighted fields.",
+                    List.of(new ApiError.FieldError(exception.field(), exception.code(), exception.getMessage())),
+                    false, RequestCorrelationFilter.requestId(request), null));
+        };
     }
 
     @ExceptionHandler(SyncInProgressException.class)

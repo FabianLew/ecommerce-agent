@@ -102,6 +102,7 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ s
           timezone={store.data.timezone}
           locale={locale}
           t={messages.meta}
+          mappingLink={messages.adMappings.openFromMeta}
         />
       ) : null}
     </>
