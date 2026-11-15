@@ -89,6 +89,7 @@ class BusinessProfileController {
     }
 
     /** Records the owner's start of monitoring (ADR-0025); refused while an earlier step is incomplete. */
+    @RateLimited(RateLimited.Group.WORK)
     @PostMapping("/onboarding/monitoring-start")
     OnboardingResponse startMonitoring(@RequiresPermission(StorePermission.STORE_MANAGE) TrustedStoreScope scope,
             @RequestBody MonitoringStartRequest request) {

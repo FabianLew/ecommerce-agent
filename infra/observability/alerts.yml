@@ -121,6 +121,13 @@ groups:
           summary: "A model provider rate limited the platform, or many calls hit the provider rate limits"
           runbook: docs/operations/runbooks.md#ai-provider-throttled
 
+      - alert: ApiRateLimited
+        expr: sum(increase(operator_api_rate_limited_total[15m])) > 50
+        labels: {severity: warning}
+        annotations:
+          summary: "Many requests that start work were refused by the API rate limits"
+          runbook: docs/operations/runbooks.md#api-rate-limited
+
   - name: operator-platform
     rules:
       - alert: ApiErrors

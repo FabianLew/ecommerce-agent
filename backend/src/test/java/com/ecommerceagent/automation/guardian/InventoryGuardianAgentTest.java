@@ -263,6 +263,33 @@ class InventoryGuardianAgentTest {
         }
     }
 
+    /**
+     * ADR-0027 section 6.1 (criterion 22): a repeated delivery for the same episode never starts a second workflow,
+     * so it never starts a second paid analysis. The webhook inbox already drops exact duplicates; this covers a
+     * repeated start that gets past it.
+     */
+    @Test
+    void aRepeatedStartOfTheSameEpisodeStartsNoSecondAgentRun() {
+        MODEL.thenTools(call("t1", InventoryReadTools.FORECAST, "productVariantId", serum),
+                        call("t2", InventoryReadTools.MAPPINGS, "productVariantId", serum))
+                .thenTools(call("t3", InventoryReadTools.DELIVERY, "adId", dedicatedAd))
+                .then(request -> FakeModelGateway.text(pauseFrom(request, dedicatedAd)));
+        Opportunity episode = opportunities.open(scope, OpportunityCategory.INVENTORY_RISK,
+                Opportunity.PRODUCT_VARIANT, serum).opportunity();
+        InventoryGuardianWorkflow workflow = start(episode);
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+                assertThat(workflow.status().opportunityStatus()).isEqualTo("AWAITING_DECISION"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> start(episode))
+                .isInstanceOf(io.temporal.client.WorkflowExecutionAlreadyStarted.class);
+
+        assertThat(agentRuns.ofOpportunity(scope, episode.id())).hasSize(1);
+        assertThat(jdbc.sql("""
+                        SELECT count(*) FROM ai_budget_reservation r JOIN agent_run a ON a.id = r.agent_run_id
+                        WHERE a.opportunity_id = ?
+                        """).param(episode.id()).query(Long.class).single()).isEqualTo(3L);
+    }
+
     @Test
     void ig28FailingModelsFallBackToTheBaselineAndEveryAttemptIsRecorded() {
         // A broken connection may have been charged; a rate-limit response is not billed.

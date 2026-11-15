@@ -20,9 +20,14 @@ class ApiErrorWriter {
 
     void write(HttpServletRequest request, HttpServletResponse response, int status, String code, String message)
             throws IOException {
+        write(request, response, status, code, message, false);
+    }
+
+    void write(HttpServletRequest request, HttpServletResponse response, int status, String code, String message,
+            boolean retryable) throws IOException {
         response.setStatus(status);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         json.writeValue(response.getOutputStream(),
-                ApiError.of(code, message, false, RequestCorrelationFilter.requestId(request)));
+                ApiError.of(code, message, retryable, RequestCorrelationFilter.requestId(request)));
     }
 }

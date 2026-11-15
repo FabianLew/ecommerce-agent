@@ -11,6 +11,8 @@ import static com.ecommerceagent.web.IntegrationApiTest.user;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -154,6 +156,32 @@ class MetaConnectionApiTest {
         assertThat(new String(ciphertext, java.nio.charset.StandardCharsets.ISO_8859_1)).doesNotContain("EAAstub");
         assertThat(GRAPH.requests).allSatisfy(r -> assertThat(r.uri().toString()).doesNotContain(TOKEN));
         create("owner", STORE_A, "456").andExpect(status().isConflict());
+    }
+
+    /** ADR-0027 section 6.1 (E-54.5): a repeated check with the same Idempotency-Key is answered once. */
+    @Test
+    void aRepeatedCheckWithTheSameKeyIsAnsweredFromTheFirstAnswer() throws Exception {
+        String id = connect();
+        String first = mvc.perform(post("/api/v1/stores/{storeId}/meta-connection/{id}/checks", STORE_A, id)
+                        .with(user("owner")).header("Idempotency-Key", "check-key-0001"))
+                .andExpect(status().isOk()).andExpect(header().doesNotExist("Idempotent-Replayed"))
+                .andReturn().getResponse().getContentAsString();
+        GRAPH.on("GET act_123", Reply.error(500, 2, 0));
+
+        mvc.perform(post("/api/v1/stores/{storeId}/meta-connection/{id}/checks", STORE_A, id)
+                        .with(user("owner")).header("Idempotency-Key", "check-key-0001"))
+                .andExpect(status().isOk()).andExpect(header().string("Idempotent-Replayed", "true"))
+                .andExpect(content().json(first));
+        // The same key for another request is refused; a malformed key too; another user has their own keys.
+        mvc.perform(post("/api/v1/stores/{storeId}/meta-connection/{id}/checks", STORE_A, UUID.randomUUID())
+                        .with(user("owner")).header("Idempotency-Key", "check-key-0001"))
+                .andExpect(status().is(422))
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REUSED"));
+        mvc.perform(post("/api/v1/stores/{storeId}/meta-connection/{id}/checks", STORE_A, id)
+                        .with(user("owner")).header("Idempotency-Key", "bad key"))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_IDEMPOTENCY_KEY"));
+        assertThat(jdbc.sql("SELECT count(*) FROM api_idempotency WHERE idempotency_key = 'check-key-0001'")
+                .query(Integer.class).single()).isEqualTo(1);
     }
 
     @Test

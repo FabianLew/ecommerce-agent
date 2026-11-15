@@ -51,6 +51,7 @@ class MetaConnectionController {
         return MetaConnectionResponse.from(connections.saveToken(scope, id(connectionId), request.token()), scope);
     }
 
+    @RateLimited(value = RateLimited.Group.WORK, idempotent = true)
     @PostMapping("/{connectionId}/checks")
     MetaConnectionResponse check(@RequiresPermission(StorePermission.STORE_MANAGE) TrustedStoreScope scope,
             @PathVariable String connectionId) {

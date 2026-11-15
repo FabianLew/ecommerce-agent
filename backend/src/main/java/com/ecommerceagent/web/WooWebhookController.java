@@ -27,6 +27,7 @@ class WooWebhookController {
         this.webhooks = webhooks;
     }
 
+    @RateLimited(RateLimited.Group.WEBHOOK)
     @PostMapping("/api/v1/webhooks/woocommerce/{endpointKey}")
     WebhookReceiptResponse receive(@PathVariable String endpointKey, HttpServletRequest request) throws IOException {
         if (request.getContentLengthLong() > WooWebhooks.MAX_BODY_BYTES) {

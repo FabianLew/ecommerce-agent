@@ -150,6 +150,16 @@ platform's own provider limits (`operator_ai_provider_slots_total` by outcome: `
 `operator.ai-provider-limits` with a new version (`ai-provider-limits/N`). The current pauses are in
 `ai_provider_cooldown` (read with the administration role).
 
+### API rate limited
+
+Many requests that start work (sync jobs, connection checks, monitoring start, approvals) got `429 RATE_LIMITED`
+(`operator_api_rate_limited_total` by endpoint). A few are normal when someone clicks repeatedly. Many from one
+endpoint point to a script or a client retrying without backoff; many for webhooks point to a delivery storm from
+the shop (the inbox still drops duplicates). The limits per user, store, endpoint and webhook key are the parameter
+set `operator.api-rate-limits` (a change needs a new version, `api-rate-limits/N`). The mutation stop is never
+limited. A repeated command with the same `Idempotency-Key` is answered from the first answer
+(`operator_api_idempotent_replays_total`), not run again.
+
 ### API errors
 
 More than 2% of API requests fail. Find the endpoint in the logs (`http.server.requests` with status 5xx) and the
