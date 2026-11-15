@@ -1,0 +1,53 @@
+package com.ecommerceagent;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
+
+/** ADR-0023: the cloud profile never starts against a developer machine or with a local profile mixed in. */
+class CloudConfigurationCheckTest {
+
+    @Test
+    void otherProfilesAreNotChecked() {
+        assertThat(CloudConfigurationCheck.problems(new MockEnvironment())).isEmpty();
+    }
+
+    @Test
+    void aCompleteCloudConfigurationPasses() {
+        assertThat(CloudConfigurationCheck.problems(cloud())).isEmpty();
+    }
+
+    @Test
+    void localAddressesMissingValuesAndLocalProfilesAreRefused() {
+        MockEnvironment environment = cloud()
+                .withProperty("spring.datasource.url", "jdbc:postgresql://localhost:5432/operator")
+                .withProperty("spring.temporal.connection.target", "127.0.0.1:7233")
+                .withProperty("operator.integration.secrets-key", "");
+        environment.setActiveProfiles("cloud", "api", "local");
+
+        assertThat(CloudConfigurationCheck.problems(environment)).containsExactly(
+                "profile cloud cannot be combined with local, test or e2e",
+                "spring.datasource.url points at a local address",
+                "spring.temporal.connection.target points at a local address",
+                "operator.integration.secrets-key is required");
+
+        MockEnvironment missing = new MockEnvironment().withProperty("spring.datasource.url", "${DB_URL_NOT_SET}");
+        missing.setActiveProfiles("cloud");
+        assertThat(CloudConfigurationCheck.problems(missing)).hasSize(CloudConfigurationCheck.ADDRESSES.size() + 1);
+    }
+
+    private static MockEnvironment cloud() {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("spring.datasource.url", "jdbc:postgresql://db.internal.example:5432/operator")
+                .withProperty("spring.temporal.connection.target", "eu-central-1.aws.api.temporal.io:7233")
+                .withProperty("spring.security.oauth2.resourceserver.jwt.issuer-uri",
+                        "https://id.example.eu/realms/operator")
+                .withProperty("operator.integration.meta.graph-base-url", "https://graph.facebook.com")
+                .withProperty("operator.notifications.app-base-url", "https://app.example.eu")
+                .withProperty("operator.integration.webhooks.base-url", "https://api.example.eu")
+                .withProperty("operator.integration.secrets-key", "c2VjcmV0");
+        environment.setActiveProfiles("cloud", "api");
+        return environment;
+    }
+}

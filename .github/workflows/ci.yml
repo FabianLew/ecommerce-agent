@@ -182,3 +182,23 @@ jobs:
       - name: Stop environment
         if: always()
         run: docker compose down -v
+
+  images:
+    name: Container images (build only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Backend image (ADR-0023)
+        run: docker build -f backend/Dockerfile -t operator-backend:ci .
+      - name: Frontend image (ADR-0023)
+        run: docker build -f frontend/Dockerfile -t operator-frontend:ci .
+      - name: Backend image refuses a local configuration in profile cloud
+        run: |
+          set +e
+          output="$(docker run --rm -e SPRING_PROFILES_ACTIVE=cloud,api operator-backend:ci 2>&1)"
+          status=$?
+          set -e
+          echo "${output}" | tail -n 5
+          test "${status}" -ne 0
+          echo "${output}" | grep -q "Profile cloud refused"

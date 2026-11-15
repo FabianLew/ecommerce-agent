@@ -29,5 +29,6 @@ Statuses: `Proposed` → `Accepted` (after the owner accepts it in a PR) → opt
 | [0020](0020-approval-authorized-action-and-execution-ledger.md) | Approval, AuthorizedAction, the execution ledger and the mutation stop | Proposed |
 | [0021](0021-operator-notifications-and-action-outcomes.md) | Operator notifications and action outcomes | Proposed |
 | [0022](0022-row-level-security-key-rotation-and-retention.md) | Row-level security, key rotation and data retention | Proposed |
+| [0023](0023-eu-environments-deployment-and-backup.md) | EU environments, deployment, Temporal Cloud and backups | Proposed |
 
 Template: [0000-template.md](0000-template.md).
