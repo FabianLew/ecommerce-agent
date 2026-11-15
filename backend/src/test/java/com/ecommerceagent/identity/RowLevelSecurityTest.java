@@ -225,7 +225,9 @@ class RowLevelSecurityTest {
                 "ai_release:operator_system", "ai_mark_sent:operator_system", "ai_settle:operator_system",
                 "ai_mark_unknown:operator_system", "ai_reconcile:operator_system",
                 "ai_sweep_reservations:operator_system", "ai_platform_stop_state:operator_system",
-                "ai_acquire_run_lease:operator_system", "ai_release_run_lease:operator_system");
+                "ai_acquire_run_lease:operator_system", "ai_release_run_lease:operator_system",
+                "ai_acquire_provider_slot:operator_system", "ai_release_provider_slot:operator_system",
+                "ai_pause_provider:operator_system");
         assertThat(fixtures.sql("""
                         SELECT p.proname FROM pg_proc p
                         WHERE p.proowner = 'operator_system'::regrole AND has_function_privilege('public', p.oid, 'EXECUTE')

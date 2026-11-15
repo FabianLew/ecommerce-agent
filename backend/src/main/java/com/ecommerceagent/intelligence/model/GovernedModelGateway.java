@@ -2,10 +2,13 @@ package com.ecommerceagent.intelligence.model;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 import com.ecommerceagent.aigovernance.AiBudgetGovernor;
+import com.ecommerceagent.aigovernance.AiProviderLimiter;
 import com.ecommerceagent.aigovernance.AiCallEstimate;
 import com.ecommerceagent.aigovernance.AiUsageLedger;
 import com.ecommerceagent.aigovernance.CostQuote;
@@ -46,15 +49,20 @@ public class GovernedModelGateway {
     private final AiUsageLedger ledger;
     private final AiAdmission admission;
     private final AiCallAuthorization authorization;
+    private final AiProviderLimiter limiter;
     private final Clock clock;
 
+    private static final Duration SLOT_MARGIN = Duration.ofMinutes(1);
+    private static final Duration MAX_SLOT = Duration.ofMinutes(30);
+
     public GovernedModelGateway(ProviderGateways providers, AiBudgetGovernor governor, AiUsageLedger ledger,
-            AiAdmission admission, AiCallAuthorization authorization, Clock clock) {
+            AiAdmission admission, AiCallAuthorization authorization, AiProviderLimiter limiter, Clock clock) {
         this.providers = providers;
         this.governor = governor;
         this.ledger = ledger;
         this.admission = admission;
         this.authorization = authorization;
+        this.limiter = limiter;
         this.clock = clock;
     }
 
@@ -128,6 +136,49 @@ public class GovernedModelGateway {
             throw new AiCallDenied(denied.reason());
         }
         ReservationDecision.Reserved reserved = (ReservationDecision.Reserved) decision;
+        // The provider's rate limits, across all instances (section 6.2); a refused slot frees the reservation.
+        UUID slotId = reserved.reservationId();
+        AiProviderLimiter.Slot slot;
+        try {
+            slot = limiter.acquire(slotId, model.provider(), model.name(), reserved.maxInputTokens(),
+                    reserved.maxOutputTokens(), slotTtl(request));
+        } catch (RuntimeException e) {
+            releaseQuietly(scope, reserved, "PROVIDER_LIMIT_FAILED");
+            throw e;
+        }
+        if (!slot.granted()) {
+            releaseQuietly(scope, reserved, "PROVIDER_LIMIT:" + slot);
+            throw new AiCallDenied(AiCallDenied.PROVIDER_LIMIT_PREFIX + slot);
+        }
+        try {
+            return send(scope, request, provider, reserved);
+        } finally {
+            try {
+                limiter.release(slotId);
+            } catch (RuntimeException e) {
+                // The slot expires on its own.
+                log.warn("Provider slot {} could not be released: {}", slotId, e.toString());
+            }
+        }
+    }
+
+    private Duration slotTtl(ModelRequest request) {
+        Duration left = Duration.between(clock.instant(), request.deadline()).plus(SLOT_MARGIN);
+        return left.compareTo(MAX_SLOT) > 0 ? MAX_SLOT : left.isNegative() ? SLOT_MARGIN : left;
+    }
+
+    private void releaseQuietly(TrustedStoreScope scope, ReservationDecision.Reserved reserved, String reason) {
+        try {
+            governor.release(scope, reserved.reservationId(), reason);
+        } catch (RuntimeException e) {
+            // Nothing was sent; the sweep closes the reservation.
+            log.warn("AI reservation {} could not be released: {}", reserved.reservationId(), e.toString());
+        }
+    }
+
+    private GovernedTurn send(TrustedStoreScope scope, ModelRequest request, ModelGateway provider,
+            ReservationDecision.Reserved reserved) {
+        ModelId model = request.model();
         SendDecision send = ledger.markSent(scope, reserved.reservationId());
         if (send == SendDecision.STOPPED) {
             throw new AiCallDenied(AiCallDenied.AI_STOPPED);
@@ -140,6 +191,9 @@ public class GovernedModelGateway {
         try {
             turn = provider.complete(request);
         } catch (ModelFailure failure) {
+            if (failure.type() == ModelFailure.Type.RATE_LIMITED) {
+                pauseQuietly(model, failure.retryAfter());
+            }
             if (failure.confirmedNotCharged()) {
                 ledger.settle(scope, reserved.reservationId(),
                         new ProviderUsage(failure.providerRequestId(), 0, 0, 0, 0, Map.of()));
@@ -170,6 +224,14 @@ public class GovernedModelGateway {
             // The answer is real; its cost stays reserved and the sweep turns the reservation UNKNOWN.
             log.warn("AI call {} could not be settled: {}", reserved.reservationId(), e.toString());
             return new GovernedTurn(turn, reserved.reservationId(), reserved.amount(), reserved.currency(), false);
+        }
+    }
+
+    private void pauseQuietly(ModelId model, Duration retryAfter) {
+        try {
+            limiter.pause(model.provider(), model.name(), retryAfter, "RATE_LIMITED");
+        } catch (RuntimeException e) {
+            log.warn("Provider {} could not be paused: {}", model, e.toString());
         }
     }
 }

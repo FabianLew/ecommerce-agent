@@ -140,6 +140,16 @@ are normal during a burst. Many point to runs that do not end (check "Agent fail
 the store limit is `max-concurrent-runs-per-store` of the agent's run policy (a new policy version), the platform limit
 `operator.ai-governance.max-concurrent-runs`. A lease of a lost worker expires one minute after the run's wall time.
 
+### AI provider throttled
+
+The provider answered with rate limiting (`operator_ai_provider_throttled_total`): the model is paused for the
+provider's retry-after (at most `operator.ai-provider-limits.max-pause`) and its calls end `LIMIT_EXCEEDED` with
+`AI_GOVERNANCE:PROVIDER_LIMIT:PROVIDER_PAUSED` until then, so the baseline proposes. Or many calls were refused by the
+platform's own provider limits (`operator_ai_provider_slots_total` by outcome: `REQUEST_LIMIT`, `INPUT_TOKEN_LIMIT`,
+`OUTPUT_TOKEN_LIMIT`, `PARALLEL_LIMIT`). Check the provider's console for the account's limits, then lower or raise
+`operator.ai-provider-limits` with a new version (`ai-provider-limits/N`). The current pauses are in
+`ai_provider_cooldown` (read with the administration role).
+
 ### API errors
 
 More than 2% of API requests fail. Find the endpoint in the logs (`http.server.requests` with status 5xx) and the

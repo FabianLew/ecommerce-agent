@@ -112,6 +112,14 @@ groups:
         annotations:
           summary: "More than 10 agent runs in an hour were not admitted because of the concurrency limits"
           runbook: docs/operations/runbooks.md#ai-admission-denied
+      - alert: AiProviderThrottled
+        expr: >
+          sum(increase(operator_ai_provider_throttled_total[15m])) > 0
+            or sum(increase(operator_ai_provider_slots_total{outcome!="GRANTED"}[15m])) > 20
+        labels: {severity: warning}
+        annotations:
+          summary: "A model provider rate limited the platform, or many calls hit the provider rate limits"
+          runbook: docs/operations/runbooks.md#ai-provider-throttled
 
   - name: operator-platform
     rules:

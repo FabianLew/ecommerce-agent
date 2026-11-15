@@ -7,6 +7,7 @@ import java.util.Map;
 
 import com.ecommerceagent.automation.guardian.InventoryProtectionPolicy;
 import com.ecommerceagent.decisions.RiskDetectorSettings;
+import com.ecommerceagent.aigovernance.ProviderRateLimits;
 import com.ecommerceagent.intelligence.inventory.InventoryAgentRunPolicy;
 import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -124,6 +125,13 @@ public class CloudConfigurationCheck implements ApplicationListener<ApplicationE
                     InventoryAgentRunPolicy.class);
             if (overridden(run.parameters(), runDefaults.parameters()) && run.version().equals(runDefaults.version())) {
                 problems.add(InventoryAgentRunPolicy.PREFIX + " differs from the defaults of " + runDefaults.version()
+                        + "; set its own version");
+            }
+            ProviderRateLimits provider = binder.bindOrCreate(ProviderRateLimits.PREFIX, ProviderRateLimits.class);
+            ProviderRateLimits providerDefaults = ProviderRateLimits.defaults();
+            if (overridden(provider.parameters(), providerDefaults.parameters())
+                    && provider.version().equals(providerDefaults.version())) {
+                problems.add(ProviderRateLimits.PREFIX + " differs from the defaults of " + providerDefaults.version()
                         + "; set its own version");
             }
         } catch (RuntimeException e) {
