@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import com.ecommerceagent.aigovernance.InMemoryAiGovernance;
 import com.ecommerceagent.decisions.ContextSnapshot;
 import com.ecommerceagent.decisions.RiskDetectorSettings;
 import com.ecommerceagent.identity.TestScopes;
@@ -24,12 +25,13 @@ import com.ecommerceagent.intelligence.agent.AgentSettings;
 import com.ecommerceagent.intelligence.agent.AgentTool;
 import com.ecommerceagent.intelligence.agent.FakeModelGateway;
 import com.ecommerceagent.intelligence.agent.InMemoryAgentRuns;
-import com.ecommerceagent.intelligence.agent.ModelGatewayRouter;
 import com.ecommerceagent.intelligence.agent.MutableClock;
 import com.ecommerceagent.intelligence.agent.ToolExecutionContext;
 import com.ecommerceagent.intelligence.agent.ToolRegistry;
 import com.ecommerceagent.intelligence.knowledge.KnowledgeRegistry;
+import com.ecommerceagent.intelligence.model.GovernedModelGateway;
 import com.ecommerceagent.intelligence.model.ModelFailure;
+import com.ecommerceagent.intelligence.model.provider.ProviderGateways;
 import com.ecommerceagent.intelligence.model.ModelId;
 import com.ecommerceagent.intelligence.model.ModelMessage;
 import com.ecommerceagent.intelligence.model.ModelRequest;
@@ -40,6 +42,7 @@ import com.ecommerceagent.intelligence.model.ToolSpec;
 import com.ecommerceagent.metrics.CanonicalJson;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.JsonNode;
 
 /**
@@ -56,6 +59,7 @@ class AgentRuntimeSafetyTest {
 
     final TrustedStoreScope scope = TestScopes.system(UUID.randomUUID(), UUID.randomUUID());
     final FakeModelGateway model = new FakeModelGateway();
+    final InMemoryAiGovernance governance = new InMemoryAiGovernance();
     final InMemoryAgentRuns runs = new InMemoryAgentRuns();
     final MutableClock clock = new MutableClock(InventoryContextFixture.AS_OF);
     final KnowledgeRegistry knowledge = new KnowledgeRegistry();
@@ -82,7 +86,8 @@ class AgentRuntimeSafetyTest {
     }
 
     AgentRuntime runtime() {
-        return new AgentRuntime(ModelGatewayRouter.of(model, "fake"), registry, runs, hooks, settings, clock);
+        return new AgentRuntime(new GovernedModelGateway(ProviderGateways.of(model, "fake"), governance, governance,
+                clock), registry, runs, hooks, settings, clock);
     }
 
     InventoryAgentProposer proposer() {
@@ -366,6 +371,93 @@ class AgentRuntimeSafetyTest {
         model.then(request -> new ModelTurn("", List.of(), ModelTurn.FinishReason.REFUSAL, FakeModelGateway.usage(),
                 "r", null));
         assertThat(run().status()).isEqualTo(AgentRunStatus.REFUSED);
+    }
+
+    @Test
+    void everyModelCallIsReservedAndMarkedSentBeforeTheProviderSeesItAndSettledAfter() {
+        model.then(request -> {
+            assertThat(governance.events()).as("reserved and marked sent before the request")
+                    .containsExactly("RESERVED:" + governance.reservations().getFirst().key,
+                            "SENT:" + governance.reservations().getFirst().key);
+            return new ModelTurn("", List.of(call("t1", InventoryReadTools.FORECAST,
+                    "{\"productVariantId\":\"" + VARIANT + "\"}")), ModelTurn.FinishReason.TOOL_USE,
+                    FakeModelGateway.usage(), "r1", null);
+        }).thenText(pause());
+
+        AgentRunResult result = run();
+
+        assertThat(result.status()).isEqualTo(AgentRunStatus.SUCCEEDED);
+        assertThat(governance.reservations()).hasSize(2).allSatisfy(reservation -> {
+            assertThat(reservation.state).isEqualTo("SETTLED");
+            assertThat(reservation.agentRunId).isEqualTo(result.runId());
+            assertThat(reservation.automationType).isEqualTo("inventory-agent");
+            assertThat(reservation.estimate.provider()).isEqualTo("fake");
+            assertThat(reservation.estimate.maxOutputTokens()).isEqualTo(1500);
+            assertThat(reservation.usage.inputTokens()).isEqualTo(500);
+        });
+        assertThat(governance.reservations()).extracting(reservation -> reservation.key).containsExactly(
+                "agent-run:" + result.runId() + ":call:1", "agent-run:" + result.runId() + ":call:2");
+    }
+
+    @Test
+    void aCallGovernanceDoesNotAdmitIsNeverSent() {
+        governance.deny("BUDGET_EXHAUSTED:PLATFORM:MONTHLY");
+        AgentRunResult exhausted = run();
+        assertThat(exhausted.status()).isEqualTo(AgentRunStatus.LIMIT_EXCEEDED);
+        assertThat(exhausted.stopReason()).isEqualTo("AI_GOVERNANCE:BUDGET_EXHAUSTED:PLATFORM:MONTHLY");
+
+        governance.deny("PRICE_UNVERIFIED");
+        AgentRunResult unpriced = run();
+        assertThat(unpriced.status()).isEqualTo(AgentRunStatus.MODEL_FAILED);
+        assertThat(unpriced.stopReason()).isEqualTo("AI_GOVERNANCE:PRICE_UNVERIFIED");
+        assertThat(model.requests()).isEmpty();
+    }
+
+    @Test
+    void aTimeoutIsPossiblyChargedAndCountsAgainstTheRun() {
+        model.thenFailure(ModelFailure.Type.TIMEOUT);
+
+        AgentRunResult result = run();
+
+        assertThat(result.status()).isEqualTo(AgentRunStatus.MODEL_FAILED);
+        assertThat(governance.reservations()).singleElement().satisfies(reservation -> {
+            assertThat(reservation.state).isEqualTo("UNKNOWN");
+            assertThat(reservation.reason).isEqualTo("MODEL_FAILURE:TIMEOUT");
+        });
+        // Not zero any more (ADR-0027 section 22, gap 1): the next attempt starts with this cost spent.
+        assertThat(result.estimatedCostUsd()).isPositive();
+        assertThat(runs.only().usageComplete()).isFalse();
+        assertThat(runs.only().outputTokens()).isEqualTo(1500);
+    }
+
+    @Test
+    void anErrorResponseTheProviderDoesNotBillIsSettledAtZero() {
+        model.thenFailure(ModelFailure.Type.RATE_LIMITED, true);
+
+        AgentRunResult result = run();
+
+        assertThat(result.stopReason()).isEqualTo("RATE_LIMITED");
+        assertThat(governance.reservations()).singleElement().satisfies(reservation -> {
+            assertThat(reservation.state).isEqualTo("SETTLED");
+            assertThat(reservation.usage.inputTokens()).isZero();
+        });
+        assertThat(result.estimatedCostUsd()).isZero();
+    }
+
+    @Test
+    void aCallThatCannotBeAttemptedReservesNothing() {
+        model.then(request -> {
+            throw new AssertionError("must not be called");
+        });
+        TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            AgentRunResult inTransaction = run();
+            assertThat(inTransaction.stopReason()).isEqualTo("AI_GOVERNANCE:CALL_INSIDE_TRANSACTION");
+        } finally {
+            TransactionSynchronizationManager.setActualTransactionActive(false);
+        }
+        assertThat(governance.reservations()).isEmpty();
+        assertThat(model.requests()).isEmpty();
     }
 
     @Test

@@ -9,8 +9,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.ecommerceagent.intelligence.model.AiCallDenied;
+import com.ecommerceagent.intelligence.model.GovernedCall;
+import com.ecommerceagent.intelligence.model.GovernedModelFailure;
+import com.ecommerceagent.intelligence.model.GovernedModelGateway;
 import com.ecommerceagent.intelligence.model.ModelFailure;
-import com.ecommerceagent.intelligence.model.ModelGateway;
 import com.ecommerceagent.intelligence.model.ModelMessage;
 import com.ecommerceagent.intelligence.model.ModelRequest;
 import com.ecommerceagent.intelligence.model.ModelTurn;
@@ -42,16 +45,16 @@ public class AgentRuntime {
     private static final Logger log = LoggerFactory.getLogger(AgentRuntime.class);
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
 
-    private final ModelGatewayRouter gateways;
+    private final GovernedModelGateway gateway;
     private final ToolRegistry registry;
     private final AgentRuns runs;
     private final List<AgentHook> hooks;
     private final AgentSettings settings;
     private final Clock clock;
 
-    public AgentRuntime(ModelGatewayRouter gateways, ToolRegistry registry, AgentRuns runs, List<AgentHook> hooks,
+    public AgentRuntime(GovernedModelGateway gateway, ToolRegistry registry, AgentRuns runs, List<AgentHook> hooks,
             AgentSettings settings, Clock clock) {
-        this.gateways = gateways;
+        this.gateway = gateway;
         this.registry = registry;
         this.runs = runs;
         this.hooks = List.copyOf(hooks);
@@ -114,7 +117,7 @@ public class AgentRuntime {
             }
             hooks.forEach(hook -> hook.beforeAgentRun(context));
             Instant deadline = started.plus(limits.maxWallTime());
-            ModelGateway gateway = gateways.forModel(request.model());
+            gateway.capabilities(request.model());
             List<ToolSpec> specs = tools.definitions().stream().map(ToolDefinition::spec).toList();
             ToolDispatcher dispatcher = new ToolDispatcher(tools, new ToolExecutionContext(request.scope(), id,
                     request.snapshot()));
@@ -149,8 +152,22 @@ public class AgentRuntime {
                 ModelTurn turn;
                 try {
                     modelCalls++;
-                    turn = gateway.complete(call);
+                    turn = gateway.complete(request.scope(), new GovernedCall(automationType(), call, modelCalls,
+                            estimatedInput)).turn();
+                } catch (AiCallDenied denied) {
+                    // Nothing was sent: no cost, and the run ends on the governance decision (ADR-0027).
+                    step(AgentRunStep.Kind.MODEL_CALL, request.model().toString(), null, "DENIED", denied.reason(),
+                            deniedPayload(denied), callStarted);
+                    return finish(denied.budget() ? AgentRunStatus.LIMIT_EXCEEDED : AgentRunStatus.MODEL_FAILED,
+                            "AI_GOVERNANCE:" + denied.reason(), null);
                 } catch (ModelFailure failure) {
+                    if (failure instanceof GovernedModelFailure governedFailure && governedFailure.possiblyCharged()) {
+                        // The request may have been charged: it counts against the run at its reserved maximum.
+                        usageComplete = false;
+                        inputTokens += estimatedInput;
+                        outputTokens += outputCap;
+                        cost = cost.add(reserved);
+                    }
                     step(AgentRunStep.Kind.MODEL_CALL, request.model().toString(), null, "FAILED",
                             failure.type().name(), failurePayload(failure), callStarted);
                     return finish(AgentRunStatus.MODEL_FAILED, failure.type().name(), null);
@@ -230,6 +247,12 @@ public class AgentRuntime {
             inputTokens += in;
             outputTokens += out;
             cost = cost.add(price.cost(in, out));
+        }
+
+        /** The agent's name as the automation of its budget and ledger rows. */
+        private String automationType() {
+            String name = request.agent().name().toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9-]", "-");
+            return name.length() > 64 ? name.substring(0, 64) : name;
         }
 
         private int estimate(List<ToolSpec> offered) {
@@ -317,11 +340,20 @@ public class AgentRuntime {
         return payload;
     }
 
+    private static JsonNode deniedPayload(AiCallDenied denied) {
+        ObjectNode payload = NODES.objectNode();
+        payload.put("governance", denied.reason());
+        return payload;
+    }
+
     private static JsonNode failurePayload(ModelFailure failure) {
         ObjectNode payload = NODES.objectNode();
         payload.put("type", failure.type().name());
         payload.put("retryable", failure.retryable());
         payload.put("providerRequestId", failure.providerRequestId());
+        if (failure instanceof GovernedModelFailure governed) {
+            payload.put("possiblyCharged", governed.possiblyCharged());
+        }
         return payload;
     }
 }

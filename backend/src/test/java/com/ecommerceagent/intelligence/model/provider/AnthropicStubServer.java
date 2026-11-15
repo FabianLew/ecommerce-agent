@@ -1,4 +1,4 @@
-package com.ecommerceagent.intelligence.model;
+package com.ecommerceagent.intelligence.model.provider;
 
 import java.io.IOException;
 import java.io.InputStream;

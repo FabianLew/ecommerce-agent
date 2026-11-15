@@ -1,4 +1,4 @@
-package com.ecommerceagent.intelligence.model;
+package com.ecommerceagent.intelligence.model.provider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -8,6 +8,14 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
+import com.ecommerceagent.intelligence.model.ModelFailure;
+import com.ecommerceagent.intelligence.model.ModelId;
+import com.ecommerceagent.intelligence.model.ModelMessage;
+import com.ecommerceagent.intelligence.model.ModelRequest;
+import com.ecommerceagent.intelligence.model.ModelTurn;
+import com.ecommerceagent.intelligence.model.ModelUsage;
+import com.ecommerceagent.intelligence.model.ToolCall;
+import com.ecommerceagent.intelligence.model.ToolSpec;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;

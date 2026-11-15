@@ -9,8 +9,8 @@ import java.util.UUID;
 import com.ecommerceagent.TestcontainersConfiguration;
 import com.ecommerceagent.identity.TestScopes;
 import com.ecommerceagent.intelligence.agent.AgentSettings;
-import com.ecommerceagent.intelligence.agent.ModelGatewayRouter;
 import com.ecommerceagent.intelligence.knowledge.KnowledgeRegistry;
+import com.ecommerceagent.intelligence.model.provider.ProviderGateways;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +31,7 @@ import org.springframework.context.annotation.Import;
 class LiveQualityReportTest {
 
     @Autowired
-    ModelGatewayRouter gateways;
+    ProviderGateways gateways;
     @Autowired
     AgentSettings configured;
     @Autowired

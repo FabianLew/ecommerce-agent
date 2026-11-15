@@ -704,8 +704,30 @@ below.
   same usage again returns the first settlement; different usage for a closed reservation is a conflict.
 - Not covered yet: a correction after a conservative reconciliation when provider data arrives later (it is a
   conflict today and needs an adjustment entry), and the retention period of `ai_usage_event` (O-03).
-- Not yet: the `GovernedModelGateway` and the boundary test (step 3); run limits as versioned policies (step 4).
-  Until step 3 the agent runtime does not call the governor, and the agent stays off.
+
+**Stage 1, step 3: `GovernedModelGateway` and the enforced boundary.**
+
+- `GovernedModelGateway` (package `intelligence.model`) is the only path from the agent runtime to a provider. For
+  each model call it refuses what cannot be sent before reserving anything (deadline passed, provider not
+  configured, a surrounding database transaction that would keep the sent mark uncommitted), reserves the
+  conservative maximum with the idempotency key `agent-run:<run id>:call:<n>`, marks it sent, calls the provider,
+  and then settles the reported usage. A failure the adapter reports as an error response the provider does not
+  bill (`ModelFailure.confirmedNotCharged`, set by the Anthropic adapter for HTTP error responses) is settled at
+  zero; any other failure after sending, and an answer without usage, leaves the reservation `UNKNOWN`. When the
+  settlement itself fails, the answer is still used and the reservation is left to the sweep.
+- Gap 1 is closed: a possibly charged failure now counts against the run at its reserved maximum (tokens and cost),
+  so the next attempt starts with it in `costSpentBefore`. A call governance does not admit ends the run with
+  `AI_GOVERNANCE:<reason>`, `LIMIT_EXCEEDED` for budgets and `MODEL_FAILED` otherwise, and is never sent.
+- Gap 4 is closed: the provider adapters (`SpringAiAnthropicGateway`, `ProviderGateways`, which replaces
+  `ModelGatewayRouter`) moved to the internal package `intelligence.model.provider`, outside the `model` named
+  interface. `GovernedModelBoundaryTest` (ArchUnit, on the compiled application classes) fails the build when any
+  other class depends on that package, calls `ModelGateway.complete`, or uses a model SDK (Spring AI chat, Spring AI
+  Anthropic, the Anthropic SDK); the module rules of Spring Modulith keep other modules out of `intelligence`
+  internals. A deliberate bypass was checked to fail the test.
+- The runtime's in-run limits (`RunLimits`, the configured price list for the run's estimate) stay as they are until
+  step 4; the budgets, the catalog price and the ledger now apply to every call on top of them.
+- Not yet: run limits as versioned policies (step 4). The agent stays off on the pilot until stage 1 is complete,
+  and prices must be verified and budgets set before it can be switched on.
 
 ### Rollout relative to the pilot
 

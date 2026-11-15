@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.ecommerceagent.aigovernance.InMemoryAiGovernance;
 import com.ecommerceagent.decisions.ContextSnapshot;
 import com.ecommerceagent.decisions.PauseAd;
 import com.ecommerceagent.decisions.Recommendation;
@@ -21,8 +22,9 @@ import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.intelligence.agent.AgentRun;
 import com.ecommerceagent.intelligence.agent.AgentRuntime;
 import com.ecommerceagent.intelligence.agent.AgentSettings;
+import com.ecommerceagent.intelligence.model.GovernedModelGateway;
+import com.ecommerceagent.intelligence.model.provider.ProviderGateways;
 import com.ecommerceagent.intelligence.agent.InMemoryAgentRuns;
-import com.ecommerceagent.intelligence.agent.ModelGatewayRouter;
 import com.ecommerceagent.intelligence.agent.ToolRegistry;
 import com.ecommerceagent.intelligence.knowledge.KnowledgeRegistry;
 import com.ecommerceagent.metrics.CanonicalJson;
@@ -84,8 +86,11 @@ final class QualityHarness {
                 InMemoryAgentRuns runs);
     }
 
-    /** The real runtime, dispatcher, read tools and knowledge on the given model; runs are kept in memory. */
-    static Agent agent(String mode, ModelGatewayRouter gateways, AgentSettings settings, KnowledgeRegistry knowledge,
+    /**
+     * The real runtime, dispatcher, read tools and knowledge on the given model; runs and budget reservations are
+     * kept in memory.
+     */
+    static Agent agent(String mode, ProviderGateways gateways, AgentSettings settings, KnowledgeRegistry knowledge,
             Clock clock) {
         InventoryReadTools tools = new InventoryReadTools();
         ToolRegistry registry = new ToolRegistry(List.of(tools.inventoryForecastTool(RISK),
@@ -100,7 +105,9 @@ final class QualityHarness {
             @Override
             public Optional<InventoryAgentProposer.AgentProposal> propose(TrustedStoreScope scope,
                     ContextSnapshot snapshot, InMemoryAgentRuns runs) {
-                AgentRuntime runtime = new AgentRuntime(gateways, registry, runs, List.of(), settings, clock);
+                InMemoryAiGovernance governance = new InMemoryAiGovernance();
+                AgentRuntime runtime = new AgentRuntime(new GovernedModelGateway(gateways, governance, governance,
+                        clock), registry, runs, List.of(), settings, clock);
                 return new InventoryAgentProposer(runtime, runs, settings, knowledge, registry)
                         .propose(scope, snapshot.opportunityId(), snapshot);
             }
