@@ -47,6 +47,14 @@ public final class InMemoryAgentRuns extends AgentRuns {
     }
 
     @Override
+    public Optional<AgentRun> latestPaidSince(TrustedStoreScope scope, UUID opportunityId, java.time.Instant since) {
+        return started.values().stream().filter(run -> run.opportunityId().equals(opportunityId))
+                .filter(run -> !run.startedAt().isBefore(since)).map(this::run)
+                .filter(run -> run.status() == AgentRunStatus.RUNNING || run.modelCalls() > 0)
+                .max(java.util.Comparator.comparing(AgentRun::startedAt));
+    }
+
+    @Override
     public void markRejected(TrustedStoreScope scope, UUID runId, String codes) {
         Finish done = finished.get(runId);
         finished.put(runId, new Finish(AgentRunStatus.OUTPUT_REJECTED, codes, done.modelCalls(), done.toolCalls(),
@@ -60,7 +68,7 @@ public final class InMemoryAgentRuns extends AgentRuns {
                 start.contextSnapshotId(), start.agent().name(), start.agent().version(), start.skillRef(),
                 start.knowledgeHash(), start.promptHash(), start.toolsHash(), start.agent().outputSchemaVersion(),
                 start.agent().modelPolicy(), start.provider(), start.model(), start.priceList(),
-                start.limits().policy(),
+                start.limits().policy(), start.situation(),
                 done == null ? AgentRunStatus.RUNNING : done.status(), done == null ? null : done.stopReason(),
                 done == null ? 0 : done.modelCalls(), done == null ? 0 : done.toolCalls(),
                 done == null ? 0 : done.repairCalls(), done == null ? 0 : done.inputTokens(),

@@ -19,8 +19,11 @@ import org.springframework.context.annotation.Configuration;
  * them. Every run records the version and the limits. A changed default needs a new version
  * ({@code ParameterSetVersionTest}), and the cloud profile refuses an override that keeps the default version.
  * {@code maxAttempts} bounds the attempts of one analysis along the model policy (primary, then fallback); all of
- * them share {@code maxRunCostUsd}. The policy is read at start-up, so a change takes effect with the next start,
- * before which every running run has ended (a run lost by a stopped worker counts as a used attempt).
+ * them share {@code maxRunCostUsd}. {@code maxConcurrentRunsPerStore} bounds the active agent runs of a store, and
+ * {@code cooldown} is how long a paid analysis of an opportunity is not repeated for a new snapshot unless the
+ * situation changed materially (both since version 2; sections 6.2 and 7). The policy is read at start-up, so a
+ * change takes effect with the next start, before which every running run has ended (a run lost by a stopped worker
+ * counts as a used attempt).
  */
 @ConfigurationProperties(InventoryAgentRunPolicy.PREFIX)
 public record InventoryAgentRunPolicy(
@@ -33,9 +36,11 @@ public record InventoryAgentRunPolicy(
         @DefaultValue("4000") int maxOutputTokensPerRun,
         @DefaultValue("0.10") BigDecimal maxRunCostUsd,
         @DefaultValue("1") int maxRepairAttempts,
-        @DefaultValue("2") int maxAttempts) {
+        @DefaultValue("2") int maxAttempts,
+        @DefaultValue("1") int maxConcurrentRunsPerStore,
+        @DefaultValue("60m") Duration cooldown) {
 
-    public static final String DEFAULT_VERSION = "inventory-agent-run/1";
+    public static final String DEFAULT_VERSION = "inventory-agent-run/2";
 
     public static final String PREFIX = "operator.agent.run-policies.inventory-agent";
 
@@ -47,8 +52,11 @@ public record InventoryAgentRunPolicy(
         if (maxAttempts < 1) {
             throw new IllegalArgumentException(PREFIX + ".max-attempts must be at least 1");
         }
+        if (cooldown == null || cooldown.isNegative()) {
+            throw new IllegalArgumentException(PREFIX + ".cooldown must not be negative");
+        }
         limits(version, maxModelCalls, maxToolCalls, maxRunDuration, maxInputTokensPerCall, maxOutputTokensPerCall,
-                maxOutputTokensPerRun, maxRunCostUsd, maxRepairAttempts);
+                maxOutputTokensPerRun, maxRunCostUsd, maxRepairAttempts, maxConcurrentRunsPerStore);
     }
 
     /** The defaults of the current version, as bound without any configuration. */
@@ -59,7 +67,8 @@ public record InventoryAgentRunPolicy(
     /** The limits the runtime applies, with this policy's version. */
     public RunLimits limits() {
         return limits(version, maxModelCalls, maxToolCalls, maxRunDuration, maxInputTokensPerCall,
-                maxOutputTokensPerCall, maxOutputTokensPerRun, maxRunCostUsd, maxRepairAttempts);
+                maxOutputTokensPerCall, maxOutputTokensPerRun, maxRunCostUsd, maxRepairAttempts,
+                maxConcurrentRunsPerStore);
     }
 
     /** The parameters as recorded with every run, in a fixed order. */
@@ -75,18 +84,21 @@ public record InventoryAgentRunPolicy(
         parameters.put("maxRunCostUsd", maxRunCostUsd.stripTrailingZeros().toPlainString());
         parameters.put("maxRepairAttempts", Integer.toString(maxRepairAttempts));
         parameters.put("maxAttempts", Integer.toString(maxAttempts));
+        parameters.put("maxConcurrentRunsPerStore", Integer.toString(maxConcurrentRunsPerStore));
+        parameters.put("cooldown", cooldown.toString());
         return parameters;
     }
 
     private static RunLimits limits(String version, int maxModelCalls, int maxToolCalls, Duration maxRunDuration,
             int maxInputTokensPerCall, int maxOutputTokensPerCall, int maxOutputTokensPerRun, BigDecimal maxRunCostUsd,
-            int maxRepairAttempts) {
+            int maxRepairAttempts, int maxConcurrentRunsPerStore) {
         if (maxRunDuration == null || maxRunCostUsd == null) {
             throw new IllegalArgumentException(PREFIX + ": max-run-duration and max-run-cost-usd are required");
         }
         try {
             return new RunLimits(version, maxModelCalls, maxToolCalls, maxRunDuration, maxInputTokensPerCall,
-                    maxOutputTokensPerCall, maxOutputTokensPerRun, maxRunCostUsd, maxRepairAttempts);
+                    maxOutputTokensPerCall, maxOutputTokensPerRun, maxRunCostUsd, maxRepairAttempts,
+                    maxConcurrentRunsPerStore);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(PREFIX + ": " + e.getMessage(), e);
         }

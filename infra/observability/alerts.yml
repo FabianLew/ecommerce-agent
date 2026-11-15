@@ -100,6 +100,18 @@ groups:
         annotations:
           summary: "An AI call cost more than its reservation in the last 24 hours"
           runbook: docs/operations/runbooks.md#ai-cost-overrun
+      - alert: AiStopped
+        expr: max(operator_ai_stopped) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "The platform AI stop is on; agent runs are not admitted and the baseline proposes"
+          runbook: docs/operations/runbooks.md#ai-stopped
+      - alert: AiAdmissionDenied
+        expr: sum(increase(operator_ai_admissions_total{outcome=~"STORE_LIMIT|GLOBAL_LIMIT"}[1h])) > 10
+        labels: {severity: info}
+        annotations:
+          summary: "More than 10 agent runs in an hour were not admitted because of the concurrency limits"
+          runbook: docs/operations/runbooks.md#ai-admission-denied
 
   - name: operator-platform
     rules:

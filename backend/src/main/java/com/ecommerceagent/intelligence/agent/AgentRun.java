@@ -10,7 +10,7 @@ import tools.jackson.databind.JsonNode;
 public record AgentRun(UUID id, String analysisKey, int attempt, UUID opportunityId, UUID contextSnapshotId,
         String agentName, String agentVersion, String skillRef, String knowledgeHash, String promptHash,
         String toolsHash, String outputSchemaVersion, String modelPolicy, String provider, String model,
-        String priceList, String runPolicy, AgentRunStatus status, String stopReason, int modelCalls, int toolCalls,
-        int repairCalls, int inputTokens, int outputTokens, boolean usageComplete, BigDecimal estimatedCostUsd,
+        String priceList, String runPolicy, String situation, AgentRunStatus status, String stopReason,
+        int modelCalls, int toolCalls, int repairCalls, int inputTokens, int outputTokens, boolean usageComplete, BigDecimal estimatedCostUsd,
         JsonNode output, Instant startedAt, Instant finishedAt) {
 }

@@ -11,17 +11,18 @@ import java.util.Objects;
  * {@code policy} every run records. They apply to the whole run, repair included; the cost limit is shared by all
  * attempts of one analysis. {@code maxInputTokens} limits the estimated size of one request and
  * {@code maxOutputTokensPerCall} the output of one call; neither replaces the limits of the run.
+ * {@code maxConcurrentRunsPerStore} bounds the store's active runs of this agent (ADR-0027 section 6.2).
  */
 public record RunLimits(String policy, int maxModelCalls, int maxToolCalls, Duration maxWallTime, int maxInputTokens,
         int maxOutputTokensPerCall, int maxOutputTokensTotal, BigDecimal maxEstimatedCostUsd,
-        int maxOutputRepairCalls) {
+        int maxOutputRepairCalls, int maxConcurrentRunsPerStore) {
 
     public RunLimits {
         Objects.requireNonNull(policy, "policy");
         Objects.requireNonNull(maxWallTime, "maxWallTime");
         Objects.requireNonNull(maxEstimatedCostUsd, "maxEstimatedCostUsd");
         if (maxModelCalls < 1 || maxToolCalls < 0 || maxInputTokens < 1 || maxOutputTokensPerCall < 1
-                || maxOutputRepairCalls < 0) {
+                || maxOutputRepairCalls < 0 || maxConcurrentRunsPerStore < 1) {
             throw new IllegalArgumentException("Run policy " + policy + " has a limit out of range");
         }
         if (maxOutputTokensTotal < maxOutputTokensPerCall) {
@@ -48,6 +49,7 @@ public record RunLimits(String policy, int maxModelCalls, int maxToolCalls, Dura
         recorded.put("maxOutputTokensTotal", Integer.toString(maxOutputTokensTotal));
         recorded.put("maxEstimatedCostUsd", maxEstimatedCostUsd.stripTrailingZeros().toPlainString());
         recorded.put("maxOutputRepairCalls", Integer.toString(maxOutputRepairCalls));
+        recorded.put("maxConcurrentRunsPerStore", Integer.toString(maxConcurrentRunsPerStore));
         return recorded;
     }
 }

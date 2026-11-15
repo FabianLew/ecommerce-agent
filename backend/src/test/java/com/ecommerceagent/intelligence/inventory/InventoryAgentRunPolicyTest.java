@@ -16,12 +16,12 @@ import org.springframework.boot.context.properties.source.MapConfigurationProper
 class InventoryAgentRunPolicyTest {
 
     @Test
-    void theDefaultsAreTheLimitsThatWereCodeBefore() {
+    void theDefaultsOfVersionTwo() {
         InventoryAgentRunPolicy policy = InventoryAgentRunPolicy.defaults();
 
-        assertThat(policy.version()).isEqualTo("inventory-agent-run/1");
+        assertThat(policy.version()).isEqualTo("inventory-agent-run/2");
         var limits = policy.limits();
-        assertThat(limits.policy()).isEqualTo("inventory-agent-run/1");
+        assertThat(limits.policy()).isEqualTo("inventory-agent-run/2");
         assertThat(limits.maxModelCalls()).isEqualTo(5);
         assertThat(limits.maxToolCalls()).isEqualTo(8);
         assertThat(limits.maxWallTime()).isEqualTo(Duration.ofSeconds(60));
@@ -31,17 +31,19 @@ class InventoryAgentRunPolicyTest {
         assertThat(limits.maxEstimatedCostUsd()).isEqualByComparingTo("0.10");
         assertThat(limits.maxOutputRepairCalls()).isEqualTo(1);
         assertThat(policy.maxAttempts()).isEqualTo(2);
+        assertThat(limits.maxConcurrentRunsPerStore()).isEqualTo(1);
+        assertThat(policy.cooldown()).isEqualTo(Duration.ofMinutes(60));
         assertThat(limits.recorded()).containsEntry("maxEstimatedCostUsd", "0.1").containsEntry("maxWallTime", "PT1M");
     }
 
     @Test
     void anOverrideBindsWithItsOwnVersion() {
         InventoryAgentRunPolicy policy = bind(Map.of(
-                InventoryAgentRunPolicy.PREFIX + ".version", "inventory-agent-run/2",
+                InventoryAgentRunPolicy.PREFIX + ".version", "inventory-agent-run/3",
                 InventoryAgentRunPolicy.PREFIX + ".max-run-cost-usd", "0.08",
                 InventoryAgentRunPolicy.PREFIX + ".max-model-calls", "3"));
 
-        assertThat(policy.limits().policy()).isEqualTo("inventory-agent-run/2");
+        assertThat(policy.limits().policy()).isEqualTo("inventory-agent-run/3");
         assertThat(policy.limits().maxEstimatedCostUsd()).isEqualByComparingTo(new BigDecimal("0.08"));
         assertThat(policy.limits().maxModelCalls()).isEqualTo(3);
     }

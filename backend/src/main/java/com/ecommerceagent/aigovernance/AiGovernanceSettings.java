@@ -13,7 +13,8 @@ import org.springframework.context.annotation.Configuration;
  * {@code operator.ai-governance} (ADR-0027): the safety margin added to estimated input tokens, how old a price
  * verification may be before the price is refused, how long a reservation may stay open before the sweep closes it,
  * and after how long an {@code UNKNOWN} reservation is reconciled conservatively at its full reserved amount
- * ({@code unknown-conservative-settlement-enabled=false} leaves every {@code UNKNOWN} to a person).
+ * ({@code unknown-conservative-settlement-enabled=false} leaves every {@code UNKNOWN} to a person), and how many
+ * agent runs may be active on the whole platform at once ({@code max-concurrent-runs}, section 6.2).
  */
 @ConfigurationProperties(prefix = "operator.ai-governance", ignoreUnknownFields = false)
 public record AiGovernanceSettings(
@@ -23,7 +24,8 @@ public record AiGovernanceSettings(
         @DefaultValue("1m") Duration sweepInterval,
         @DefaultValue("500") int sweepBatchSize,
         @DefaultValue("true") boolean unknownConservativeSettlementEnabled,
-        @DefaultValue("24h") Duration unknownConservativeSettlementAfter) {
+        @DefaultValue("24h") Duration unknownConservativeSettlementAfter,
+        @DefaultValue("8") int maxConcurrentRuns) {
 
     public AiGovernanceSettings {
         Objects.requireNonNull(inputTokenMargin, "inputTokenMargin");
@@ -36,6 +38,9 @@ public record AiGovernanceSettings(
         }
         if (sweepInterval.isNegative() || sweepInterval.isZero() || sweepBatchSize < 1 || sweepBatchSize > 10_000) {
             throw new IllegalArgumentException("operator.ai-governance sweep settings are out of range");
+        }
+        if (maxConcurrentRuns < 1 || maxConcurrentRuns > 1_000) {
+            throw new IllegalArgumentException("operator.ai-governance.max-concurrent-runs is out of range");
         }
         if (unknownConservativeSettlementAfter.compareTo(Duration.ofMinutes(1)) < 0) {
             throw new IllegalArgumentException(

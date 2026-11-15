@@ -126,8 +126,9 @@ public class GuardianActivitiesImpl implements GuardianActivities {
             return outcome(stored.get(), null);
         }
         ContextSnapshot snapshot = snapshots.find(scope, snapshotKey).orElseThrow();
-        String fallback = agent.enabled() ? "AGENT_FAILED" : "AGENT_DISABLED";
-        Optional<InventoryAgentProposer.AgentProposal> proposal = agent.propose(scope, opportunity, snapshot);
+        InventoryAgentProposer.AgentDecision decision = agent.decide(scope, opportunity, snapshot);
+        String fallback = decision.fallback();
+        Optional<InventoryAgentProposer.AgentProposal> proposal = decision.proposal();
         if (proposal.isPresent()) {
             ProposalSubmission submission = proposals.submit(scope, opportunity, snapshotKey,
                     proposal.get().proposer(), proposal.get().agentRunId(), proposal.get().recommendation(),

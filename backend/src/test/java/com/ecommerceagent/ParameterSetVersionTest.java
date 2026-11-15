@@ -27,7 +27,9 @@ class ParameterSetVersionTest {
             "inventory-protection@1.1.0",
             "ff9b88ec7c30fc6fd17603a85728dd49dcf67a20b6e66f18ca3ebf5797b6c11c",
             "inventory-agent-run/1",
-            "f990175a0d3dc623a2fdcee5a5a95954fb0c7b8606269b54c08b59df4a3b41a6");
+            "f990175a0d3dc623a2fdcee5a5a95954fb0c7b8606269b54c08b59df4a3b41a6",
+            "inventory-agent-run/2",
+            "6642229c6f9dd07dee8083bdd650a78bb53ec2374b988cadfa635aa89ea0510c");
 
     @Test
     void theDefaultsOfTheDetectorMatchTheirVersion() {

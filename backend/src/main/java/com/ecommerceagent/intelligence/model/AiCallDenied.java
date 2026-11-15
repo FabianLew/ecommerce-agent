@@ -19,9 +19,17 @@ public class AiCallDenied extends RuntimeException {
         return reason;
     }
 
-    /** A budget, not a price or configuration problem: the run ended on a limit. */
+    /** The platform AI stop is on, or the run was not admitted while it was on. */
+    public boolean stopped() {
+        return reason.equals(AI_STOPPED);
+    }
+
+    public static final String AI_STOPPED = "AI_STOPPED";
+
+    /** A budget or concurrency limit, not a price or configuration problem: the run ended on a limit. */
     public boolean budget() {
         return reason.startsWith("BUDGET_EXHAUSTED") || reason.startsWith("NO_PLATFORM_BUDGET")
-                || reason.startsWith("NO_STORE_BUDGET");
+                || reason.startsWith("NO_STORE_BUDGET") || reason.equals("STORE_LIMIT")
+                || reason.equals("GLOBAL_LIMIT");
     }
 }

@@ -175,7 +175,7 @@ operator:
     # override needs its own version (inventory-agent-run/N), which the cloud profile checks.
     # run-policies:
     #   inventory-agent:
-    #     version: inventory-agent-run/2
+    #     version: inventory-agent-run/3
     #     max-run-cost-usd: "0.08"
     # USD per million tokens. Check against the provider before switching the agent on; change the version with it.
     price-list:

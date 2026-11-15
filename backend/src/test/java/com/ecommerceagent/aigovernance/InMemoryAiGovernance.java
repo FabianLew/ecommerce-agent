@@ -15,7 +15,7 @@ import com.ecommerceagent.identity.TrustedStoreScope;
  * life of each call. The real governance is tested on PostgreSQL ({@link AiBudgetGovernorTest},
  * {@link AiUsageLedgerTest}).
  */
-public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedger {
+public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedger, AiAdmission {
 
     public static final BigDecimal AMOUNT = new BigDecimal("0.01");
 
@@ -23,6 +23,60 @@ public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedg
     private final Map<UUID, Reservation> byId = new LinkedHashMap<>();
     private final List<String> events = new ArrayList<>();
     private String denyReason;
+    private boolean stopped;
+    private String broken;
+
+    /** Makes the named step fail as a broken database would ({@code admit}, {@code reserve} or {@code markSent}). */
+    public synchronized void breakStep(String step) {
+        this.broken = step;
+    }
+
+    private void failIfBroken(String step) {
+        if (step.equals(broken)) {
+            throw new IllegalStateException("governance unavailable: " + step);
+        }
+    }
+    private Admission admission = Admission.GRANTED;
+    private final java.util.Set<UUID> leases = new java.util.LinkedHashSet<>();
+
+    /** Turns the platform AI stop on or off: no run is admitted and no reserved call is sent while it is on. */
+    public synchronized void stop(boolean on) {
+        this.stopped = on;
+    }
+
+    /** The answer for the next admissions (GRANTED by default). */
+    public synchronized void admission(Admission answer) {
+        this.admission = answer;
+    }
+
+    /** Runs that hold a lease now. */
+    public synchronized java.util.Set<UUID> leases() {
+        return java.util.Set.copyOf(leases);
+    }
+
+    @Override
+    public synchronized Admission admit(TrustedStoreScope scope, UUID agentRunId, String automationType,
+            int maxStoreRuns, java.time.Duration ttl) {
+        failIfBroken("admit");
+        Admission answer = stopped ? Admission.AI_STOPPED : admission;
+        events.add("ADMISSION:" + answer + ":" + maxStoreRuns);
+        if (answer.granted()) {
+            leases.add(agentRunId);
+        }
+        return answer;
+    }
+
+    @Override
+    public synchronized void release(TrustedStoreScope scope, UUID agentRunId) {
+        if (leases.remove(agentRunId)) {
+            events.add("LEASE_RELEASED");
+        }
+    }
+
+    @Override
+    public synchronized boolean stopped() {
+        return stopped;
+    }
 
     /** One reservation as a test sees it. */
     public static final class Reservation {
@@ -65,6 +119,7 @@ public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedg
 
     @Override
     public synchronized ReservationDecision reserve(TrustedStoreScope scope, ReservationRequest request) {
+        failIfBroken("reserve");
         if (denyReason != null) {
             events.add("DENIED:" + denyReason);
             return new ReservationDecision.Denied(denyReason);
@@ -99,9 +154,15 @@ public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedg
 
     @Override
     public synchronized SendDecision markSent(TrustedStoreScope scope, UUID reservationId) {
+        failIfBroken("markSent");
         Reservation reservation = byId.get(reservationId);
         if (!"RESERVED".equals(reservation.state)) {
             return "RELEASED".equals(reservation.state) ? SendDecision.RELEASED : SendDecision.ALREADY_ATTEMPTED;
+        }
+        if (stopped) {
+            reservation.state = "RELEASED";
+            events.add("STOPPED:" + reservation.key);
+            return SendDecision.STOPPED;
         }
         reservation.state = "IN_PROGRESS";
         events.add("SENT:" + reservation.key);
