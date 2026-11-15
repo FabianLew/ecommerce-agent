@@ -332,6 +332,35 @@ class AgentRuntimeSafetyTest {
         assertThat(model.requests()).hasSize(5);
     }
 
+    /**
+     * ADR-0027 criteria 18 and 21: nothing the model writes chooses the model or changes a limit. No tool takes a
+     * model, a token or a cost argument; arguments that try are rejected; every request keeps the configured model and
+     * output cap, and the run still ends at its call limit.
+     */
+    @Test
+    void theModelCannotChooseAModelOrChangeALimit() {
+        String injected = "{\"productVariantId\":\"" + VARIANT + "\",\"model\":\"fake/fallback\","
+                + "\"maxModelCalls\":100,\"maxOutputTokens\":100000,\"maxEstimatedCostUsd\":1000}";
+        for (int i = 0; i < 6; i++) {
+            model.thenTools(call("t" + i, InventoryReadTools.REPLENISHMENT, injected));
+        }
+
+        AgentRunResult result = run();
+
+        assertThat(result.status()).isEqualTo(AgentRunStatus.LIMIT_EXCEEDED);
+        assertThat(result.stopReason()).isEqualTo("MAX_MODEL_CALLS");
+        assertThat(model.requests()).hasSize(POLICY.limits().maxModelCalls())
+                .allSatisfy(request -> {
+                    assertThat(request.model()).isEqualTo(PRIMARY);
+                    assertThat(request.maxOutputTokens()).isLessThanOrEqualTo(POLICY.limits().maxOutputTokensPerCall());
+                    assertThat(request.tools()).allSatisfy(tool -> assertThat(tool.inputSchema().toLowerCase())
+                            .doesNotContain("\"model\"", "token", "cost", "budget", "limit"));
+                });
+        for (int i = 0; i < 4; i++) {
+            assertThat(toolResult(result, i).get("error").asString()).isEqualTo("INVALID_ARGUMENTS");
+        }
+    }
+
     @Test
     void toolCallLimitStopsBeforeAnyCallOverTheLimitRuns() {
         ToolCall[] calls = new ToolCall[9];

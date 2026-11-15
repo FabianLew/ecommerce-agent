@@ -966,3 +966,28 @@ after a stream started and for calls that were never sent.
   `operator_ai_admissions_total{priority}` and `operator_ai_admission_waits_total{reason,outcome}`, alert
   `AiAdmissionWaitExhausted`. Histories of version 1 and earlier replay unchanged; a recorded version 2 history is
   replayed in `InventoryGuardianWorkflowTest`.
+
+### Acceptance criteria coverage (section 16)
+
+Every criterion has at least one automated test on a real PostgreSQL (Testcontainers), the Temporal test server or a
+fake model; none needs a paid call.
+
+| Criteria | Tests |
+|---|---|
+| A1 | `GovernedModelBoundaryTest`, `AgentRuntimeSafetyTest.everyModelCallIsReservedAndMarkedSentBeforeTheProviderSeesItAndSettledAfter` |
+| A2–A8 | `AiBudgetGovernorTest` (store, organization and platform exhaustion, parallel reservations, idempotent repeat, stricter policy, new period) |
+| B9–B10, B15 | `AiUsageLedgerTest` (settlement, parallel double settlement, overrun) |
+| B11–B13 | `AiUsageLedgerTest` (worker dies before or after sending, timeout or lost response is `UNKNOWN`), `AgentRuntimeSafetyTest.aTimeoutIsPossiblyChargedAndCountsAgainstTheRun` |
+| B14 | `AiUsageLedgerTest.aNewPriceVersionNeverChangesTheCostOfEarlierCalls`, `AiBudgetGovernorTest.onlyAVerifiedRecentCurrentPriceAdmitsACall` |
+| C16–C17, C20 | `AgentRuntimeSafetyTest` (call, tool, wall-time and cost limits, shared cost across attempts, budget exhausted during a run) |
+| C18, C21 | `AgentRuntimeSafetyTest.theModelCannotChooseAModelOrChangeALimit`, `argumentsOutsideTheClosedSchemaAreRejectedBeforeTheToolRuns` |
+| C19 | `GovernedModelBoundaryTest` (ArchUnit) |
+| D22 | `InventoryGuardianAgentTest.aRepeatedStartOfTheSameEpisodeStartsNoSecondAgentRun`, `WooWebhookApiTest`, `OutboxDispatchTest` |
+| D23 | `AiBudgetGovernorTest.aStoreCannotTouchAnotherStoresReservation`, `AiUsageLedgerTest.aStoreCannotSettleReadOrWriteAnotherStoresUsage`, `RowLevelSecurityTest` |
+| D24 | `AiAdmissionTest` (store limit, parallel admissions, reserved slots) |
+| D25 | `AiBudgetGovernorTest.theRuntimeCannotWriteBudgetsOrReadPlatformEconomics`, `PlatformAiApiTest` |
+| D26 | `AiAdmissionTest.theStopRefusesNewRunsAndReservedCallsAndOnlyOperationsCanChangeIt`, `AiScopedStopTest`, `AgentRuntimeSafetyTest` stop cases |
+| D27 | `AgentRuntimeSafetyTest.allAttemptsFailingLeavesTheBaselineToTheCaller`, `InventoryGuardianAgentTest.ig28FailingModelsFallBackToTheBaselineAndEveryAttemptIsRecorded` |
+| E28–E30 | `AiUsageLedgerTest` (crash before and after sending, reconciliation), `AiReconciliationTest` |
+| E31 | `AiAdmissionTest.anExpiredLeaseOfALostWorkerDoesNotBlockTheStore` (limits live in PostgreSQL, not in a worker), `GuardianFaultInjectionTest` |
+| E32 | `AgentRuntimeSafetyTest.aFailingGovernanceFailsClosed`, `AiBudgetGovernorTest.governanceIsBoundToTheScopeItIsGivenAndFailsClosedWithoutOne` |
