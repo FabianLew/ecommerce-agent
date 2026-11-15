@@ -47,6 +47,7 @@ class PlatformAiApiTest {
         mvc.perform(get("/api/v1/platform/ai/reservations/uncertain")).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/v1/platform/ai/reservations/uncertain").with(user(member)))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        mvc.perform(get("/api/v1/platform/ai/budget-alerts").with(user(member))).andExpect(status().isForbidden());
         mvc.perform(post("/api/v1/platform/ai/reservations/{id}/reconciliation", UUID.randomUUID())
                         .with(user(member)).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isForbidden());
@@ -64,6 +65,10 @@ class PlatformAiApiTest {
         mvc.perform(get("/api/v1/platform/ai/reservations/uncertain").with(user(operator)))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.items").isArray())
                 .andExpect(jsonPath("$.hasMore").value(false));
+        mvc.perform(get("/api/v1/platform/ai/budget-alerts").with(user(operator)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.items").isArray());
+        mvc.perform(get("/api/v1/platform/ai/budget-alerts").param("limit", "0").with(user(operator)))
+                .andExpect(status().isBadRequest());
         mvc.perform(get("/api/v1/platform/ai/reservations/uncertain").param("limit", "0").with(user(operator)))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_LIMIT"));
         mvc.perform(post("/api/v1/platform/ai/reservations/{id}/reconciliation", UUID.randomUUID())

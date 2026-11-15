@@ -20,6 +20,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/ai/budget-alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["budgetAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/ai/reservations/uncertain": {
         parameters: {
             query?: never;
@@ -978,6 +994,33 @@ export interface components {
             /** @description Business summary of a decision */
             summary?: string;
         };
+        BudgetAlertDto: {
+            /** @description Decimal string */
+            amountLimit: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** @description ISO 4217 code */
+            currency: string;
+            /** Format: uuid */
+            id: string;
+            /** @description PLATFORM, ORGANIZATION, STORE or AUTOMATION */
+            level: string;
+            /** Format: uuid */
+            organizationId?: string;
+            /** Format: date-time */
+            periodEnd: string;
+            /** Format: date-time */
+            periodStart: string;
+            /** @description MONTHLY or DAILY */
+            periodType: string;
+            scopeKey: string;
+            /** Format: uuid */
+            storeId?: string;
+            /** Format: int32 */
+            thresholdPercent: number;
+            /** @description Reserved plus spent when the threshold was reached; decimal string */
+            usedAmount: string;
+        };
         CandidateResponse: {
             displayName?: string;
             /** Format: uuid */
@@ -1377,6 +1420,11 @@ export interface components {
         ListResponseAiStopDto: {
             hasMore: boolean;
             items: components["schemas"]["AiStopDto"][];
+            nextCursor?: string;
+        };
+        ListResponseBudgetAlertDto: {
+            hasMore: boolean;
+            items: components["schemas"]["BudgetAlertDto"][];
             nextCursor?: string;
         };
         ListResponseIntegrationResponse: {
@@ -1933,6 +1981,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    budgetAlerts: {
+        parameters: {
+            query?: {
+                since?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListResponseBudgetAlertDto"];
                 };
             };
             /** @description Missing or invalid access token */

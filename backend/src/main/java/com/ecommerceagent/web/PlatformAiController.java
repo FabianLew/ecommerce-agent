@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.UUID;
 
 import com.ecommerceagent.aigovernance.Adjustment;
+import com.ecommerceagent.aigovernance.AiBudgetAlert;
+import com.ecommerceagent.aigovernance.AiBudgetAlerts;
 import com.ecommerceagent.aigovernance.AiReconciliation;
 import com.ecommerceagent.aigovernance.AiReconciliationException;
 import com.ecommerceagent.aigovernance.AiStopChange;
@@ -37,11 +39,27 @@ class PlatformAiController {
     private final PlatformOperators operators;
     private final AiReconciliation reconciliation;
     private final AiStops stops;
+    private final AiBudgetAlerts budgetAlerts;
 
-    PlatformAiController(PlatformOperators operators, AiReconciliation reconciliation, AiStops stops) {
+    PlatformAiController(PlatformOperators operators, AiReconciliation reconciliation, AiStops stops,
+            AiBudgetAlerts budgetAlerts) {
         this.operators = operators;
         this.reconciliation = reconciliation;
         this.stops = stops;
+        this.budgetAlerts = budgetAlerts;
+    }
+
+    /** Budgets that reached an alert threshold, newest first; amounts in the budget's currency. */
+    @GetMapping("/budget-alerts")
+    ListResponse<BudgetAlertDto> budgetAlerts(RegisteredUser user,
+            @RequestParam(name = "since", required = false) Instant since,
+            @RequestParam(name = "limit", defaultValue = "100") int limit) {
+        if (limit < 1 || limit > 1000) {
+            throw new InvalidQueryException("INVALID_LIMIT");
+        }
+        PlatformOperator operator = operators.require(user.id());
+        return ListResponse.complete(budgetAlerts.recent(operator, since, limit).stream()
+                .map(BudgetAlertDto::from).toList());
     }
 
     /** The scoped AI stops in force now (the platform stop is shown by the {@code operator_ai_stopped} gauge). */
@@ -106,6 +124,31 @@ class PlatformAiController {
             return ReconciliationOutcome.valueOf(String.valueOf(value));
         } catch (IllegalArgumentException e) {
             throw new AiReconciliationException(AiReconciliationException.Kind.INVALID, "UNKNOWN_OUTCOME", e);
+        }
+    }
+
+    record BudgetAlertDto(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID id,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED,
+                    description = "PLATFORM, ORGANIZATION, STORE or AUTOMATION") String level,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String scopeKey,
+            UUID organizationId,
+            UUID storeId,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "MONTHLY or DAILY") String periodType,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant periodStart,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant periodEnd,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int thresholdPercent,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "Decimal string") String amountLimit,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED,
+                    description = "Reserved plus spent when the threshold was reached; decimal string")
+            String usedAmount,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED, description = "ISO 4217 code") String currency,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant createdAt) {
+
+        static BudgetAlertDto from(AiBudgetAlert a) {
+            return new BudgetAlertDto(a.id(), a.level(), a.scopeKey(), a.organizationId(), a.storeId(),
+                    a.periodType(), a.periodStart(), a.periodEnd(), a.thresholdPercent(),
+                    a.amountLimit().toPlainString(), a.usedAmount().toPlainString(), a.currency(), a.createdAt());
         }
     }
 

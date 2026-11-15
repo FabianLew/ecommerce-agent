@@ -925,3 +925,15 @@ after a stream started and for calls that were never sent.
   everything stays with the administration role. A store reads the decisions about itself. Gauge
   `operator_ai_stops_active`, alert `AiScopedStopActive` after a day. New definer functions: `ai_change_stop`,
   `ai_stop_changes`; `ai_acquire_run_lease` and `ai_mark_sent` are replaced with the scoped checks.
+- **E-54.7, budget alerts.** The worker compares every budget of the current periods, at every level, with the
+  thresholds of the versioned parameter set `ai-budget-alerts/1` (`operator.ai-budget-alerts.threshold-percents`,
+  default 70, 90, 100) every 5 minutes. A threshold reached for the first time in a period is recorded once in
+  `ai_budget_alert` (V39, append-only, unique per balance and threshold, so repeated or parallel evaluations record
+  nothing twice and a new period starts again), with the limit, the usage (reserved plus spent), the currency and the
+  parameter version. It is counted in `operator_ai_budget_alerts_total` (alert `AiBudgetThresholdReached`), logged,
+  and published as `AiBudgetThresholdReached` for a later e-mail or chat channel to platform operators. Platform
+  operators read the alerts (`GET /api/v1/platform/ai/budget-alerts`); stores never see them. The hard limit is still
+  enforced at reservation, fail closed, and nothing stops automatically on an alert. Amounts stay in the technical
+  currency (USD) with their ISO code in every API answer; the frontend formats any currency
+  (`formatMoney`, tested with USD, EUR and PLN), never assuming PLN. New definer functions:
+  `ai_record_budget_alerts`, `ai_budget_alerts`.

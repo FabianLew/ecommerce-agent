@@ -92,6 +92,21 @@ The estimated model cost passed 20 USD in a day. Check whether the number of ana
 many) or the runs grew (more model calls per run). Reduce the run limits or switch the agent off; the price version
 of every call is on its reservation (`ai_budget_reservation.price_id`, catalog `ai_price`).
 
+### AI budget threshold reached
+
+An AI budget (platform, organization, store or automation; monthly or daily) reached a threshold of its limit: by
+default 70, 90 and 100 percent (parameter set `operator.ai-budget-alerts`, a change needs a new version
+`ai-budget-alerts/N`). Each threshold is recorded once per budget period in `ai_budget_alert`; usage is reserved
+plus spent. Amounts are in the budget's currency (USD) and are never converted.
+
+1. See which budget: `GET /api/v1/platform/ai/budget-alerts` (platform operators), or the log line
+   `AI budget ... reached`.
+2. At 70 or 90 percent: check whether the growth is expected (more stores, more analyses) or a runaway (see "Agent
+   cost high"). Nothing stops on its own before the limit.
+3. At 100 percent new calls of that budget are already refused (fail closed) and the baseline proposes. Raise the
+   limit with a new budget policy version, or stop AI for the store or automation if the spending is not wanted.
+   No stop is switched on automatically.
+
 ### AI reservation unknown
 
 An AI call was sent and its result is not known (timeout, dropped connection, worker crash after sending), so it may

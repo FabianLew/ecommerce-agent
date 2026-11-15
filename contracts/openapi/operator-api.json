@@ -450,6 +450,63 @@
         "required" : [ "kind" ],
         "type" : "object"
       },
+      "BudgetAlertDto" : {
+        "properties" : {
+          "amountLimit" : {
+            "description" : "Decimal string",
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "currency" : {
+            "description" : "ISO 4217 code",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "level" : {
+            "description" : "PLATFORM, ORGANIZATION, STORE or AUTOMATION",
+            "type" : "string"
+          },
+          "organizationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "periodEnd" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "periodStart" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "periodType" : {
+            "description" : "MONTHLY or DAILY",
+            "type" : "string"
+          },
+          "scopeKey" : {
+            "type" : "string"
+          },
+          "storeId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "thresholdPercent" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "usedAmount" : {
+            "description" : "Reserved plus spent when the threshold was reached; decimal string",
+            "type" : "string"
+          }
+        },
+        "required" : [ "amountLimit", "createdAt", "currency", "id", "level", "periodEnd", "periodStart", "periodType", "scopeKey", "thresholdPercent", "usedAmount" ],
+        "type" : "object"
+      },
       "CandidateResponse" : {
         "properties" : {
           "displayName" : {
@@ -1472,6 +1529,24 @@
           "items" : {
             "items" : {
               "$ref" : "#/components/schemas/AiStopDto"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "hasMore", "items" ],
+        "type" : "object"
+      },
+      "ListResponseBudgetAlertDto" : {
+        "properties" : {
+          "hasMore" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/BudgetAlertDto"
             },
             "type" : "array"
           },
@@ -2904,6 +2979,52 @@
           }
         },
         "tags" : [ "identity-controller" ]
+      }
+    },
+    "/api/v1/platform/ai/budget-alerts" : {
+      "get" : {
+        "operationId" : "budgetAlerts",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "since",
+          "required" : false,
+          "schema" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 100,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ListResponseBudgetAlertDto"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          }
+        },
+        "tags" : [ "platform-ai-controller" ]
       }
     },
     "/api/v1/platform/ai/reservations/uncertain" : {
