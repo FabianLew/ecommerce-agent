@@ -53,6 +53,17 @@ public class InventoryGuardianWorkflowImpl implements InventoryGuardianWorkflow 
                             .build())
                     .build());
 
+    /** Notification (document 03 §8): short, a few attempts; its failure never undoes or repeats the action. */
+    private final GuardianActivities notifying = Workflow.newActivityStub(GuardianActivities.class,
+            ActivityOptions.newBuilder()
+                    .setStartToCloseTimeout(Duration.ofSeconds(10))
+                    .setRetryOptions(RetryOptions.newBuilder()
+                            .setInitialInterval(Duration.ofSeconds(1))
+                            .setBackoffCoefficient(2)
+                            .setMaximumAttempts(3)
+                            .build())
+                    .build());
+
     /** The agent path (ADR-0016): model attempts take longer than the other steps; the step itself is idempotent. */
     private final GuardianActivities proposing = Workflow.newActivityStub(GuardianActivities.class,
             ActivityOptions.newBuilder()
@@ -179,6 +190,7 @@ public class InventoryGuardianWorkflowImpl implements InventoryGuardianWorkflow 
                 if (Workflow.getVersion(APPROVAL_EXECUTION_CHANGE, Workflow.DEFAULT_VERSION, 1) == 1
                         && activities.awaitsApproval(proposalId)) {
                     awaitingApproval = true;
+                    notifySafely(() -> notifying.notifyDecisionNeeded(proposalId));
                     return now + APPROVAL_LOOKUP.toMillis();
                 }
                 return null;
@@ -245,7 +257,18 @@ public class InventoryGuardianWorkflowImpl implements InventoryGuardianWorkflow 
             // UNKNOWN, FAILED, CONFLICT: nothing is undone automatically; a person decides (escalation).
             default -> opportunityStatus = activities.moveTo(input.opportunityId(), "AWAITING_DECISION", null);
         }
+        String reported = executionId;
+        notifySafely(() -> notifying.notifyOutcome(reported));
         return null;
+    }
+
+    /** A notification failure never changes the episode or the action (IG-23); the sweep retries the e-mail. */
+    private static void notifySafely(Runnable step) {
+        try {
+            step.run();
+        } catch (io.temporal.failure.ActivityFailure e) {
+            log.warn("Notification step failed, the episode continues: {}", e.getMessage());
+        }
     }
 
     private Long waitForData(GuardianInput input, long now) {

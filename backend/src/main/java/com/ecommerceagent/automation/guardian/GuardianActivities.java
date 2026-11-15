@@ -43,6 +43,12 @@ public interface GuardianActivities {
     /** One verification read of the execution; the last one turns an unconfirmed pause into UNKNOWN. */
     ExecutionRef verifyExecution(String executionId, boolean last);
 
+    /** Tells the approvers that the proposal waits for them (ADR-0021); idempotent per proposal revision. */
+    void notifyDecisionNeeded(String proposalId);
+
+    /** Tells the approvers how the execution ended (ADR-0021); idempotent per execution and status. */
+    void notifyOutcome(String executionId);
+
     /** Marks the active proposal superseded and the episode resolved. */
     void resolve(String opportunityId, String proposalId);
 }

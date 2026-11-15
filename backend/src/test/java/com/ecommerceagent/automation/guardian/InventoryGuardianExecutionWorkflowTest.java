@@ -237,6 +237,9 @@ class InventoryGuardianExecutionWorkflowTest {
         assertThat(GRAPH.requests.stream().filter(r -> r.method().equals("POST")).count()).isEqualTo(1);
         assertThat(jdbc.sql("SELECT status FROM action_execution WHERE store_id = ?").param(STORE)
                 .query(String.class).list()).containsExactly("VERIFIED");
+        // The approvers were told twice: a decision is needed, then the confirmed pause (ADR-0021).
+        assertThat(jdbc.sql("SELECT kind FROM operator_notification WHERE store_id = ? ORDER BY created_at")
+                .param(STORE).query(String.class).list()).containsExactly("DECISION_NEEDED", "ACTION_VERIFIED");
 
         String id = InventoryGuardianWorkflow.workflowId(STORE, serum.toString(), episode.id().toString());
         WorkflowReplayer.replayWorkflowExecution(client.fetchHistory(id), InventoryGuardianWorkflowImpl.class);

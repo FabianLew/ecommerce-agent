@@ -50,6 +50,7 @@ public class GuardianActivitiesImpl implements GuardianActivities {
     private final ExecutionAuthority authority;
     private final AdPauseExecutor executor;
     private final ExecutionLedger ledger;
+    private final GuardianNotifications notifications;
     private final TransactionTemplate transactions;
     private final Clock clock;
 
@@ -57,7 +58,7 @@ public class GuardianActivitiesImpl implements GuardianActivities {
             BaselineProposer baseline, InventoryAgentProposer agent, DecisionProposals proposals,
             PolicyEvaluations policies, GuardianSettings settings, InventoryProtectionPolicy policy,
             DecisionApprovals approvals, ExecutionAuthority authority, AdPauseExecutor executor, ExecutionLedger ledger,
-            TransactionTemplate transactions, Clock clock) {
+            GuardianNotifications notifications, TransactionTemplate transactions, Clock clock) {
         this.opportunities = opportunities;
         this.contexts = contexts;
         this.snapshots = snapshots;
@@ -71,6 +72,7 @@ public class GuardianActivitiesImpl implements GuardianActivities {
         this.authority = authority;
         this.executor = executor;
         this.ledger = ledger;
+        this.notifications = notifications;
         this.transactions = transactions;
         this.clock = clock;
     }
@@ -214,6 +216,16 @@ public class GuardianActivitiesImpl implements GuardianActivities {
         AdPauseExecutor.Outcome outcome = executor.verify(ActivityStoreScope.current(), UUID.fromString(executionId),
                 last);
         return new ExecutionRef(executionId, outcome.status().name(), outcome.code());
+    }
+
+    @Override
+    public void notifyDecisionNeeded(String proposalId) {
+        notifications.decisionNeeded(ActivityStoreScope.current(), UUID.fromString(proposalId));
+    }
+
+    @Override
+    public void notifyOutcome(String executionId) {
+        notifications.outcome(ActivityStoreScope.current(), UUID.fromString(executionId));
     }
 
     @Override

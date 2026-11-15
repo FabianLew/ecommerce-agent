@@ -95,6 +95,30 @@ public class StoreAccess {
                 StoreRole.permissionsOf(store.roles()));
     }
 
+    /**
+     * The people who currently hold the permission in the scope's store, with their e-mail address, for backend
+     * notifications. Never derived from a payload: the store comes from the trusted scope.
+     */
+    public List<RegisteredUser> membersWith(TrustedStoreScope scope, StorePermission permission) {
+        List<String> roles = Arrays.stream(StoreRole.values())
+                .filter(role -> StoreRole.permissionsOf(Set.of(role)).contains(permission))
+                .map(Enum::name)
+                .toList();
+        return jdbc.sql("""
+                        SELECT DISTINCT u.id, u.email, u.display_name
+                        FROM store_membership m
+                        JOIN app_user u ON u.id = m.user_id
+                        WHERE m.organization_id = :organizationId AND m.store_id = :storeId AND m.role IN (:roles)
+                        ORDER BY u.id
+                        """)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .param("roles", roles)
+                .query((rs, n) -> new RegisteredUser(rs.getObject("id", UUID.class), rs.getString("email"),
+                        rs.getString("display_name")))
+                .list();
+    }
+
     private boolean storeExists(UUID organizationId, UUID storeId) {
         return jdbc.sql("SELECT count(*) FROM store WHERE id = :storeId AND organization_id = :organizationId")
                 .param("storeId", storeId)

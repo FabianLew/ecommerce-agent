@@ -532,6 +532,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stores/{storeId}/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["notifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/stores/{storeId}/notifications/{notificationId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["markRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stores/{storeId}/onboarding": {
         parameters: {
             query?: never;
@@ -1167,6 +1199,35 @@ export interface components {
              * @description 0 until the first change
              */
             version: number;
+        };
+        NotificationListResponse: {
+            hasMore: boolean;
+            items: components["schemas"]["NotificationResponse"][];
+            nextCursor?: string;
+            /** Format: int64 */
+            unreadCount: number;
+        };
+        NotificationResponse: {
+            code?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: uuid */
+            executionId?: string;
+            /** Format: uuid */
+            id: string;
+            /** @enum {string} */
+            kind: "DECISION_NEEDED" | "ACTION_VERIFIED" | "ACTION_NOOP" | "ACTION_UNKNOWN" | "ACTION_FAILED" | "ACTION_CONFLICT";
+            /** Format: uuid */
+            opportunityId?: string;
+            /** @description Backend-set values the UI renders: adExternalId, adName, sku, variantName */
+            parameters: {
+                [key: string]: string;
+            };
+            /** Format: uuid */
+            proposalId?: string;
+            read: boolean;
+            /** @enum {string} */
+            severity: "INFO" | "WARNING" | "CRITICAL";
         };
         OnboardingRequest: {
             acknowledgements?: ("SKIP_META" | "MAPPINGS_LATER")[];
@@ -3198,6 +3259,106 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["MutationStopResponse"];
                 };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    notifications: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationListResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notificationId: string;
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Missing or invalid access token */
             401: {

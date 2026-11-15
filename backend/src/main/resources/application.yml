@@ -121,6 +121,15 @@ operator:
     max-pauses-per-store-24h: 3
     cooldown-per-ad: 24h
 
+  notifications:
+    # Operator notifications (ADR-0021): stored first, e-mailed to everyone with DECISION_APPROVE. The pilot's
+    # MailProvider only logs deliveries until a provider is chosen (O-11).
+    sweep-enabled: true
+    retry-interval: 5m
+    max-attempts: 5
+    claim-duration: 1m
+    app-base-url: ${OPERATOR_APP_BASE_URL:http://localhost:3000}
+
   agent:
     # The agent proposer (ADR-0016). Off: the deterministic baseline is the only proposer.
     enabled: ${OPERATOR_AGENT_ENABLED:false}
