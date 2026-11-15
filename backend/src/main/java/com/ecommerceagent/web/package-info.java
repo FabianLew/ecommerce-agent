@@ -4,7 +4,7 @@
  * <p>Allowed dependencies follow the module map in the architecture plan (B2); dependencies point
  * down the map only, and upward communication uses domain events.
  */
-@ApplicationModule(displayName = "Web", allowedDependencies = {"identity", "integration", "commerce", "businessprofile", "metrics", "decisions", "support", "reporting", "intelligence", "intelligence :: inventory", "automation", "automation :: guardian", "automation :: execution", "automation :: notifications"})
+@ApplicationModule(displayName = "Web", allowedDependencies = {"identity", "integration", "commerce", "businessprofile", "metrics", "decisions", "support", "reporting", "intelligence", "intelligence :: inventory", "automation", "automation :: guardian", "automation :: execution", "automation :: notifications", "aigovernance"})
 package com.ecommerceagent.web;
 
 import org.springframework.modulith.ApplicationModule;

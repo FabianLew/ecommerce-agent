@@ -20,6 +20,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/ai/reservations/uncertain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["uncertainReservations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/ai/reservations/{reservationId}/correction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["correctReservation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/ai/reservations/{reservationId}/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reconcileReservation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stores": {
         parameters: {
             query?: never;
@@ -1276,6 +1324,11 @@ export interface components {
             items: components["schemas"]["StoreResponse"][];
             nextCursor?: string;
         };
+        ListResponseUncertainReservationDto: {
+            hasMore: boolean;
+            items: components["schemas"]["UncertainReservationDto"][];
+            nextCursor?: string;
+        };
         ListResponseVariantResponse: {
             hasMore: boolean;
             items: components["schemas"]["VariantResponse"][];
@@ -1586,6 +1639,22 @@ export interface components {
             timezone: string;
             warnings: string[];
         };
+        ReconciliationRequest: {
+            /** @description The confirmed amount in the reservation's currency; required for CHARGED only */
+            cost?: number;
+            /** @description NOT_CHARGED, CHARGED or CONSERVATIVE (CONSERVATIVE only for an UNKNOWN call) */
+            outcome: string;
+            /** @description What the provider shows, 1 to 500 characters */
+            reason: string;
+        };
+        ReconciliationResponse: {
+            cost: number;
+            /** @description Change of every charged budget, for a correction */
+            delta?: number;
+            outcome: string;
+            /** @description The same decision was already recorded; nothing changed */
+            repeated: boolean;
+        };
         RejectionRequest: {
             /** @description Why the proposal is rejected; at most 1000 characters */
             reason?: string;
@@ -1709,6 +1778,30 @@ export interface components {
             /** Format: date-time */
             windowUntil: string;
         };
+        UncertainReservationDto: {
+            automationType: string;
+            currency: string;
+            model: string;
+            /** Format: uuid */
+            organizationId: string;
+            provider: string;
+            providerRequestId?: string;
+            recordedCost?: number;
+            /** Format: uuid */
+            reservationId: string;
+            reservedAmount: number;
+            /** Format: date-time */
+            sentAt?: string;
+            /** Format: date-time */
+            settledAt?: string;
+            /** @description UNKNOWN or RECONCILED_CONSERVATIVE */
+            state: string;
+            stateReason?: string;
+            /** Format: uuid */
+            storeId: string;
+            /** Format: date-time */
+            unknownAt?: string;
+        };
         VariantRef: {
             /** Format: uuid */
             id: string;
@@ -1770,6 +1863,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    uncertainReservations: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ListResponseUncertainReservationDto"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    correctReservation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reservationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconciliationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    reconcileReservation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reservationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconciliationRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconciliationResponse"];
                 };
             };
             /** @description Missing or invalid access token */

@@ -232,12 +232,14 @@ public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedg
     }
 
     @Override
-    public synchronized void markUnknown(TrustedStoreScope scope, UUID reservationId, String reason) {
+    public synchronized void markUnknown(TrustedStoreScope scope, UUID reservationId, String reason,
+            String providerRequestId) {
         Reservation reservation = byId.get(reservationId);
         if ("IN_PROGRESS".equals(reservation.state)) {
             reservation.state = "UNKNOWN";
             reservation.reason = reason;
-            events.add("UNKNOWN:" + reservation.key + ":" + reason);
+            events.add("UNKNOWN:" + reservation.key + ":" + reason
+                    + (providerRequestId == null ? "" : ":" + providerRequestId));
         }
     }
 
@@ -245,6 +247,18 @@ public final class InMemoryAiGovernance implements AiBudgetGovernor, AiUsageLedg
     public Settlement reconcile(TrustedStoreScope scope, UUID reservationId, ReconciliationOutcome outcome,
             BigDecimal cost, String reason) {
         throw new UnsupportedOperationException("Reconciliation is tested on PostgreSQL");
+    }
+
+    @Override
+    public Settlement reconcile(TrustedStoreScope scope, com.ecommerceagent.identity.PlatformOperator operator,
+            UUID reservationId, ReconciliationOutcome outcome, BigDecimal cost, String reason) {
+        throw new UnsupportedOperationException("Reconciliation is tested on PostgreSQL");
+    }
+
+    @Override
+    public Adjustment adjust(TrustedStoreScope scope, com.ecommerceagent.identity.PlatformOperator operator,
+            UUID reservationId, ReconciliationOutcome outcome, BigDecimal cost, String reason) {
+        throw new UnsupportedOperationException("Corrections are tested on PostgreSQL");
     }
 
     private Slot slotAnswer = Slot.GRANTED;

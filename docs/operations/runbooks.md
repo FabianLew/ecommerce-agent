@@ -98,13 +98,16 @@ An AI call was sent and its result is not known (timeout, dropped connection, wo
 have been charged. Its reservation keeps counting against every budget (ADR-0027 section 4.5); it is never retried
 automatically.
 
-1. Find it: `SELECT id, store_id, automation_type, state_reason, sent_at, unknown_at FROM ai_budget_reservation
-   WHERE state = 'UNKNOWN'` (as an operator role, not the runtime).
-2. Check the provider's usage or console for the request around `sent_at`.
-3. Close it with `AiUsageLedger.reconcile`: `NOT_CHARGED` when the provider shows no request, `CHARGED` with the
-   confirmed amount, or leave it: after `operator.ai-governance.unknown-conservative-settlement-after` (24 hours) the
-   sweep records the full reserved amount as spent (`RECONCILED_CONSERVATIVE`).
-4. Many at once point to a provider outage or a network problem between the worker and the provider.
+1. Find it, as a platform operator: `GET /api/v1/platform/ai/reservations/uncertain` lists every store's uncertain
+   calls, oldest first, with the provider's request id when the provider gave one.
+2. Check the provider's usage or console for that request id, or for the request around `sentAt`.
+3. Close it with `POST /api/v1/platform/ai/reservations/{id}/reconciliation`: `NOT_CHARGED` when the provider shows
+   no charge, `CHARGED` with the confirmed `cost`, or `CONSERVATIVE`; give the evidence as `reason`. Or leave it:
+   after `operator.ai-governance.unknown-conservative-settlement-after` (24 hours) the sweep records the full
+   reserved amount as spent (`RECONCILED_CONSERVATIVE`).
+4. When the provider's data arrives after a conservative close, correct it with `POST .../{id}/correction`
+   (`NOT_CHARGED` or `CHARGED` with the amount). The budgets move by the difference; one correction per call.
+5. Many at once point to a provider outage or a network problem between the worker and the provider.
 
 ### AI reservations overdue
 
@@ -205,6 +208,14 @@ The master user is used for nothing else. Its password is rotated by RDS.
 Once the periods are approved (O-03), set `operator.retention.enabled=true` for the worker, in staging first. Each
 run records `RETENTION_APPLIED` audit entries with the number of rows per task, and `RETENTION_SKIPPED_HOLD` for a
 store under a legal hold.
+
+### Granting a platform operator (ADR-0027 section 15)
+
+Platform operators reconcile uncertain AI calls and, later, switch AI off for a store or an automation. The person
+signs in once so the application knows them, then, with the administration role:
+`INSERT INTO platform_operator (user_id, granted_by, reason) SELECT id, 'ops:<name>', '<why>' FROM app_user WHERE
+email = '<email>'`. To revoke: `UPDATE platform_operator SET revoked_at = now() WHERE user_id = '<id>'`. Store roles
+never grant it, and the application cannot change the list.
 
 ### Legal hold (ADR-0022 point 7)
 

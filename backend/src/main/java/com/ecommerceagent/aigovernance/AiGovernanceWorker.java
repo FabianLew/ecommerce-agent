@@ -8,16 +8,19 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** Worker only: runs the reservation sweep and publishes the AI reservation gauges (ADR-0024, ADR-0027). */
+/** Worker only: runs the reservation sweep and the provider reconciliation, and publishes the AI reservation gauges (ADR-0024, ADR-0027). */
 @Component
 @Profile("worker")
 @EnableScheduling
 class AiGovernanceWorker {
 
     private final AiReservationSweeper sweeper;
+    private final AiUnknownReconciler reconciler;
 
-    AiGovernanceWorker(AiReservationSweeper sweeper, MeterRegistry registry, JdbcClient jdbc, AiAdmission admission) {
+    AiGovernanceWorker(AiReservationSweeper sweeper, AiUnknownReconciler reconciler, MeterRegistry registry,
+            JdbcClient jdbc, AiAdmission admission) {
         this.sweeper = sweeper;
+        this.reconciler = reconciler;
         io.micrometer.core.instrument.Gauge.builder("operator.ai.stopped", admission, a -> a.stopped() ? 1 : 0)
                 .description("1 while the platform AI stop is on (ADR-0027 section 12)").register(registry);
         new DatabaseGauges(registry, jdbc)
@@ -33,5 +36,10 @@ class AiGovernanceWorker {
     @Scheduled(initialDelayString = "30s", fixedDelayString = "${operator.ai-governance.sweep-interval:1m}")
     void sweep() {
         sweeper.sweep();
+    }
+
+    @Scheduled(initialDelayString = "2m", fixedDelayString = "${operator.ai-governance.reconciliation-interval:15m}")
+    void reconcile() {
+        reconciler.run();
     }
 }

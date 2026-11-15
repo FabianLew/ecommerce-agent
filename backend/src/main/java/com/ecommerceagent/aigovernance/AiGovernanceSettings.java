@@ -14,7 +14,8 @@ import org.springframework.context.annotation.Configuration;
  * verification may be before the price is refused, how long a reservation may stay open before the sweep closes it,
  * and after how long an {@code UNKNOWN} reservation is reconciled conservatively at its full reserved amount
  * ({@code unknown-conservative-settlement-enabled=false} leaves every {@code UNKNOWN} to a person), and how many
- * agent runs may be active on the whole platform at once ({@code max-concurrent-runs}, section 6.2).
+ * agent runs may be active on the whole platform at once ({@code max-concurrent-runs}, section 6.2), and how often,
+ * how many and for how long uncertain calls are looked up with their providers ({@code reconciliation-*}).
  */
 @ConfigurationProperties(prefix = "operator.ai-governance", ignoreUnknownFields = false)
 public record AiGovernanceSettings(
@@ -25,7 +26,10 @@ public record AiGovernanceSettings(
         @DefaultValue("500") int sweepBatchSize,
         @DefaultValue("true") boolean unknownConservativeSettlementEnabled,
         @DefaultValue("24h") Duration unknownConservativeSettlementAfter,
-        @DefaultValue("8") int maxConcurrentRuns) {
+        @DefaultValue("8") int maxConcurrentRuns,
+        @DefaultValue("15m") Duration reconciliationInterval,
+        @DefaultValue("100") int reconciliationBatchSize,
+        @DefaultValue("30s") Duration reconciliationTimeLimit) {
 
     public AiGovernanceSettings {
         Objects.requireNonNull(inputTokenMargin, "inputTokenMargin");
@@ -41,6 +45,11 @@ public record AiGovernanceSettings(
         }
         if (maxConcurrentRuns < 1 || maxConcurrentRuns > 1_000) {
             throw new IllegalArgumentException("operator.ai-governance.max-concurrent-runs is out of range");
+        }
+        if (reconciliationInterval.compareTo(Duration.ofMinutes(1)) < 0 || reconciliationBatchSize < 1
+                || reconciliationBatchSize > 1_000 || reconciliationTimeLimit.compareTo(Duration.ofSeconds(1)) < 0
+                || reconciliationTimeLimit.compareTo(Duration.ofMinutes(5)) > 0) {
+            throw new IllegalArgumentException("operator.ai-governance reconciliation settings are out of range");
         }
         if (unknownConservativeSettlementAfter.compareTo(Duration.ofMinutes(1)) < 0) {
             throw new IllegalArgumentException(

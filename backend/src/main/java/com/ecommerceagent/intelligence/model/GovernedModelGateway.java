@@ -199,7 +199,8 @@ public class GovernedModelGateway {
                         new ProviderUsage(failure.providerRequestId(), 0, 0, 0, 0, Map.of()));
                 throw new GovernedModelFailure(failure, false, BigDecimal.ZERO);
             }
-            ledger.markUnknown(scope, reserved.reservationId(), "MODEL_FAILURE:" + failure.type());
+            ledger.markUnknown(scope, reserved.reservationId(), "MODEL_FAILURE:" + failure.type(),
+                    failure.providerRequestId());
             throw new GovernedModelFailure(failure, true, reserved.amount());
         } catch (RuntimeException e) {
             ledger.markUnknown(scope, reserved.reservationId(), "PROVIDER_ERROR:" + e.getClass().getSimpleName());
