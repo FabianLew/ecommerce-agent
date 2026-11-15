@@ -157,6 +157,12 @@ operator:
     input-token-margin: 0.25
     price-max-verification-age: 90d
     reservation-timeout: 15m
+    # The worker's sweep closes reservations nobody closed: unsent ones are released, sent ones become UNKNOWN, and
+    # UNKNOWN ones older than unknown-conservative-settlement-after are recorded as spent at their full amount.
+    sweep-interval: 1m
+    sweep-batch-size: 500
+    unknown-conservative-settlement-enabled: true
+    unknown-conservative-settlement-after: 24h
   agent:
     # The agent proposer (ADR-0016). Off: the deterministic baseline is the only proposer.
     enabled: ${OPERATOR_AGENT_ENABLED:false}

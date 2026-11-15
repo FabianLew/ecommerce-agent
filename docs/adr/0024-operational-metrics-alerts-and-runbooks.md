@@ -22,7 +22,9 @@ The metrics backend is chosen with the hosting (ADR-0023), so the definitions mu
      `operator.executions.unknown`, `operator.executions.stuck`, `operator.mutation.stops.active`,
      `operator.observations.overdue`, `operator.webhook.inbox.pending`, `operator.webhook.inbox.oldest.age`
      (seconds), `operator.outbox.pending`, `operator.outbox.oldest.age` (seconds), `operator.connections.failing`,
-     `operator.notification.deliveries.exhausted`. Each is one count over all stores; store identifiers are never
+     `operator.notification.deliveries.exhausted`, and the AI reservation signals of ADR-0027
+     `operator.ai.reservations.unknown`, `operator.ai.reservations.unknown.oldest.age` (seconds),
+     `operator.ai.reservations.overdue` and `operator.ai.overruns.recent`. Each is one count over all stores; store identifiers are never
      metric labels (cardinality, and they belong in logs and the audit).
 2. **Alerts as code** in `infra/observability/alerts.yml` (Prometheus rule format, checked with `promtool`), each
    with a severity and a runbook link. Critical: an `UNKNOWN` execution, API 5xx above 2%, no worker. The dashboard

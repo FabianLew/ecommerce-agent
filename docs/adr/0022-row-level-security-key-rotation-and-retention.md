@@ -91,6 +91,13 @@ metrics); it must keep working without a general way around the policies.
        - `ai_reserve(...)` and `ai_release(...)` (V30, ADR-0027): the atomic budget reservation and its release.
          They take the store only from the session settings, fail closed when none is bound, and are the only way
          the runtime reaches platform and organization budgets.
+       - `ai_mark_sent`, `ai_settle`, `ai_mark_unknown`, `ai_reconcile` (V31, ADR-0027): the rest of a
+         reservation's life, on the bound store only; `ai_sweep_reservations` closes expired reservations of all
+         stores and returns only counts.
+     - Only these definer functions are executable by `operator_runtime`, and no function of `operator_system` is
+       executable by `PUBLIC` (V31). Until V31 the runtime reached them through `PUBLIC`: the per-schema default of
+       V25 cannot remove the global `PUBLIC` default, and the migrator's `GRANT`/`REVOKE` after the owner change had
+       no effect. V31 sets the grants as the owner and the schema test checks both rules.
      - The schema test fails on any other definer function.
    - **Privileged maintenance is a function too.** Deleting audit rows (point 6) runs only through
      `apply_audit_retention(cutoff, batch_size)`, a definer function that enforces the 365-day floor itself. The
