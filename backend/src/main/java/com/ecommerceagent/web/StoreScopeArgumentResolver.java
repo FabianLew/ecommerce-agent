@@ -10,6 +10,7 @@ import com.ecommerceagent.identity.RegisteredUser;
 import com.ecommerceagent.identity.StoreAccess;
 import com.ecommerceagent.identity.StoreAccessDeniedException;
 import com.ecommerceagent.identity.StorePermission;
+import com.ecommerceagent.identity.StoreRowGuard;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import org.springframework.core.MethodParameter;
 import org.springframework.stereotype.Component;
@@ -24,7 +25,8 @@ import org.springframework.web.servlet.HandlerMapping;
  * Builds {@link TrustedStoreScope} for endpoints under {@code /api/v1/stores/{storeId}} from the
  * authenticated user and a verified membership. Unknown, malformed and foreign store IDs all end in
  * the same 404. A member without the required permission ({@link RequiresPermission}, default
- * {@code STORE_READ}) gets 403. Both denials are audited (ADR-0004).
+ * {@code STORE_READ}) gets 403. Both denials are audited (ADR-0004). A granted scope is bound to
+ * {@link StoreRowGuard} until the request completes.
  */
 @Component
 class StoreScopeArgumentResolver implements HandlerMethodArgumentResolver {
@@ -65,6 +67,8 @@ class StoreScopeArgumentResolver implements HandlerMethodArgumentResolver {
                     scope.get().storeId().toString(), Map.of("permission", required.name())));
             throw new StoreAccessDeniedException(scope.get().storeId(), required);
         }
+        // Row-level security for the rest of the request; StoreRowGuardInterceptor clears it (ADR-0022).
+        StoreRowGuard.bind(scope.get());
         return scope.get();
     }
 

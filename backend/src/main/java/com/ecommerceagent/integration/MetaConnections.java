@@ -120,7 +120,14 @@ public class MetaConnections {
         SecretCipher.Sealed sealed = repository.credential(scope, connection.id(), ACCESS_TOKEN)
                 .orElseThrow(() -> new InvalidIntegrationRequestException("token", "CREDENTIALS_MISSING",
                         "Save the access token first"));
-        return cipher.open(sealed, associatedData(scope, connection.id(), ACCESS_TOKEN));
+        String associatedData = associatedData(scope, connection.id(), ACCESS_TOKEN);
+        String token = cipher.open(sealed, associatedData);
+        if (!cipher.current(sealed)) {
+            // Rotation (ADR-0022 point 4): the token moves to the current key the first time it is used.
+            repository.reseal(scope, connection.id(), ACCESS_TOKEN, cipher.seal(token, associatedData),
+                    sealed.keyId());
+        }
+        return token;
     }
 
     static String associatedData(TrustedStoreScope scope, UUID connectionId, String name) {

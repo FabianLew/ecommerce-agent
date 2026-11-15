@@ -18,7 +18,7 @@ class IntegrationConfiguration {
 
     @Bean
     SecretCipher secretCipher(IntegrationProperties properties) {
-        return new SecretCipher(properties.secretsKey(), properties.secretsKeyId());
+        return new SecretCipher(properties.secretsKey(), properties.secretsKeyId(), properties.previousSecretsKeys());
     }
 
     @Bean

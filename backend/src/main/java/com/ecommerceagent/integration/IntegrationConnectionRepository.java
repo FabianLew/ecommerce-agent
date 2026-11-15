@@ -143,6 +143,29 @@ class IntegrationConnectionRepository {
         }
     }
 
+    /**
+     * Replaces a value sealed with a previous key by the same value under the current key (ADR-0022 point 4); a
+     * value saved meanwhile under another key is left alone.
+     */
+    void reseal(TrustedStoreScope scope, UUID connectionId, String name, SecretCipher.Sealed sealed,
+            String previousKeyId) {
+        jdbc.sql("""
+                        UPDATE integration_credential
+                        SET ciphertext = :ciphertext, nonce = :nonce, key_id = :keyId
+                        WHERE connection_id = :connectionId AND name = :name AND key_id = :previousKeyId
+                          AND organization_id = :organizationId AND store_id = :storeId
+                        """)
+                .param("ciphertext", sealed.ciphertext())
+                .param("nonce", sealed.nonce())
+                .param("keyId", sealed.keyId())
+                .param("connectionId", connectionId)
+                .param("name", name)
+                .param("previousKeyId", previousKeyId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .update();
+    }
+
     Optional<SecretCipher.Sealed> credential(TrustedStoreScope scope, UUID connectionId, String name) {
         return jdbc.sql("""
                         SELECT ciphertext, nonce, key_id FROM integration_credential

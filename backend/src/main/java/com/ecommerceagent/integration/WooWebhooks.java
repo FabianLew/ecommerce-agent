@@ -146,8 +146,8 @@ public class WooWebhooks {
                 .systemScope(WEBHOOK_SERVICE, endpoint.organizationId(), endpoint.storeId())
                 .orElseThrow(() -> new WebhookRejectedException(Reason.NOT_FOUND, "Unknown webhook endpoint"));
         String secret = connections.credential(scope, endpoint.connectionId(), WEBHOOK_SECRET)
-                .map(sealed -> cipher.open(sealed,
-                        IntegrationConnections.associatedData(scope, endpoint.connectionId(), WEBHOOK_SECRET)))
+                .map(sealed -> IntegrationConnections.openAndRefresh(connections, cipher, scope,
+                        endpoint.connectionId(), WEBHOOK_SECRET, sealed))
                 .orElseThrow(() -> new WebhookRejectedException(Reason.SIGNATURE_INVALID, "No webhook secret saved"));
         if (!signatureMatches(secret, headers.signature(), body)) {
             throw new WebhookRejectedException(Reason.SIGNATURE_INVALID, "Webhook signature does not match");

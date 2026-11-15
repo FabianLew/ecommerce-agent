@@ -28,5 +28,6 @@ Statuses: `Proposed` → `Accepted` (after the owner accepts it in a PR) → opt
 | [0019](0019-sales-and-product-analytics.md) | Sales and product analytics v1: definitions, coverage and the MetricDTO | Proposed |
 | [0020](0020-approval-authorized-action-and-execution-ledger.md) | Approval, AuthorizedAction, the execution ledger and the mutation stop | Proposed |
 | [0021](0021-operator-notifications-and-action-outcomes.md) | Operator notifications and action outcomes | Proposed |
+| [0022](0022-row-level-security-key-rotation-and-retention.md) | Row-level security, key rotation and data retention | Proposed |
 
 Template: [0000-template.md](0000-template.md).

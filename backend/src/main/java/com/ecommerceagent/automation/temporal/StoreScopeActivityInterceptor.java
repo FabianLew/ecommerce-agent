@@ -7,6 +7,7 @@ import com.ecommerceagent.Correlation;
 import com.ecommerceagent.identity.AuditEntry;
 import com.ecommerceagent.identity.AuditTrail;
 import com.ecommerceagent.identity.StoreAccess;
+import com.ecommerceagent.identity.StoreRowGuard;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import io.temporal.common.interceptors.ActivityInboundCallsInterceptor;
 import io.temporal.common.interceptors.ActivityInboundCallsInterceptorBase;
@@ -17,8 +18,9 @@ import org.springframework.stereotype.Component;
 
 /**
  * Rebuilds the store scope from the Temporal header claim in {@link StoreAccess} before every activity and
- * exposes the result as {@link ActivityStoreScope}. A missing or unverifiable claim fails the activity
- * with a non-retryable error: Temporal headers are not trusted on their own (ADR-0004).
+ * exposes the result as {@link ActivityStoreScope} and to row-level security ({@link StoreRowGuard}). A missing
+ * or unverifiable claim fails the activity with a non-retryable error: Temporal headers are not trusted on their
+ * own (ADR-0004).
  */
 @Component
 public class StoreScopeActivityInterceptor extends WorkerInterceptorBase {
@@ -46,7 +48,7 @@ public class StoreScopeActivityInterceptor extends WorkerInterceptorBase {
                 ActivityStoreScope.set(scope);
                 MDC.put(Correlation.CORRELATION_ID, context.correlationId());
                 MDC.put("storeId", scope.storeId().toString());
-                try {
+                try (StoreRowGuard.Binding rows = StoreRowGuard.bind(scope)) {
                     return super.execute(input);
                 } finally {
                     ActivityStoreScope.clear();

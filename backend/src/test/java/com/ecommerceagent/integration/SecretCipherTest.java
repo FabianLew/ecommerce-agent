@@ -57,4 +57,26 @@ class SecretCipherTest {
         assertThatThrownBy(() -> new SecretCipher(Base64.getEncoder().encodeToString(new byte[16]), "v1"))
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    /** ADR-0022 point 4: a rotation keeps old values readable and seals new ones with the current key only. */
+    @Test
+    void opensValuesOfPreviousKeysAndSealsWithTheCurrentOne() {
+        byte[] other = new byte[32];
+        other[0] = 7;
+        String newKey = Base64.getEncoder().encodeToString(other);
+        SecretCipher.Sealed old = cipher.seal("cs_secret", "aad");
+        SecretCipher rotated = new SecretCipher(newKey, "test-v2", java.util.Map.of("test-v1", KEY));
+
+        assertThat(rotated.open(old, "aad")).isEqualTo("cs_secret");
+        assertThat(rotated.current(old)).isFalse();
+        SecretCipher.Sealed resealed = rotated.seal("cs_secret", "aad");
+        assertThat(resealed.keyId()).isEqualTo("test-v2");
+        assertThat(rotated.current(resealed)).isTrue();
+        assertThatThrownBy(() -> cipher.open(resealed, "aad")).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("unknown key");
+        assertThatThrownBy(() -> new SecretCipher(newKey, "test-v1", java.util.Map.of("test-v1", KEY)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> new SecretCipher(newKey, "test-v2", java.util.Map.of("test-v1", "short")))
+                .isInstanceOf(IllegalStateException.class);
+    }
 }

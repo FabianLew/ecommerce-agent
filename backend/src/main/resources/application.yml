@@ -134,6 +134,24 @@ operator:
     claim-duration: 1m
     app-base-url: ${OPERATOR_APP_BASE_URL:http://localhost:3000}
 
+  row-security:
+    # Second line of store isolation (ADR-0022): store work runs as operator_app under RLS. Off only for diagnosis.
+    enabled: true
+
+  retention:
+    # Off until the periods are approved (ADR-0022 point 5, O-03). Runs in the worker profile.
+    enabled: false
+    interval: 24h
+    batch-size: 1000
+    max-batches: 100
+    periods:
+      webhook-inbox: 30d
+      outbox: 30d
+      agent-run-content: 90d
+      notifications: 180d
+      # The audit trigger refuses entries younger than 365 days whatever this says.
+      audit: 400d
+
   agent:
     # The agent proposer (ADR-0016). Off: the deterministic baseline is the only proposer.
     enabled: ${OPERATOR_AGENT_ENABLED:false}

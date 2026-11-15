@@ -76,6 +76,8 @@ class MutationStopApiTest extends DecisionScenario {
                 .andExpect(jsonPath("$.globallyStopped").value(false))
                 .andExpect(jsonPath("$.canStop").value(false))
                 .andExpect(jsonPath("$.canResume").value(false));
+        // ADR-0022: the request's row-level security binding does not outlive the request.
+        org.assertj.core.api.Assertions.assertThat(com.ecommerceagent.identity.StoreRowGuard.current()).isEmpty();
 
         change("analyst", store, "\"stop-0\"", true, "Promo").andExpect(status().isForbidden());
         change("operator", store, null, true, "Promo").andExpect(status().isPreconditionRequired());
