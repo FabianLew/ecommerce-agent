@@ -19,12 +19,18 @@ public class AiCallDenied extends RuntimeException {
         return reason;
     }
 
-    /** The platform AI stop is on, or the run was not admitted while it was on. */
+    /**
+     * The run must not go on whatever its limits say: the platform AI stop is on (or was when the run asked for
+     * admission), or the actor's access to the store was revoked.
+     */
     public boolean stopped() {
-        return reason.equals(AI_STOPPED);
+        return reason.equals(AI_STOPPED) || reason.equals(AUTHORIZATION_REVOKED);
     }
 
     public static final String AI_STOPPED = "AI_STOPPED";
+
+    /** The actor of the run no longer has access to the store. */
+    public static final String AUTHORIZATION_REVOKED = "AUTHORIZATION_REVOKED";
 
     /** A budget or concurrency limit, not a price or configuration problem: the run ended on a limit. */
     public boolean budget() {

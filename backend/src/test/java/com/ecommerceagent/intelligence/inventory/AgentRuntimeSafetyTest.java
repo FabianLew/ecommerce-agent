@@ -12,6 +12,8 @@ import com.ecommerceagent.aigovernance.InMemoryAiGovernance;
 import com.ecommerceagent.decisions.ContextSnapshot;
 import com.ecommerceagent.decisions.RiskDetectorSettings;
 import com.ecommerceagent.identity.TestScopes;
+import com.ecommerceagent.identity.StoreAccessDeniedException;
+import com.ecommerceagent.identity.StorePermission;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.intelligence.agent.AgentHook;
 import com.ecommerceagent.intelligence.agent.AgentRun;
@@ -67,6 +69,7 @@ class AgentRuntimeSafetyTest {
     final KnowledgeRegistry knowledge = new KnowledgeRegistry();
     final ContextSnapshot snapshot = SnapshotFixture.serum();
     List<AgentHook> hooks = List.of();
+    volatile boolean accessRevoked;
     AgentSettings settings = settings(List.of(PRIMARY.toString(), FALLBACK.toString()));
     ToolRegistry registry;
 
@@ -89,7 +92,11 @@ class AgentRuntimeSafetyTest {
 
     AgentRuntime runtime() {
         return new AgentRuntime(new GovernedModelGateway(ProviderGateways.of(model, "fake"), governance, governance,
-                governance, clock), registry, runs, hooks, settings, clock);
+                governance, checked -> {
+                    if (accessRevoked) {
+                        throw new StoreAccessDeniedException(checked.storeId(), StorePermission.STORE_READ);
+                    }
+                }, clock), registry, runs, hooks, settings, clock);
     }
 
     InventoryAgentProposer proposer() {
@@ -645,6 +652,56 @@ class AgentRuntimeSafetyTest {
         var next = proposer().decide(scope, SnapshotFixture.OPPORTUNITY, snapshot(UUID.randomUUID(), 0));
         assertThat(next.fallback()).isEqualTo("AI_GOVERNANCE:AI_STOPPED");
         assertThat(model.requests()).hasSize(1);
+    }
+
+    /** ADR-0027 section 5 (A1): a revoked access stops a running run before its next paid call. */
+    @Test
+    void aRevokedAccessEndsARunningRunBeforeItsNextCall() {
+        hooks = List.of(new AgentHook() {
+            int calls;
+
+            @Override
+            public void beforeModelCall(AgentRunContext run, ModelRequest request) {
+                if (++calls == 2) {
+                    accessRevoked = true;
+                }
+            }
+        });
+        model.thenTools(call("t1", InventoryReadTools.FORECAST, "{\"productVariantId\":\"" + VARIANT + "\"}"))
+                .thenText(pause());
+
+        var decision = proposer().decide(scope, SnapshotFixture.OPPORTUNITY, snapshot);
+
+        assertThat(decision.proposal()).isEmpty();
+        assertThat(decision.fallback()).isEqualTo("AI_GOVERNANCE:AUTHORIZATION_REVOKED");
+        assertThat(model.requests()).as("the second call was never sent").hasSize(1);
+        assertThat(governance.reservations()).as("nothing was reserved for the refused call").hasSize(1);
+        AgentRun run = runs.only();
+        assertThat(run.status()).isEqualTo(AgentRunStatus.STOPPED);
+        assertThat(governance.leases()).isEmpty();
+    }
+
+    /** ADR-0027 section 5 (A1): a budget exhausted during a run applies before its next call, not at the next run. */
+    @Test
+    void aBudgetExhaustedDuringARunAppliesBeforeItsNextCall() {
+        hooks = List.of(new AgentHook() {
+            int calls;
+
+            @Override
+            public void beforeModelCall(AgentRunContext run, ModelRequest request) {
+                if (++calls == 2) {
+                    governance.deny("BUDGET_EXHAUSTED:STORE:MONTHLY");
+                }
+            }
+        });
+        model.thenTools(call("t1", InventoryReadTools.FORECAST, "{\"productVariantId\":\"" + VARIANT + "\"}"))
+                .thenText(pause());
+
+        var decision = proposer().decide(scope, SnapshotFixture.OPPORTUNITY, snapshot);
+
+        assertThat(decision.fallback()).isEqualTo("AI_GOVERNANCE:BUDGET_EXHAUSTED:STORE:MONTHLY");
+        assertThat(model.requests()).hasSize(1);
+        assertThat(runs.only().status()).isEqualTo(AgentRunStatus.LIMIT_EXCEEDED);
     }
 
     /** ADR-0027 section 7: a new snapshot inside the cooldown is analysed again only after a material change. */

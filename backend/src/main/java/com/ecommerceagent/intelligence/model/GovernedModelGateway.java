@@ -14,6 +14,7 @@ import com.ecommerceagent.aigovernance.ReservationRequest;
 import com.ecommerceagent.aigovernance.SendDecision;
 import com.ecommerceagent.aigovernance.AiAdmission;
 import com.ecommerceagent.aigovernance.Settlement;
+import com.ecommerceagent.identity.StoreAccessDeniedException;
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.intelligence.model.provider.ProviderGateways;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * The only production path to a paid model (ADR-0027 section 10). For one call it:
  * <ol>
+ *   <li>re-checks the actor's access to the store ({@link AiCallAuthorization}); a revoked access sends nothing;</li>
  *   <li>refuses what cannot be sent (deadline passed, provider not configured) before reserving anything;</li>
  *   <li>reserves the conservative maximum cost against every budget of the store ({@link AiBudgetGovernor});</li>
  *   <li>marks the reservation sent, committed, and sends only when this caller won ({@link SendDecision#SEND});</li>
@@ -42,14 +44,16 @@ public class GovernedModelGateway {
     private final AiBudgetGovernor governor;
     private final AiUsageLedger ledger;
     private final AiAdmission admission;
+    private final AiCallAuthorization authorization;
     private final Clock clock;
 
     public GovernedModelGateway(ProviderGateways providers, AiBudgetGovernor governor, AiUsageLedger ledger,
-            AiAdmission admission, Clock clock) {
+            AiAdmission admission, AiCallAuthorization authorization, Clock clock) {
         this.providers = providers;
         this.governor = governor;
         this.ledger = ledger;
         this.admission = admission;
+        this.authorization = authorization;
         this.clock = clock;
     }
 
@@ -98,6 +102,12 @@ public class GovernedModelGateway {
         if (TransactionSynchronizationManager.isActualTransactionActive()) {
             // The sent mark must be committed before the request leaves; inside a transaction it would not be.
             throw new AiCallDenied("CALL_INSIDE_TRANSACTION");
+        }
+        try {
+            // Before every call, not once per run: a revoked access stops the run before its next paid call.
+            authorization.check(scope);
+        } catch (StoreAccessDeniedException revoked) {
+            throw new AiCallDenied(AiCallDenied.AUTHORIZATION_REVOKED);
         }
 
         AiCallEstimate estimate = AiCallEstimate.of(model.provider(), model.name(), providers.region(model),

@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import com.ecommerceagent.intelligence.model.ModelFailure;
@@ -16,6 +17,9 @@ import com.ecommerceagent.intelligence.model.ModelTurn;
 import com.ecommerceagent.intelligence.model.ModelUsage;
 import com.ecommerceagent.intelligence.model.ToolCall;
 import com.ecommerceagent.intelligence.model.ToolSpec;
+import com.anthropic.core.JsonValue;
+import com.anthropic.core.http.Headers;
+import com.anthropic.errors.SseException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -142,25 +146,107 @@ class SpringAiAnthropicGatewayTest {
                 });
     }
 
-    /** ADR-0027 section 4.5: only a refusal before processing is known not to be charged. */
+    /**
+     * ADR-0027 section 4.5 and rule set {@code anthropic-charge/1}: only an error response whose status and error type
+     * both say the request was refused before processing is confirmed not charged. A status alone is not enough.
+     */
     @Test
     void onlyRefusalsBeforeProcessingAreConfirmedNotCharged() {
-        int[] statuses = {429, 529, 400, 500, 502, 503, 504, 408};
-        boolean[] notCharged = {true, true, true, false, false, false, false, false};
-        for (int status : statuses) {
-            stub.enqueue(status, AnthropicStubServer.error(status == 429 ? "rate_limit_error" : "api_error"));
+        record Case(int status, String type, boolean notCharged) {
         }
-        for (int i = 0; i < statuses.length; i++) {
-            int index = i;
-            assertThatThrownBy(() -> gateway.complete(request(List.of(new ModelMessage.User("s" + index)))))
-                    .as("status %d", statuses[index])
+        List<Case> cases = List.of(
+                new Case(400, "invalid_request_error", true),
+                new Case(401, "authentication_error", true),
+                new Case(403, "permission_error", true),
+                new Case(404, "not_found_error", true),
+                new Case(413, "request_too_large", true),
+                new Case(429, "rate_limit_error", true),
+                new Case(529, "overloaded_error", true),
+                // A matching status with another error type, or a status outside the list, stays UNKNOWN.
+                new Case(400, "api_error", false),
+                new Case(429, "api_error", false),
+                new Case(529, "api_error", false),
+                new Case(402, "billing_error", false),
+                new Case(409, "invalid_request_error", false),
+                new Case(422, "invalid_request_error", false),
+                new Case(500, "api_error", false),
+                new Case(502, "api_error", false),
+                new Case(503, "overloaded_error", false),
+                new Case(504, "timeout_error", false),
+                new Case(408, "timeout_error", false));
+        for (Case c : cases) {
+            stub.enqueue(c.status(), AnthropicStubServer.error(c.type()));
+        }
+        for (Case c : cases) {
+            assertThatThrownBy(() -> gateway.complete(request(List.of(new ModelMessage.User("s" + c.status())))))
+                    .as("%d %s", c.status(), c.type())
                     .isInstanceOfSatisfying(ModelFailure.class,
-                            failure -> assertThat(failure.confirmedNotCharged()).isEqualTo(notCharged[index]));
+                            failure -> assertThat(failure.confirmedNotCharged()).isEqualTo(c.notCharged()));
         }
         stub.enqueue(504, AnthropicStubServer.error("api_error"));
         assertThatThrownBy(() -> gateway.complete(request(List.of(new ModelMessage.User("t")))))
                 .isInstanceOfSatisfying(ModelFailure.class,
                         failure -> assertThat(failure.type()).isEqualTo(ModelFailure.Type.TIMEOUT));
+    }
+
+    @Test
+    void anErrorBodyWithoutAnErrorTypeIsPossiblyCharged() {
+        stub.enqueue(400, "{\"type\":\"error\"}");
+        stub.enqueue(429, "not json");
+
+        for (String text : List.of("a", "b")) {
+            assertThatThrownBy(() -> gateway.complete(request(List.of(new ModelMessage.User(text)))))
+                    .isInstanceOfSatisfying(ModelFailure.class,
+                            failure -> assertThat(failure.confirmedNotCharged()).isFalse());
+        }
+    }
+
+    /** An error event after a streaming response started is possibly charged, whatever its type says. */
+    @Test
+    void anErrorAfterAStreamStartedIsPossiblyCharged() {
+        for (String type : List.of("overloaded_error", "rate_limit_error", "invalid_request_error", "api_error")) {
+            SseException midStream = SseException.builder().statusCode(200).headers(Headers.builder().build())
+                    .body(JsonValue.from(Map.of("type", "error", "error", Map.of("type", type, "message", "x"))))
+                    .build();
+
+            ModelFailure failure = SpringAiAnthropicGateway.failure(new RuntimeException("wrapped", midStream));
+
+            assertThat(failure.confirmedNotCharged()).as(type).isFalse();
+            assertThat(failure.retryable()).as(type).isTrue();
+        }
+    }
+
+    @Test
+    void aFailureWithNoResponseIsPossiblyCharged() {
+        assertThat(SpringAiAnthropicGateway.failure(new RuntimeException(new java.net.http.HttpTimeoutException("t")))
+                .confirmedNotCharged()).isFalse();
+        assertThat(SpringAiAnthropicGateway.failure(new RuntimeException(new java.io.InterruptedIOException("t")))
+                .confirmedNotCharged()).isFalse();
+        assertThat(SpringAiAnthropicGateway.failure(new IllegalStateException("anything else"))
+                .confirmedNotCharged()).isFalse();
+    }
+
+    @Test
+    void theChargeRulesDependOnTheStage() {
+        assertThat(AnthropicChargeRules.confirmedNotCharged(AnthropicChargeRules.Stage.NOT_SENT, 0, null)).isTrue();
+        assertThat(AnthropicChargeRules.confirmedNotCharged(AnthropicChargeRules.Stage.ERROR_RESPONSE, 529,
+                "overloaded_error")).isTrue();
+        assertThat(AnthropicChargeRules.confirmedNotCharged(AnthropicChargeRules.Stage.STREAM_STARTED, 529,
+                "overloaded_error")).isFalse();
+        assertThat(AnthropicChargeRules.confirmedNotCharged(AnthropicChargeRules.Stage.NO_RESPONSE, 429,
+                "rate_limit_error")).isFalse();
+        assertThat(AnthropicChargeRules.confirmedNotCharged(AnthropicChargeRules.Stage.ERROR_RESPONSE, 429, null))
+                .isFalse();
+    }
+
+    @Test
+    void aCallThatWasNeverSentIsNotCharged() {
+        ModelRequest late = new ModelRequest(UUID.randomUUID(), MODEL, "s", List.of(new ModelMessage.User("a")),
+                List.of(), 256, Instant.now().minusSeconds(1), null);
+
+        assertThatThrownBy(() -> gateway.complete(late)).isInstanceOfSatisfying(ModelFailure.class,
+                failure -> assertThat(failure.confirmedNotCharged()).isTrue());
+        assertThat(stub.requests()).isEmpty();
     }
 
     @Test
