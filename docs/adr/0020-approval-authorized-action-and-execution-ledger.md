@@ -2,6 +2,8 @@
 
 - Status: Proposed
 - Date: 2026-11-15
+- Revised: 2026-11-15 (review: point 1 amended by ADR-0025; point 2 states how the proposal TTL, the approval
+  window and freshness relate)
 - Related: document 01 D-02, document 02 §9 (Policy Engine, AuthorizedAction, states) and §10 (Temporal),
   document 03 §7–§10 (L1/L2, Temporal, Meta idempotency, verification), document 04 §5 and §11 (approval and
   mutation-stop endpoints), ADR-0012 (proposal and policy), ADR-0014 (decision read API), ADR-0017 (Meta pause
@@ -20,6 +22,8 @@ The model must stay outside it: it proposes, and only trusted backend code appro
 1. **Execution is opt-in per deployment.** `InventoryProtectionPolicy.mode` gets a second value,
    `EXECUTE_ON_APPROVAL`. `EVALUATION_ONLY` stays the default: approvals are refused with `SHADOW_MODE` and the
    workflow never waits. L2 (`ALLOW` without a person) stays disabled; nothing in this ADR enables it.
+   *Amended by ADR-0025:* the mode is a deployment-wide ceiling. A store executes only when its own action
+   permission for the action type is `APPROVAL_REQUIRED` as well.
 2. **Approval (B-37).** `POST /decisions/{proposalId}/approvals` `{revision}` and `.../rejections`
    `{revision, reason?}` need the new permission `DECISION_APPROVE` (roles `OWNER` and `DECISION_OPERATOR`), an
    `If-Match` with the detail ETag and an `Idempotency-Key`. The service re-checks the membership
@@ -32,6 +36,22 @@ The model must stay outside it: it proposes, and only trusted backend code appro
    the approval id and an operation id; `200` never means the ad is paused. After the commit the API signals the
    workflow `approvalDecided(approvalId)`; the workflow deduplicates by id. A lost signal is harmless: the
    workflow also looks up a stored approval when it wakes.
+
+   **Three different clocks.** They are kept apart on purpose:
+   - *Proposal TTL* (`operator.guardian.proposal-ttl`, default 24 h from the proposal's creation) bounds when a
+     decision can be made. After it the proposal is `EXPIRED`, approvals and rejections are refused, and the
+     workflow stops waiting.
+   - *Approval validity* is the 24 h of plan decision I1, but as an upper bound only:
+     `expires_at = min(proposal expiry, approval time + 24 h)`. An approval never extends a proposal. With the
+     default TTL of 24 h the proposal expiry is always the earlier one, so an approval given at hour 23 of a
+     proposal is valid for one hour. A TTL longer than 24 h is allowed, and the 24 h cap then applies.
+   - *Data freshness* is not measured by either clock. However much validity is left, the authorization (point 3)
+     re-evaluates the policy on a fresh context, with the stock age and the ad state age limits of the policy,
+     and the executor reads the ad again right before the write (point 6). An approval that is still valid but
+     whose facts are stale, or no longer lead to the same action hash, is refused at authorization
+     (`ACTION_CHANGED` or the policy's freshness code). A new proposal revision is then needed.
+   The current code matches this (`DecisionApprovals` computes the minimum); a start-up check that the TTL is
+   positive is the only addition.
 3. **AuthorizedAction (B-38).** Only `ExecutionAuthority.authorize(scope, approvalId)` creates one, after a new policy
    evaluation on a fresh context that must again be `REQUIRE_APPROVAL` with the same action hash. The record holds
    the proposal id/revision/hash, the approval and policy evaluation ids, the action type, the target (ad id and

@@ -107,7 +107,7 @@ worker (`SPRING_PROFILES_ACTIVE=cloud,worker`). Workflows continue from their hi
 2. Run `infra/backup/restore-check.sh <dump>` against a scratch server, never against the live database.
 3. Record the date, the dump and the output in the operations log. A failure is a blocker for the next release.
 
-### Rotating the credentials key (ADR-0022 point 4)
+### Rotating the credentials key (ADR-0022 point 5)
 
 1. Generate a new key: `openssl rand -base64 32`; store it in the secret store.
 2. Deploy with the new key as `INTEGRATION_SECRETS_KEY` and a new `INTEGRATION_SECRETS_KEY_ID`, and the old key
@@ -115,14 +115,15 @@ worker (`SPRING_PROFILES_ACTIVE=cloud,worker`). Workflows continue from their hi
 3. Values are resealed the next time they are used. The start-up log lists how many credentials still use an old
    key; when it shows none, remove the old key and deploy again.
 
-### Enabling retention (ADR-0022 point 5)
+### Enabling retention (ADR-0022 point 6)
 
 Once the periods are approved (O-03), set `operator.retention.enabled=true` for the worker. Each run records
 `RETENTION_APPLIED` audit entries with the number of rows per task.
 
 ### Responding to a wrong pause
 
-1. Stop mutations for the store.
+1. Stop mutations for the store, and lower its `PAUSE_AD` permission to `PROPOSE_ONLY` (Settings → Actions,
+   ADR-0025).
 2. Resume the ad in Meta Ads Manager (the application never resumes ads in the pilot).
 3. Record what happened in the decision (rejection reason on the next proposal) and in the pilot log; the
    outcome record keeps the pre-state and post-state for the review.

@@ -2,6 +2,7 @@
 
 - Status: Proposed
 - Date: 2026-11-15
+- Revised: 2026-11-15 (review: `get_recent_actions` reads only frozen data)
 - Related: document 02 §3–8 and §12, document 03 §4–6 and §12 (IG-07, IG-11, IG-22, IG-24, IG-28), ADR-0002 (the tool
   loop belongs to the runtime), ADR-0011 (evidence, snapshot), ADR-0012 (DecisionProposal v1, baseline, workflow),
   backlog B-26..B-30
@@ -41,9 +42,19 @@ enters the existing episode workflow without weakening it.
    `get_replenishment_plan`, `get_product_ad_mappings`, `get_ad_delivery_state`, `get_recent_actions`. Every result
    carries the snapshot id, `asOf`, quality and the evidence references the proposal may cite. A variant or ad that is
    not in the snapshot is `NOT_FOUND`, whatever exists elsewhere (IG-07): the model cannot reach another store's or
-   another episode's data even with a valid id. `get_recent_actions` adds the earlier proposals of the episode (and
-   executed actions once B-38 exists) read through the scope. The snapshot is the single consistent state the
-   proposal is validated against, so the agent and the baseline see the same facts.
+   another episode's data even with a valid id. The snapshot is the single consistent state the proposal is
+   validated against, so the agent and the baseline see the same facts.
+
+   `get_recent_actions` follows the same rule. The earlier proposals of the episode are frozen into the snapshot
+   when it is built, in a `recentActions` section:
+   - each proposal's revision, disposition, action and its status *as of the snapshot time*;
+   - the episode's executed actions with their ledger state as of that time;
+   - the last risk outcome.
+
+   The section is part of the snapshot's content hash. The tool reads only that section, never the live tables. A
+   later approval, rejection, expiry or execution therefore does not change what the tool returns for the same
+   snapshot. A run, its replay and the baseline see the same history, and a newer state reaches the agent only
+   through a new snapshot. Like every tool result, the result is stored in the run step with its hash (point 6).
 5. **Agent runtime.** `AgentRuntime.run` drives the loop: `BeforeAgentRun` checks, then up to `maxModelCalls` model
    steps; for each tool call the dispatcher; tool results go back in one message. Limits apply to the run:
    `maxModelCalls`, `maxToolCalls`, `maxWallTimeSeconds`, `maxOutputTokensTotal`, `maxOutputRepairCalls`, and
@@ -103,13 +114,24 @@ enters the existing episode workflow without weakening it.
 - Opus-class models think adaptively and thinking counts as output, so the run limits of document 02 may be tight;
   the quality report measures stop reasons and cost, and the limits are changed only with a new ADR revision.
 - Two activity paths exist in the workflow until old episodes have finished.
+- Snapshots built before the `recentActions` section exists have none; for them the tool returns an empty history
+  with the limitation `RECENT_ACTIONS_NOT_IN_SNAPSHOT`, rather than reading live data.
+
+## Implementation status
+
+On the pilot branch `get_recent_actions` reads the episode's proposals from the live table at call time. It keeps
+those created before the snapshot time, but it shows their *current* status, so a replay after a later decision can
+see different data. After this revision is approved, a follow-up moves the history into the snapshot builder and the
+tool to that section.
 
 ## Verification
 
 - Gateway contract tests against a local stub of the Messages API: tool calls are returned and never executed
   inside Spring AI, the tool result goes back with its id, usage and finish reason are mapped, failures are typed.
 - Runtime safety suite on a fake gateway, merge-blocking (B-36): IG-07, IG-11, IG-22, IG-24, IG-28, every limit, the
-  hooks, idempotency of the activity and the fallback to the baseline.
+  hooks, idempotency of the activity and the fallback to the baseline. IG-24 includes `get_recent_actions`: the
+  result for a snapshot is byte-identical before and after a later approval, rejection or expiry of an earlier
+  proposal.
 - Quality report (B-36): `QualityReportTest` runs every case of `evals/cases.jsonl` through the baseline (which
   must meet all of them) and writes `build/reports/quality/inventory-guardian.{md,json}`. `LiveQualityReportTest`
   adds the agent column on the configured model policy only with `OPERATOR_QUALITY_LIVE=true`, an API key and an

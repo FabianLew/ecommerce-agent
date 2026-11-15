@@ -31,6 +31,6 @@ Statuses: `Proposed` → `Accepted` (after the owner accepts it in a PR) → opt
 | [0022](0022-row-level-security-key-rotation-and-retention.md) | Row-level security, key rotation and data retention | Proposed |
 | [0023](0023-eu-environments-deployment-and-backup.md) | EU environments, deployment, Temporal Cloud and backups | Proposed |
 | [0024](0024-operational-metrics-alerts-and-runbooks.md) | Operational metrics, alerts and runbooks | Proposed |
-| [0025](0025-monitoring-start-and-the-pilot-gate.md) | Monitoring start and the pilot gate for execution | Proposed |
+| [0025](0025-monitoring-start-and-the-pilot-gate.md) | Monitoring start, per-store action permission and the pilot gate | Proposed |
 
 Template: [0000-template.md](0000-template.md).
