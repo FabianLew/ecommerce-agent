@@ -10,7 +10,11 @@ public final class TestScopes {
     }
 
     public static TrustedStoreScope system(UUID organizationId, UUID storeId) {
-        return new TrustedStoreScope(organizationId, storeId, new Actor.SystemActor("unit-test"),
+        return system(organizationId, storeId, "unit-test");
+    }
+
+    public static TrustedStoreScope system(UUID organizationId, UUID storeId, String service) {
+        return new TrustedStoreScope(organizationId, storeId, new Actor.SystemActor(service),
                 EnumSet.noneOf(StoreRole.class), EnumSet.allOf(StorePermission.class));
     }
 }

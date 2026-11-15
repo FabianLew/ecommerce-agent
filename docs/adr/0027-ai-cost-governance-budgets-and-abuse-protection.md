@@ -674,9 +674,38 @@ below.
 - The runtime role reads only its store's reservations and the price catalog. It cannot read or write budget
   policies, balances or charges, so a store never sees platform economics. Prices and policies are changed by
   reviewed migrations (`operator_migrator`) until an administrative interface exists.
-- Not yet: settlement, `UNKNOWN`, the usage ledger and the reconciliation of overdue reservations (step 2); the
-  `GovernedModelGateway` and the boundary test (step 3); run limits as versioned policies (step 4). Until step 3
-  the agent runtime does not call the governor, and the agent stays off.
+
+**Stage 1, step 2 (V31): settlement, uncertain outcomes and the usage ledger.**
+
+- `ai_mark_sent` must be called and committed before a request leaves. It lets exactly one caller move a
+  reservation from `RESERVED` to `IN_PROGRESS`; an expired, released or already attempted reservation is never sent.
+  This is the line between "known not sent" and "possibly sent": a worker that dies before it leaves `RESERVED`, one
+  that dies after it leaves `IN_PROGRESS`.
+- `ai_settle` records the provider's usage for an `IN_PROGRESS` or `UNKNOWN` reservation. The cost is computed in the
+  database from the reservation's own price (input, output, cache write, cache read, priced extra units, rounded up
+  to 8 decimals), so the caller cannot understate it. Unused reservation goes back to every charged balance; the
+  actual cost is charged in full, and an overrun is stored on the reservation and the ledger row, never capped.
+  Cache reads without a cache-read price are charged at the input price; cache writes or extra units without a price
+  are refused, so the reservation stays open and is reconciled rather than recorded as free.
+- `ai_mark_unknown` marks a sent call whose result is unknown (timeout, dropped connection, unreadable answer). The
+  reservation keeps counting. A retry of the same command gets the same reservation back, and `ai_mark_sent` answers
+  `ALREADY_ATTEMPTED`: an ambiguous call is not sent again without a new reservation.
+- `ai_reconcile` closes an `UNKNOWN` reservation as `NOT_CHARGED`, `CHARGED` (a confirmed amount) or `CONSERVATIVE`
+  (the full reserved amount), recorded with the actor. It is not exposed to store users.
+- `ai_sweep_reservations`, run by the worker every minute: expired `RESERVED` → `RELEASED`, expired `IN_PROGRESS` →
+  `UNKNOWN`, and `UNKNOWN` older than `unknown-conservative-settlement-after` (24 hours) → `RECONCILED`
+  conservatively. With `unknown-conservative-settlement-enabled=false` an `UNKNOWN` waits for a person. Either way it
+  is visible: gauges `operator.ai.reservations.unknown`, `...unknown.oldest.age`, `...overdue` and
+  `operator.ai.overruns.recent`, with alerts and runbook entries.
+- `ai_usage_event` is the usage ledger: one append-only row per closed reservation that may have cost money, with
+  provider, model, region, price version, token counts, cost, reserved amount and overrun. No prompt or response
+  content. A store reads only its own rows; only the functions write them.
+- Every transition is a conditional update of one locked row; nothing assumes exactly-once delivery. Settling the
+  same usage again returns the first settlement; different usage for a closed reservation is a conflict.
+- Not covered yet: a correction after a conservative reconciliation when provider data arrives later (it is a
+  conflict today and needs an adjustment entry), and the retention period of `ai_usage_event` (O-03).
+- Not yet: the `GovernedModelGateway` and the boundary test (step 3); run limits as versioned policies (step 4).
+  Until step 3 the agent runtime does not call the governor, and the agent stays off.
 
 ### Rollout relative to the pilot
 

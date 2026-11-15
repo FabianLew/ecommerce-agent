@@ -80,7 +80,7 @@ class PostgresAiBudgetGovernor implements AiBudgetGovernor {
         jdbc.sql("SELECT ai_release(?, ?)").params(reservationId, reason).query(String.class).single();
     }
 
-    private static void requireBound(TrustedStoreScope scope) {
+    static void requireBound(TrustedStoreScope scope) {
         TrustedStoreScope bound = StoreRowGuard.current()
                 .orElseThrow(() -> new AiGovernanceException("AI_SCOPE_NOT_BOUND"));
         if (!bound.storeId().equals(scope.storeId()) || !bound.organizationId().equals(scope.organizationId())) {

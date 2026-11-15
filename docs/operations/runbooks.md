@@ -92,6 +92,34 @@ The estimated model cost passed 20 USD in a day. Check whether the number of ana
 many) or the runs grew (more model calls per run). Reduce the run limits or switch the agent off; the price list
 version is on every run.
 
+### AI reservation unknown
+
+An AI call was sent and its result is not known (timeout, dropped connection, worker crash after sending), so it may
+have been charged. Its reservation keeps counting against every budget (ADR-0027 section 4.5); it is never retried
+automatically.
+
+1. Find it: `SELECT id, store_id, automation_type, state_reason, sent_at, unknown_at FROM ai_budget_reservation
+   WHERE state = 'UNKNOWN'` (as an operator role, not the runtime).
+2. Check the provider's usage or console for the request around `sent_at`.
+3. Close it with `AiUsageLedger.reconcile`: `NOT_CHARGED` when the provider shows no request, `CHARGED` with the
+   confirmed amount, or leave it: after `operator.ai-governance.unknown-conservative-settlement-after` (24 hours) the
+   sweep records the full reserved amount as spent (`RECONCILED_CONSERVATIVE`).
+4. Many at once point to a provider outage or a network problem between the worker and the provider.
+
+### AI reservations overdue
+
+Reservations stay `RESERVED` or `IN_PROGRESS` more than 10 minutes past their expiry, so the worker's reservation
+sweep is not running. Budgets are not overspent (the reservations still count), but they stay blocked. Check that the
+worker runs (see "Worker missing") and look for `AI reservations swept` and errors of `ai_sweep_reservations` in its
+logs.
+
+### AI cost overrun
+
+A call cost more than its conservative reservation. The full cost is recorded (`ai_usage_event.overrun_amount`) and
+budgets already count it. Look at the event: usage far above `max_output_tokens` or unexpected cache or extra units
+mean the estimate is wrong for that automation (margin, token limits, or a feature without a price). Fix the estimate
+before the next price or limit change; repeated overruns are a reason to switch the agent off.
+
 ### API errors
 
 More than 2% of API requests fail. Find the endpoint in the logs (`http.server.requests` with status 5xx) and the

@@ -222,7 +222,14 @@ class RowLevelSecurityTest {
                         """).query(String.class).list()).containsExactlyInAnyOrder(
                 "webhook_endpoint:operator_system", "operational_metric:operator_system",
                 "apply_audit_retention:operator_system", "ai_reserve:operator_system",
-                "ai_release:operator_system");
+                "ai_release:operator_system", "ai_mark_sent:operator_system", "ai_settle:operator_system",
+                "ai_mark_unknown:operator_system", "ai_reconcile:operator_system",
+                "ai_sweep_reservations:operator_system");
+        assertThat(fixtures.sql("""
+                        SELECT p.proname FROM pg_proc p
+                        WHERE p.proowner = 'operator_system'::regrole AND has_function_privilege('public', p.oid, 'EXECUTE')
+                        """).query(String.class).list()).as("no function of operator_system is executable by PUBLIC")
+                .isEmpty();
         assertThat(jdbc.sql("SELECT operational_metric('operator.outbox.pending')").query(Double.class).single())
                 .as("a cross-store count, unbound").isGreaterThanOrEqualTo(2.0);
         assertThat(fixtures.sql("""

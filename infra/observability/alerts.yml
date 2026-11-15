@@ -80,6 +80,26 @@ groups:
         annotations:
           summary: "Estimated model cost above 20 USD in 24 hours"
           runbook: docs/operations/runbooks.md#agent-cost-high
+      - alert: AiReservationUnknown
+        expr: max(operator_ai_reservations_unknown) > 0
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "An AI call may have been charged but its cost is not confirmed (UNKNOWN); it keeps its budget"
+          runbook: docs/operations/runbooks.md#ai-reservation-unknown
+      - alert: AiReservationsOverdue
+        expr: max(operator_ai_reservations_overdue) > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "AI reservations stay open past expiry; the reservation sweep is not running"
+          runbook: docs/operations/runbooks.md#ai-reservations-overdue
+      - alert: AiCostOverrun
+        expr: max(operator_ai_overruns_recent) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "An AI call cost more than its reservation in the last 24 hours"
+          runbook: docs/operations/runbooks.md#ai-cost-overrun
 
   - name: operator-platform
     rules:
