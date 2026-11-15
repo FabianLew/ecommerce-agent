@@ -201,8 +201,9 @@ public class AdPauseExecutor {
     private Outcome finish(TrustedStoreScope scope, AuthorizedAction action, ActionExecution execution,
             ExecutionStatus next, String code, String providerRequestId, boolean nothingChanged) {
         ActionExecution moved = ledger.move(scope, execution.id(), next, code, providerRequestId, nothingChanged);
-        record(scope, moved, action, Map.of());
-        return outcome(moved, false);
+        record(scope, moved, action, code == null ? Map.of() : Map.of("attemptCode", code));
+        // An UNKNOWN row that stays UNKNOWN keeps its first reason; the outcome says why this attempt stopped.
+        return new Outcome(moved.id(), moved.status(), code != null ? code : moved.resultCode(), false);
     }
 
     private void record(TrustedStoreScope scope, ActionExecution execution, AuthorizedAction action,

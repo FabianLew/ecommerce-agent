@@ -1463,6 +1463,55 @@
         "required" : [ "definitionVersion", "key", "missingComponents", "observedAt", "period", "quality", "sourceRefs", "unit" ],
         "type" : "object"
       },
+      "MutationStopRequest" : {
+        "properties" : {
+          "reason" : {
+            "description" : "Required when stopping, at most 500 characters",
+            "type" : "string"
+          },
+          "stopped" : {
+            "description" : "true stops writes, false resumes them",
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "stopped" ],
+        "type" : "object"
+      },
+      "MutationStopResponse" : {
+        "properties" : {
+          "canResume" : {
+            "type" : "boolean"
+          },
+          "canStop" : {
+            "type" : "boolean"
+          },
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changedBy" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "globallyStopped" : {
+            "description" : "Operators stopped all writes; the store cannot resume them",
+            "type" : "boolean"
+          },
+          "reason" : {
+            "type" : "string"
+          },
+          "stopped" : {
+            "type" : "boolean"
+          },
+          "version" : {
+            "description" : "0 until the first change",
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "canResume", "canStop", "globallyStopped", "stopped", "version" ],
+        "type" : "object"
+      },
       "OnboardingRequest" : {
         "properties" : {
           "acknowledgements" : {
@@ -4432,6 +4481,135 @@
           }
         },
         "tags" : [ "meta-connection-controller" ]
+      }
+    },
+    "/api/v1/stores/{storeId}/mutation-stop" : {
+      "get" : {
+        "operationId" : "mutationStop",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MutationStopResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "mutation-stop-controller" ]
+      },
+      "post" : {
+        "operationId" : "changeMutationStop",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "storeId",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MutationStopRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MutationStopResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Missing or invalid access token"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store member without the required permission"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description" : "Store or resource does not exist or is not available"
+          }
+        },
+        "tags" : [ "mutation-stop-controller" ]
       }
     },
     "/api/v1/stores/{storeId}/onboarding" : {

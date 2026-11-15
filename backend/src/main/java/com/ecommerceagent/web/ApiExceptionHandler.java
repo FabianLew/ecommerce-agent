@@ -3,6 +3,7 @@ package com.ecommerceagent.web;
 import java.util.List;
 
 import com.ecommerceagent.automation.OnboardingConflictException;
+import com.ecommerceagent.automation.execution.MutationStopException;
 import com.ecommerceagent.automation.guardian.ApprovalException;
 import com.ecommerceagent.businessprofile.BusinessProfileException;
 import com.ecommerceagent.commerce.AdMappingException;
@@ -87,6 +88,20 @@ class ApiExceptionHandler {
             default -> "The decision cannot be recorded now.";
         };
         return error(request, status, exception.code(), message, false);
+    }
+
+    @ExceptionHandler(MutationStopException.class)
+    ResponseEntity<ApiError> mutationStop(MutationStopException exception, HttpServletRequest request) {
+        return switch (exception.kind()) {
+            case INVALID -> ResponseEntity.status(HttpStatus.UNPROCESSABLE_CONTENT).body(new ApiError(
+                    "VALIDATION_FAILED", "Correct the highlighted fields.",
+                    List.of(new ApiError.FieldError("reason", exception.code(), exception.getMessage())), false,
+                    RequestCorrelationFilter.requestId(request), null));
+            case PRECONDITION_FAILED -> error(request, HttpStatus.PRECONDITION_FAILED, exception.code(),
+                    "The stop was changed by someone else. Reload it and try again.", false);
+            case PRECONDITION_REQUIRED -> error(request, HttpStatus.PRECONDITION_REQUIRED, exception.code(),
+                    "Reload the stop and try again.", false);
+        };
     }
 
     @ExceptionHandler(BusinessProfileException.class)

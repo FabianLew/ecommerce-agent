@@ -9,20 +9,23 @@ import { getLocale, getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { storePath } from "@/lib/store-path";
 
+import { MutationStopForm } from "./MutationStopForm";
 import { ProfileForm } from "./ProfileForm";
 
 export const dynamic = "force-dynamic";
 
 type Profile = components["schemas"]["ProfileResponse"];
+type Stop = components["schemas"]["MutationStopResponse"];
 
-/** Settings: the Store Business Profile (B-33, ADR-0018). Other settings follow in later iterations. */
+/** Settings: the mutation stop (B-40, ADR-0020) and the Store Business Profile (B-33, ADR-0018). */
 export default async function SettingsPage({ params }: { params: Promise<{ storeId: string }> }) {
   const { storeId } = await params;
   const path = storePath(storeId, "settings");
   const api = await backend(path);
-  const [store, profile, locale, messages] = await Promise.all([
+  const [store, profile, stop, locale, messages] = await Promise.all([
     api.GET("/api/v1/stores/{storeId}", { params: { path: { storeId } } }),
     api.GET("/api/v1/stores/{storeId}/business-profile", { params: { path: { storeId } } }),
+    api.GET("/api/v1/stores/{storeId}/mutation-stop", { params: { path: { storeId } } }),
     getLocale(),
     getMessages(),
   ]);
@@ -36,6 +39,10 @@ export default async function SettingsPage({ params }: { params: Promise<{ store
   return (
     <>
       <PageHeading>{messages.sections.settings}</PageHeading>
+      {stop.data ? (
+        <MutationStopCard storeId={storeId} stop={stop.data} timezone={store.data.timezone} locale={locale}
+          t={messages.mutationStop} />
+      ) : null}
       <section className="card" aria-labelledby="profile-title" data-testid="profile-card">
         <div className="card-header">
           <h2 id="profile-title">{t.title}</h2>
@@ -103,5 +110,45 @@ function ProfileSummary({
       <p className="muted">{t.approvedAt(formatInstant(profile.approvedAt, timezone, locale))}</p>
       <Missing profile={profile} t={t} />
     </>
+  );
+}
+
+function MutationStopCard({
+  storeId,
+  stop,
+  timezone,
+  locale,
+  t,
+}: {
+  storeId: string;
+  stop: Stop;
+  timezone: string;
+  locale: Locale;
+  t: Messages["mutationStop"];
+}) {
+  const allowed = stop.stopped ? stop.canResume : stop.canStop;
+  return (
+    <section className="card" aria-labelledby="stop-title" data-testid="mutation-stop-card">
+      <div className="card-header">
+        <h2 id="stop-title">{t.title}</h2>
+        <span className={`badge ${stop.stopped || stop.globallyStopped ? "badge-error" : "badge-connected"}`}>
+          {stop.stopped || stop.globallyStopped ? t.stopped : t.running}
+        </span>
+      </div>
+      <p className="muted">{t.intro}</p>
+      {stop.globallyStopped ? <p className="form-message warning">{t.globallyStopped}</p> : null}
+      {stop.stopped && stop.reason ? (
+        <dl className="details" data-testid="mutation-stop-reason">
+          <dt>{t.reason}</dt>
+          <dd>{stop.reason}</dd>
+        </dl>
+      ) : null}
+      {stop.changedAt ? <p className="muted">{t.changedAt(formatInstant(stop.changedAt, timezone, locale))}</p> : null}
+      {allowed ? (
+        <MutationStopForm key={stop.version} storeId={storeId} version={stop.version} stopped={stop.stopped} />
+      ) : (
+        <p className="muted">{stop.stopped ? t.resumeReadOnly : t.readOnly}</p>
+      )}
+    </section>
   );
 }

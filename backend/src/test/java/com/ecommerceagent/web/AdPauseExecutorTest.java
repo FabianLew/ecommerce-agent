@@ -13,6 +13,7 @@ import com.ecommerceagent.automation.execution.AdPauseExecutor;
 import com.ecommerceagent.automation.execution.AuthorizedAction;
 import com.ecommerceagent.automation.execution.ExecutionAuthority;
 import com.ecommerceagent.automation.execution.ExecutionStatus;
+import com.ecommerceagent.automation.execution.MutationStops;
 import com.ecommerceagent.automation.guardian.DecisionApprovals;
 import com.ecommerceagent.automation.guardian.GuardianSignals;
 import com.ecommerceagent.commerce.AdData;
@@ -82,6 +83,8 @@ class AdPauseExecutorTest extends DecisionScenario {
     AdPauseExecutor executor;
     @Autowired
     MetaConnections connections;
+    @Autowired
+    MutationStops mutationStops;
 
     TrustedStoreScope owner;
 
@@ -215,6 +218,53 @@ class AdPauseExecutorTest extends DecisionScenario {
         assertThat(outcome.status()).isEqualTo(ExecutionStatus.FAILED);
         assertThat(outcome.code()).isEqualTo("AUTHORIZATION_EXPIRED");
         assertThat(writes()).isZero();
+    }
+
+    @Test
+    void aMutationStopBetweenApprovalAndWriteKeepsTheWriteFromHappening() {
+        // IG-14: the stop arrives after the authorization was issued.
+        AuthorizedAction action = authorized();
+        mutationStops.change(owner, true, "Account under review", 0);
+        GRAPH.on("GET ad-9001", ad("ACTIVE"));
+        GRAPH.on("POST ad-9001", Reply.ok("{\"success\":true}"));
+
+        AdPauseExecutor.Outcome outcome = executor.execute(scope, action.id());
+
+        assertThat(outcome.status()).isEqualTo(ExecutionStatus.FAILED);
+        assertThat(outcome.code()).isEqualTo("MUTATIONS_STOPPED");
+        assertThat(writes()).isZero();
+        assertThat(openSlots()).isZero();
+    }
+
+    @Test
+    void aStopNeverBlocksReconcilingAWriteAlreadySent() {
+        AuthorizedAction action = authorized();
+        GRAPH.on("GET ad-9001", ad("ACTIVE"));
+        GRAPH.on("POST ad-9001", Reply.error(503, 2, 0));
+        assertThat(executor.execute(scope, action.id()).status()).isEqualTo(ExecutionStatus.UNKNOWN);
+        mutationStops.change(owner, true, "Stop everything", 0);
+
+        // The ad turned out paused: the effect is confirmed by reading and verified, no new write.
+        GRAPH.on("GET ad-9001", ad("PAUSED"));
+        AdPauseExecutor.Outcome retry = executor.execute(scope, action.id());
+        assertThat(retry.status()).isEqualTo(ExecutionStatus.APPLIED);
+        assertThat(executor.verify(scope, retry.executionId(), false).status()).isEqualTo(ExecutionStatus.VERIFIED);
+        assertThat(writes()).isEqualTo(1);
+    }
+
+    @Test
+    void aStopKeepsAnUncertainRetryFromWritingAgain() {
+        AuthorizedAction action = authorized();
+        GRAPH.on("GET ad-9001", ad("ACTIVE"));
+        GRAPH.on("POST ad-9001", Reply.error(503, 2, 0));
+        assertThat(executor.execute(scope, action.id()).status()).isEqualTo(ExecutionStatus.UNKNOWN);
+        mutationStops.change(owner, true, "Stop everything", 0);
+
+        // Still active after the uncertain write: a new write would be needed, and the stop forbids it.
+        AdPauseExecutor.Outcome retry = executor.execute(scope, action.id());
+        assertThat(retry.status()).isEqualTo(ExecutionStatus.UNKNOWN);
+        assertThat(retry.code()).isEqualTo("MUTATIONS_STOPPED");
+        assertThat(writes()).isEqualTo(1);
     }
 
     @Test

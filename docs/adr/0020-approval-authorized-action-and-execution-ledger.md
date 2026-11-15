@@ -58,9 +58,10 @@ The model must stay outside it: it proposes, and only trusted backend code appro
    time: own status `PAUSED` gives `VERIFIED`; otherwise `UNKNOWN` with an escalation. Nothing is undone
    automatically.
 7. **Mutation stop (B-40).** A per-store `store_mutation_stop` (state, reason, version, who and when) and a global
-   setting `operator.execution.mutations-enabled`. `GET/POST /mutation-stop` `{enabled, reason}` with `If-Match` of
-   the version: stopping needs `DECISION_APPROVE` or `STORE_MANAGE`; resuming needs `STORE_MANAGE` and a
-   reauthorization. The stop is checked when approving, when authorizing and right before the write; it never
+   setting `operator.execution.mutations-enabled`. `GET/POST /mutation-stop` `{stopped, reason}` with `If-Match` of
+   the version (ETag `"stop-{version}"`, version 0 before the first change): stopping needs `DECISION_APPROVE` or
+   `STORE_MANAGE` and a reason; resuming needs `STORE_MANAGE`; both reauthorize. A rejection is still possible
+   while stopped, because it changes nothing outside. The stop is checked when approving, when authorizing and right before the write; it never
    stops reads, verification or reconciliation of an already sent write.
 8. **Workflow.** A new `Workflow.getVersion` branch: with `REQUIRE_APPROVAL` and mode `EXECUTE_ON_APPROVAL` the
    episode waits (status `AWAITING_DECISION`) for the approval signal or the proposal expiry. On approval it runs

@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
 
+import com.ecommerceagent.automation.execution.MutationStops;
 import com.ecommerceagent.decisions.DecisionDisposition;
 import com.ecommerceagent.decisions.DecisionProposal;
 import com.ecommerceagent.decisions.DecisionProposals;
@@ -65,11 +66,12 @@ public class DecisionApprovals {
     private final JdbcClient jdbc;
     private final TransactionTemplate transactions;
     private final GuardianSignals signals;
+    private final MutationStops stops;
     private final Clock clock;
 
     DecisionApprovals(DecisionProposals proposals, Opportunities opportunities, PolicyEvaluations evaluations,
             InventoryProtectionPolicy policy, StoreAccess storeAccess, AuditTrail audit, JdbcClient jdbc,
-            TransactionTemplate transactions, GuardianSignals signals, Clock clock) {
+            TransactionTemplate transactions, GuardianSignals signals, MutationStops stops, Clock clock) {
         this.proposals = proposals;
         this.opportunities = opportunities;
         this.evaluations = evaluations;
@@ -79,6 +81,7 @@ public class DecisionApprovals {
         this.jdbc = jdbc;
         this.transactions = transactions;
         this.signals = signals;
+        this.stops = stops;
         this.clock = clock;
     }
 
@@ -89,6 +92,10 @@ public class DecisionApprovals {
         }
         if (!scope.has(StorePermission.DECISION_APPROVE)) {
             return Optional.of("PERMISSION_MISSING");
+        }
+        Optional<String> stopped = stops.blocker(scope);
+        if (stopped.isPresent() && decision == Decision.APPROVED) {
+            return stopped;
         }
         return precondition(scope, stored, decision, clock.instant());
     }
@@ -151,6 +158,12 @@ public class DecisionApprovals {
             }
             StoredProposal stored = proposals.find(fresh, proposalId)
                     .orElseThrow(() -> new ApprovalException(ApprovalException.Kind.NOT_FOUND, "NOT_FOUND"));
+            // A rejection changes nothing outside: only an approval is refused while mutations are stopped.
+            if (decision == Decision.APPROVED) {
+                stops.blocker(fresh).ifPresent(code -> {
+                    throw new ApprovalException(ApprovalException.Kind.CONFLICT, code);
+                });
+            }
             if (ofProposal(fresh, proposalId).isPresent()) {
                 throw new ApprovalException(ApprovalException.Kind.CONFLICT, "ALREADY_DECIDED");
             }

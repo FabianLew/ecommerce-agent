@@ -516,6 +516,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stores/{storeId}/mutation-stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mutationStop"];
+        put?: never;
+        post: operations["changeMutationStop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stores/{storeId}/onboarding": {
         parameters: {
             query?: never;
@@ -1128,6 +1144,29 @@ export interface components {
             unit: string;
             /** @description Decimal string; null when quality is UNAVAILABLE */
             value?: string;
+        };
+        MutationStopRequest: {
+            /** @description Required when stopping, at most 500 characters */
+            reason?: string;
+            /** @description true stops writes, false resumes them */
+            stopped: boolean;
+        };
+        MutationStopResponse: {
+            canResume: boolean;
+            canStop: boolean;
+            /** Format: date-time */
+            changedAt?: string;
+            /** Format: uuid */
+            changedBy?: string;
+            /** @description Operators stopped all writes; the store cannot resume them */
+            globallyStopped: boolean;
+            reason?: string;
+            stopped: boolean;
+            /**
+             * Format: int32
+             * @description 0 until the first change
+             */
+            version: number;
         };
         OnboardingRequest: {
             acknowledgements?: ("SKIP_META" | "MAPPINGS_LATER")[];
@@ -3054,6 +3093,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MetaConnectionResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    mutationStop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationStopResponse"];
+                };
+            };
+            /** @description Missing or invalid access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store member without the required permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+            /** @description Store or resource does not exist or is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiError"];
+                };
+            };
+        };
+    };
+    changeMutationStop: {
+        parameters: {
+            query?: never;
+            header?: {
+                "If-Match"?: string;
+            };
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MutationStopRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MutationStopResponse"];
                 };
             };
             /** @description Missing or invalid access token */
