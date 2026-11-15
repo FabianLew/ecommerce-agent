@@ -26,6 +26,7 @@ import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.integration.MetaAdActions;
 import com.ecommerceagent.metrics.CanonicalJson;
 import com.ecommerceagent.metrics.MetricDefinition;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,8 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 @NamedInterface("execution")
 public class ActionOutcomes {
+
+    private final MeterRegistry meters;
 
     public enum Authorship {
         /** We sent the write and a read confirmed it. */
@@ -102,7 +105,8 @@ public class ActionOutcomes {
     ActionOutcomes(ExecutionLedger ledger, ExecutionAuthority authority, DecisionProposals proposals,
             Opportunities opportunities, MetaAdActions meta, InventoryRepository inventory, OrderRepository orders,
             StoreAccess storeAccess, AuditTrail audit, JdbcClient jdbc, TransactionTemplate transactions,
-            Clock clock) {
+            Clock clock, MeterRegistry meters) {
+        this.meters = meters;
         this.ledger = ledger;
         this.authority = authority;
         this.proposals = proposals;
@@ -202,6 +206,9 @@ public class ActionOutcomes {
             audit.record(AuditEntry.inScope(scope, "ACTION_OUTCOME_RECORDED", RESOURCE, id.toString(),
                     Map.of("executionId", executionId.toString(), "technicalResult", execution.status().name(),
                             "authorship", authorship(execution).name())));
+            // ADR-0024: one count per final execution, by technical result and authorship.
+            meters.counter("operator.action.outcomes", "result", execution.status().name(),
+                    "authorship", authorship(execution).name()).increment();
         });
         return ofExecution(scope, executionId).orElseThrow();
     }

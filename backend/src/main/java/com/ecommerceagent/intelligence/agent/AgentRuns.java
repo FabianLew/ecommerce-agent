@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.metrics.CanonicalJson;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 import tools.jackson.databind.JsonNode;
@@ -30,8 +31,11 @@ public class AgentRuns {
 
     private final JdbcClient jdbc;
 
-    AgentRuns(JdbcClient jdbc) {
+    private final MeterRegistry meters;
+
+    AgentRuns(JdbcClient jdbc, MeterRegistry meters) {
         this.jdbc = jdbc;
+        this.meters = meters;
     }
 
     /** What a new run pins before its first model call. */
@@ -103,7 +107,7 @@ public class AgentRuns {
     }
 
     public void finish(TrustedStoreScope scope, UUID runId, Finish finish) {
-        jdbc.sql("""
+        int finished = jdbc.sql("""
                         UPDATE agent_run SET status = :status, stop_reason = :stopReason, model_calls = :modelCalls,
                                tool_calls = :toolCalls, repair_calls = :repairCalls, input_tokens = :inputTokens,
                                output_tokens = :outputTokens, usage_complete = :usageComplete,
@@ -126,6 +130,11 @@ public class AgentRuns {
                 .param("organizationId", scope.organizationId())
                 .param("storeId", scope.storeId())
                 .update();
+        if (finished == 1) {
+            // ADR-0024: runs by status and their estimated cost, for the agent dashboard and the cost alert.
+            meters.counter("operator.agent.runs", "status", finish.status().name()).increment();
+            meters.summary("operator.agent.cost.usd").record(finish.estimatedCostUsd().doubleValue());
+        }
     }
 
     /** A succeeded run whose proposal the validator rejected. */

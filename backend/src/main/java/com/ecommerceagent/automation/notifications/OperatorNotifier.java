@@ -16,6 +16,7 @@ import com.ecommerceagent.identity.TrustedStoreScope;
 import com.ecommerceagent.metrics.CanonicalJson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.modulith.NamedInterface;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,8 @@ import tools.jackson.databind.node.ObjectNode;
 @NamedInterface("notifications")
 public class OperatorNotifier {
 
+    private final MeterRegistry meters;
+
     static final String SWEEP = "notification-sweep";
     private static final Logger log = LoggerFactory.getLogger(OperatorNotifier.class);
     private static final String COLUMNS = """
@@ -46,7 +49,8 @@ public class OperatorNotifier {
     private final Clock clock;
 
     OperatorNotifier(StoreAccess storeAccess, MailProvider mail, NotificationSettings settings, JdbcClient jdbc,
-            TransactionTemplate transactions, Clock clock) {
+            TransactionTemplate transactions, Clock clock, MeterRegistry meters) {
+        this.meters = meters;
         this.storeAccess = storeAccess;
         this.mail = mail;
         this.settings = settings;
@@ -287,6 +291,8 @@ public class OperatorNotifier {
                 .param("floor", attemptsFloor)
                 .param("id", deliveryId)
                 .update();
+        meters.counter("operator.notification.deliveries", "status", status,
+                "code", errorCode == null ? "none" : errorCode).increment();
     }
 
     private boolean exists(TrustedStoreScope scope, UUID notificationId) {

@@ -1,0 +1,101 @@
+# Alert rules for the pilot (ADR-0024), in Prometheus rule format. Metric names are the Prometheus form of the
+# OTLP metrics the backend exports (dots become underscores, counters get _total, seconds get _seconds).
+# Every alert links its runbook section in docs/operations/runbooks.md.
+groups:
+  - name: operator-actions
+    rules:
+      - alert: ExecutionUnknown
+        expr: max(operator_executions_unknown) > 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "An ad pause is not confirmed (UNKNOWN); a person must check the ad in Meta"
+          runbook: docs/operations/runbooks.md#execution-unknown
+      - alert: ExecutionStuck
+        expr: max(operator_executions_stuck) > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "An execution has been IN_PROGRESS or APPLIED for more than 15 minutes"
+          runbook: docs/operations/runbooks.md#execution-stuck
+      - alert: MutationsStopped
+        expr: max(operator_mutation_stops_active) > 0
+        for: 24h
+        labels: {severity: info}
+        annotations:
+          summary: "A store has had its mutations stopped for a day; confirm it is still intended"
+          runbook: docs/operations/runbooks.md#mutations-stopped
+      - alert: ObservationsOverdue
+        expr: max(operator_observations_overdue) > 0
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "Outcome checkpoints are more than an hour past due; the observer is not running"
+          runbook: docs/operations/runbooks.md#observations-overdue
+
+  - name: operator-integrations
+    rules:
+      - alert: WebhookBacklog
+        expr: max(operator_webhook_inbox_oldest_age_seconds) > 600
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Webhook deliveries wait more than 10 minutes; stock may be stale"
+          runbook: docs/operations/runbooks.md#webhook-backlog
+      - alert: OutboxBacklog
+        expr: max(operator_outbox_oldest_age_seconds) > 600
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Outbox events wait more than 10 minutes; analyses are not started"
+          runbook: docs/operations/runbooks.md#outbox-backlog
+      - alert: ConnectionFailing
+        expr: max(operator_connections_failing) > 0
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "A WooCommerce or Meta connection is in ERROR"
+          runbook: docs/operations/runbooks.md#connection-failing
+
+  - name: operator-notifications-and-agent
+    rules:
+      - alert: NotificationDeliveriesExhausted
+        expr: max(delta(operator_notification_deliveries_exhausted[1h])) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "E-mail deliveries failed after the last attempt; approvers may not know about a decision"
+          runbook: docs/operations/runbooks.md#notification-deliveries-exhausted
+      - alert: AgentFailing
+        expr: >
+          sum(increase(operator_agent_runs_total{status!="SUCCEEDED"}[1h]))
+            / clamp_min(sum(increase(operator_agent_runs_total[1h])), 1) > 0.5
+          and sum(increase(operator_agent_runs_total[1h])) >= 4
+        labels: {severity: warning}
+        annotations:
+          summary: "More than half of the agent runs in the last hour did not succeed; the baseline takes over"
+          runbook: docs/operations/runbooks.md#agent-failing
+      - alert: AgentCostHigh
+        expr: sum(increase(operator_agent_cost_usd_sum[24h])) > 20
+        labels: {severity: warning}
+        annotations:
+          summary: "Estimated model cost above 20 USD in 24 hours"
+          runbook: docs/operations/runbooks.md#agent-cost-high
+
+  - name: operator-platform
+    rules:
+      - alert: ApiErrors
+        expr: >
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 0.001) > 0.02
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "More than 2% of API requests fail with 5xx"
+          runbook: docs/operations/runbooks.md#api-errors
+      - alert: WorkerMissing
+        expr: absent(operator_executions_unknown)
+        for: 10m
+        labels: {severity: critical}
+        annotations:
+          summary: "No worker publishes metrics; workflows, sweeps and observers are not running"
+          runbook: docs/operations/runbooks.md#worker-missing

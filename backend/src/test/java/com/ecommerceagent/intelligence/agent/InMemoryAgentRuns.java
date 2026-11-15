@@ -17,7 +17,7 @@ public final class InMemoryAgentRuns extends AgentRuns {
     public final Map<UUID, List<AgentRunStep>> steps = new LinkedHashMap<>();
 
     public InMemoryAgentRuns() {
-        super(null);
+        super(null, new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
     }
 
     @Override

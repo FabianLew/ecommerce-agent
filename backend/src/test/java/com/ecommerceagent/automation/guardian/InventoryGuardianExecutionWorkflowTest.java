@@ -84,6 +84,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 @Import(TestcontainersConfiguration.class)
 class InventoryGuardianExecutionWorkflowTest extends ExecutionWorkflowScenario {
 
+    @org.springframework.beans.factory.annotation.Autowired
+    io.micrometer.core.instrument.MeterRegistry meters;
+
+
     @Test
     void anApprovalIsAuthorizedExecutedOnceAndVerified() throws Exception {
         java.util.concurrent.atomic.AtomicBoolean paused = new java.util.concurrent.atomic.AtomicBoolean();
@@ -116,6 +120,13 @@ class InventoryGuardianExecutionWorkflowTest extends ExecutionWorkflowScenario {
         // The approvers were told twice: a decision is needed, then the confirmed pause (ADR-0021).
         assertThat(jdbc.sql("SELECT kind FROM operator_notification WHERE store_id = ? ORDER BY created_at")
                 .param(STORE).query(String.class).list()).containsExactly("DECISION_NEEDED", "ACTION_VERIFIED");
+        // ADR-0024: the outcome is counted and the worker publishes the execution gauges.
+        assertThat(meters.counter("operator.action.outcomes", "result", "VERIFIED", "authorship", "OPERATOR")
+                .count()).isPositive();
+        assertThat(meters.get("operator.notification.deliveries").counters()).isNotEmpty();
+        assertThat(meters.get("operator.executions.unknown").gauge().value()).isNotNaN();
+        assertThat(meters.get("operator.webhook.inbox.oldest.age").gauge().value()).isNotNaN();
+        assertThat(meters.get("operator.notification.deliveries.exhausted").gauge().value()).isNotNaN();
 
         String id = InventoryGuardianWorkflow.workflowId(STORE, serum.toString(), episode.id().toString());
         WorkflowReplayer.replayWorkflowExecution(client.fetchHistory(id), InventoryGuardianWorkflowImpl.class);
