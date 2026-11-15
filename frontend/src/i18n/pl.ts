@@ -230,6 +230,7 @@ export const pl: Messages = {
       INTEGRATION_CHECK_COMPLETED: "Zakończono test połączenia",
       INTEGRATION_SYNC_STARTED: "Rozpoczęto import",
       INTEGRATION_SYNC_FINISHED: "Zakończono import",
+      INTEGRATION_HISTORY_COMPLETED: "Zaimportowano historię zamówień z 12 miesięcy",
       INTEGRATION_WEBHOOK_SECRET_UPDATED: "Zapisano sekret webhooków",
     },
     opportunityStatus: {
@@ -267,6 +268,10 @@ export const pl: Messages = {
     missedWebhooks24h: "Zgubione webhooki (24 h)",
     notImported: "Dane nie zostały jeszcze zaimportowane.",
     sync: "Synchronizacja",
+    history: "Historia zamówień (12 miesięcy)",
+    historyInProgress: (from: string, target: string) =>
+      `Import w tle: na razie zamówienia od ${from}, docelowo od ${target}`,
+    historyComplete: (from: string) => `Zaimportowano od ${from}`,
     orderWindow: "Zakres zamówień",
     productsVariants: "Produkty / warianty",
     orders: "Zamówienia",

@@ -477,9 +477,24 @@ export interface components {
             /** @enum {string} */
             status: "NOT_READY" | "STALE" | "DEGRADED" | "HEALTHY";
         };
+        HistoryResponse: {
+            /**
+             * Format: date-time
+             * @description Orders are imported from this moment on
+             */
+            importedFrom?: string;
+            /** @enum {string} */
+            status: "WAITING_FOR_IMPORT" | "IN_PROGRESS" | "COMPLETE";
+            /**
+             * Format: date-time
+             * @description How far back the history import goes
+             */
+            target?: string;
+        };
         IntegrationResponse: {
             allowedActions: ("SAVE_CREDENTIALS" | "SAVE_WEBHOOK_SECRET" | "RUN_CHECK" | "START_SYNC")[];
             health: components["schemas"]["HealthResponse"];
+            history: components["schemas"]["HistoryResponse"];
             /** Format: uuid */
             id: string;
             /** @description Last 4 characters of the API key */

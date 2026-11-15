@@ -16,6 +16,7 @@ import com.ecommerceagent.integration.IntegrationConnection;
 import com.ecommerceagent.integration.IntegrationConnections;
 import com.ecommerceagent.integration.IntegrationHealth;
 import com.ecommerceagent.integration.IntegrationHealthService;
+import com.ecommerceagent.integration.WooHistoryImport;
 import com.ecommerceagent.integration.IntegrationNotFoundException;
 import com.ecommerceagent.integration.IntegrationProvider;
 import com.ecommerceagent.integration.InvalidIntegrationRequestException;
@@ -43,14 +44,16 @@ class IntegrationController {
     private final StoreSync sync;
     private final WooWebhooks webhooks;
     private final IntegrationHealthService health;
+    private final WooHistoryImport history;
 
     IntegrationController(IntegrationConnections connections, WooCommerceImport imports, StoreSync sync,
-            WooWebhooks webhooks, IntegrationHealthService health) {
+            WooWebhooks webhooks, IntegrationHealthService health, WooHistoryImport history) {
         this.connections = connections;
         this.imports = imports;
         this.sync = sync;
         this.webhooks = webhooks;
         this.health = health;
+        this.history = history;
     }
 
     @GetMapping("/integrations")
@@ -118,7 +121,8 @@ class IntegrationController {
     private IntegrationResponse response(IntegrationConnection connection, TrustedStoreScope scope) {
         return IntegrationResponse.from(connection, imports.latestRun(scope, connection.id()).orElse(null),
                 WebhookResponse.from(connection, webhooks.deliveryUrl(connection).orElse(null)),
-                health.health(scope, connection), scope);
+                health.health(scope, connection), HistoryResponse.from(history.progress(scope, connection.id())),
+                scope);
     }
 
     /** A malformed id is reported like a missing one, as for store ids. */
@@ -180,7 +184,7 @@ class IntegrationController {
         START_SYNC
     }
 
-    /** Only the initial window exists; full history (B-13b) gets its own bounded scope. */
+    /** Only the initial window is started by a user; the order history follows in the background (ADR-0015). */
     enum SyncScope {
         INITIAL_14_DAYS
     }
@@ -222,10 +226,11 @@ class IntegrationController {
             SyncJobResponse lastSync,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) WebhookResponse webhook,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) HealthResponse health,
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) HistoryResponse history,
             @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<IntegrationAction> allowedActions) {
 
         static IntegrationResponse from(IntegrationConnection connection, SyncRun lastSync, WebhookResponse webhook,
-                IntegrationHealth health, TrustedStoreScope scope) {
+                IntegrationHealth health, HistoryResponse history, TrustedStoreScope scope) {
             List<IntegrationAction> actions = new ArrayList<>();
             if (scope.has(StorePermission.STORE_MANAGE)) {
                 actions.add(IntegrationAction.SAVE_CREDENTIALS);
@@ -242,7 +247,18 @@ class IntegrationController {
                     connection.status(), connection.keyHint(), connection.lastCheckAt(), connection.lastSuccessAt(),
                     connection.lastErrorCode(), connection.lastCheckWarnings(), connection.sourceCurrency(),
                     lastSync == null ? null : SyncJobResponse.from(lastSync), webhook, HealthResponse.from(health),
-                    List.copyOf(actions));
+                    history, List.copyOf(actions));
+        }
+    }
+
+    /** The background order history import (ADR-0015); it never affects {@code health}. */
+    record HistoryResponse(
+            @Schema(requiredMode = Schema.RequiredMode.REQUIRED) WooHistoryImport.HistoryProgress.Status status,
+            @Schema(description = "Orders are imported from this moment on") Instant importedFrom,
+            @Schema(description = "How far back the history import goes") Instant target) {
+
+        static HistoryResponse from(WooHistoryImport.HistoryProgress progress) {
+            return new HistoryResponse(progress.status(), progress.importedFrom(), progress.target());
         }
     }
 

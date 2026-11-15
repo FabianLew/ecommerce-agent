@@ -30,9 +30,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * Temporal Schedules for polling ({@code woo-poll-{connectionId}}) and order reconciliation
- * ({@code woo-reconcile-{connectionId}}) of every connected, imported store (ADR-0010). Creating them is
- * idempotent; the store context is stored in the schedule's workflow header.
+ * Temporal Schedules for polling ({@code woo-poll-{connectionId}}), order reconciliation
+ * ({@code woo-reconcile-{connectionId}}, ADR-0010) and the order history import ({@code woo-history-{connectionId}},
+ * ADR-0015) of every connected, imported store. Creating them is idempotent; the store context is stored in the
+ * schedule's workflow header.
  */
 @Service
 public class SyncSchedules {
@@ -44,16 +45,19 @@ public class SyncSchedules {
     private final ScheduleClient schedules;
     private final Duration pollInterval;
     private final Duration reconcileInterval;
+    private final HistorySettings history;
     private final Set<UUID> ensured = ConcurrentHashMap.newKeySet();
 
     SyncSchedules(WooIncrementalSync sync, StoreAccess storeAccess, ScheduleClient schedules,
             @Value("${operator.automation.sync.poll-interval:5m}") Duration pollInterval,
-            @Value("${operator.automation.sync.reconcile-interval:1h}") Duration reconcileInterval) {
+            @Value("${operator.automation.sync.reconcile-interval:1h}") Duration reconcileInterval,
+            HistorySettings history) {
         this.sync = sync;
         this.storeAccess = storeAccess;
         this.schedules = schedules;
         this.pollInterval = pollInterval;
         this.reconcileInterval = reconcileInterval;
+        this.history = history;
     }
 
     /** Ensures schedules for every target not yet handled by this worker; returns how many were created. */
@@ -71,21 +75,26 @@ public class SyncSchedules {
             }
             created += ensure(scope, target.connectionId(), "POLL", pollInterval);
             created += ensure(scope, target.connectionId(), "RECONCILE", reconcileInterval);
+            if (history.enabled()) {
+                created += ensure(scope, target.connectionId(), "HISTORY", history.interval());
+            }
             ensured.add(target.connectionId());
         }
         return created;
     }
 
     public static String scheduleId(UUID connectionId, String kind) {
-        return ("RECONCILE".equals(kind) ? "woo-reconcile-" : "woo-poll-") + connectionId;
+        return switch (kind) {
+            case "RECONCILE" -> "woo-reconcile-";
+            case "HISTORY" -> "woo-history-";
+            default -> "woo-poll-";
+        } + connectionId;
     }
 
     private int ensure(TrustedStoreScope scope, UUID connectionId, String kind, Duration interval) {
         String id = scheduleId(connectionId, kind);
         Schedule schedule = Schedule.newBuilder()
-                .setAction(ScheduleActionStartWorkflow.newBuilder()
-                        .setWorkflowType(IncrementalSyncWorkflow.class)
-                        .setArguments(connectionId.toString(), kind)
+                .setAction(action(connectionId, kind)
                         .setOptions(WorkflowOptions.newBuilder()
                                 .setWorkflowId(id)
                                 .setTaskQueue(TaskQueues.MAIN)
@@ -109,5 +118,17 @@ public class SyncSchedules {
         } catch (ScheduleAlreadyRunningException e) {
             return 0;
         }
+    }
+
+    private ScheduleActionStartWorkflow.Builder action(UUID connectionId, String kind) {
+        if ("HISTORY".equals(kind)) {
+            return ScheduleActionStartWorkflow.newBuilder()
+                    .setWorkflowType(HistoryImportWorkflow.class)
+                    .setArguments(connectionId.toString(), history.maxChunksPerRun(),
+                            (int) history.pause().toSeconds());
+        }
+        return ScheduleActionStartWorkflow.newBuilder()
+                .setWorkflowType(IncrementalSyncWorkflow.class)
+                .setArguments(connectionId.toString(), kind);
     }
 }

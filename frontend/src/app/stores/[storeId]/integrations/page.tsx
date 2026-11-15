@@ -195,6 +195,19 @@ function SyncDetails({ integration, timezone, locale, t }: DetailsProps) {
         </dd>
         <dt>{t.finished}</dt>
         <dd>{formatInstant(job.finishedAt, timezone, locale)}</dd>
+        {integration.history.status !== "WAITING_FOR_IMPORT" ? (
+          <>
+            <dt>{t.history}</dt>
+            <dd data-testid="sync-history">
+              {integration.history.status === "COMPLETE"
+                ? t.historyComplete(formatInstant(integration.history.importedFrom, timezone, locale))
+                : t.historyInProgress(
+                    formatInstant(integration.history.importedFrom, timezone, locale),
+                    formatInstant(integration.history.target, timezone, locale),
+                  )}
+            </dd>
+          </>
+        ) : null}
       </dl>
     </section>
   );

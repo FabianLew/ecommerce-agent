@@ -2,13 +2,15 @@ package com.ecommerceagent.integration;
 
 import java.time.Instant;
 
-/** One poll or reconciliation run (ADR-0010). */
+/** One poll, reconciliation (ADR-0010) or history chunk (ADR-0015) run. */
 public record SyncCheck(Kind kind, Status status, Instant startedAt, Instant finishedAt, int changes,
         int missedWebhooks, String errorCode) {
 
     public enum Kind {
         POLL,
-        RECONCILE
+        RECONCILE,
+        /** A chunk of the order history import; Integration Health ignores it. */
+        HISTORY
     }
 
     public enum Status {

@@ -254,6 +254,7 @@ export const en = {
       INTEGRATION_CHECK_COMPLETED: "A connection check finished",
       INTEGRATION_SYNC_STARTED: "An import started",
       INTEGRATION_SYNC_FINISHED: "An import finished",
+      INTEGRATION_HISTORY_COMPLETED: "The 12-month order history was imported",
       INTEGRATION_WEBHOOK_SECRET_UPDATED: "The webhook secret was saved",
     } as Record<string, string>,
     opportunityStatus: {
@@ -291,6 +292,10 @@ export const en = {
     missedWebhooks24h: "Missed webhooks (24 h)",
     notImported: "The data has not been imported yet.",
     sync: "Synchronization",
+    history: "Order history (12 months)",
+    historyInProgress: (from: string, target: string) =>
+      `Importing in the background: orders from ${from} so far, going back to ${target}`,
+    historyComplete: (from: string) => `Imported from ${from}`,
     orderWindow: "Order range",
     productsVariants: "Products / variants",
     orders: "Orders",

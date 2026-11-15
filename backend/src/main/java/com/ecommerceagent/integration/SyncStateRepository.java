@@ -62,6 +62,27 @@ class SyncStateRepository {
                 .update();
     }
 
+    /** Moves the watermark back only, for the history import (ADR-0015); a later value never replaces it. */
+    void moveBack(TrustedStoreScope scope, UUID connectionId, SyncStream stream, Instant watermark) {
+        jdbc.sql("""
+                        INSERT INTO sync_watermark (connection_id, organization_id, store_id, stream, watermark,
+                                                    updated_at)
+                        SELECT c.id, c.organization_id, c.store_id, :stream, :watermark, :now
+                        FROM integration_connection c
+                        WHERE c.id = :connectionId AND c.organization_id = :organizationId AND c.store_id = :storeId
+                        ON CONFLICT (connection_id, stream) DO UPDATE
+                            SET watermark = least(sync_watermark.watermark, EXCLUDED.watermark),
+                                updated_at = EXCLUDED.updated_at
+                        """)
+                .param("stream", stream.name())
+                .param("watermark", Timestamp.from(watermark))
+                .param("now", Timestamp.from(clock.instant()))
+                .param("connectionId", connectionId)
+                .param("organizationId", scope.organizationId())
+                .param("storeId", scope.storeId())
+                .update();
+    }
+
     void recordCheck(TrustedStoreScope scope, UUID connectionId, SyncCheck check) {
         jdbc.sql("""
                         INSERT INTO sync_check (id, organization_id, store_id, connection_id, kind, status, started_at,

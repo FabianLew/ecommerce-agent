@@ -59,6 +59,8 @@ test("a stock drop in WooCommerce becomes a pause proposal waiting for approval 
   // 3. Import the last 14 days: 49 SERUM-30 units in the last 7 full days, 60 in stock (not at risk yet).
   await card.getByRole("button", { name: "Import data from the last 14 days" }).click();
   await expect(card.getByTestId("sync-status")).toHaveText("Synchronization complete", { timeout: 120_000 });
+  // The 12-month order history follows in the background and does not hold anything up (B-13b).
+  await expect(card.getByTestId("sync-history")).toContainText(/Importing in the background|Imported from/);
 
   // 4. Stock drops to 18 in WooCommerce; Woo delivers the product webhook through Action Scheduler.
   const productId = wp("wc", "product", "list", "--user=admin", "--sku=SERUM", "--field=id");
