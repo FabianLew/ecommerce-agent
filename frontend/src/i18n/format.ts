@@ -79,3 +79,19 @@ export function toNumber(value: number | string | undefined | null): number | un
   const number = typeof value === "number" ? value : Number(value);
   return Number.isFinite(number) ? number : undefined;
 }
+
+/**
+ * Time until (or since) an instant in words, for deadlines where urgency matters (plan section 5.4): "in 23 hours",
+ * "za 2 dni". Minutes below an hour, hours below two days, days above. `now` is passed in so tests are stable.
+ */
+export function formatRelative(value: string | undefined | null, locale: Locale, now: Date = new Date()): string {
+  if (!value) {
+    return "—";
+  }
+  const minutes = (new Date(value).getTime() - now.getTime()) / 60_000;
+  const format = new Intl.RelativeTimeFormat(INTL_TAGS[locale], { numeric: "auto" });
+  const size = Math.abs(minutes);
+  if (size < 60) return format.format(Math.round(minutes), "minute");
+  if (size < 48 * 60) return format.format(Math.round(minutes / 60), "hour");
+  return format.format(Math.round(minutes / (24 * 60)), "day");
+}

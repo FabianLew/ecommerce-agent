@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatCount, formatDays, formatMoney, plural } from "./format";
+import { formatCount, formatDays, formatMoney, formatRelative, plural } from "./format";
 
 describe("formatMoney", () => {
   it("formats each amount in its own currency, never assuming PLN", () => {
@@ -59,5 +59,16 @@ describe("plural and formatCount", () => {
   it("rounds counts", () => {
     expect(formatCount("1234.6", "en")).toBe("1,235");
     expect(formatCount(null, "en")).toBe("—");
+  });
+});
+
+describe("formatRelative", () => {
+  const now = new Date("2026-11-16T12:00:00Z");
+  it("uses minutes, hours and days", () => {
+    expect(formatRelative("2026-11-16T12:30:00Z", "en", now)).toBe("in 30 minutes");
+    expect(formatRelative("2026-11-17T11:00:00Z", "en", now)).toBe("in 23 hours");
+    expect(formatRelative("2026-11-19T12:00:00Z", "en", now)).toBe("in 3 days");
+    expect(formatRelative("2026-11-16T10:00:00Z", "en", now)).toBe("2 hours ago");
+    expect(formatRelative("2026-11-17T11:00:00Z", "pl", now)).toBe("za 23 godziny");
   });
 });
