@@ -121,8 +121,12 @@ test("an expiring access token is refreshed transparently", async ({ page, conte
 test("owner saves a WooCommerce key and sees the check result; analyst gets a read-only card", async ({ page }) => {
   await signIn(page, "owner-a", `/stores/${STORE_A}/integrations`);
   await expect(page).toHaveURL(`/stores/${STORE_A}/integrations`);
+  // The catalog shows one tile per supported integration; the tile opens the connection page.
+  await expect(page.getByTestId("tile-meta-ads")).toBeVisible();
+  await page.getByRole("link", { name: "WooCommerce" }).click();
+  await expect(page).toHaveURL(`/stores/${STORE_A}/integrations/woocommerce`);
+  await expect(page.getByRole("heading", { level: 1, name: "WooCommerce" })).toBeVisible();
   const card = page.getByTestId("woocommerce-card");
-  await expect(card.getByRole("heading", { name: "WooCommerce" })).toBeVisible();
 
   // Client-side format check: the key and the secret are easy to swap.
   const storeUrl = card.getByLabel("Store address");
@@ -146,6 +150,7 @@ test("owner saves a WooCommerce key and sees the check result; analyst gets a re
 
   await switchStore(page, "Sklep C");
   await expect(page).toHaveURL(`/stores/${STORE_C}/integrations`);
+  await page.getByRole("link", { name: "WooCommerce" }).click();
   await expect(page.getByRole("heading", { name: "View only" })).toBeVisible();
   await expect(page.getByLabel("Consumer key")).toHaveCount(0);
 });

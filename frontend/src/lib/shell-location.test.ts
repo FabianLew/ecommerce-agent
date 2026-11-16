@@ -39,6 +39,8 @@ describe("shellLocation", () => {
 
   it("knows the ad mappings and product pages", () => {
     expect(shellLocation(`/stores/${S}/integrations/ads`).crumbs.at(-1)).toEqual({ kind: "sub", page: "adMappings" });
+    expect(shellLocation(`/stores/${S}/integrations/woocommerce`).crumbs.at(-1)).toEqual({ kind: "sub", page: "woocommerce" });
+    expect(shellLocation(`/stores/${S}/integrations/meta-ads`).crumbs.at(-1)).toEqual({ kind: "sub", page: "metaAds" });
     expect(shellLocation(`/stores/${S}/analytics/products/v1`).crumbs.at(-1)).toEqual({ kind: "sub", page: "product" });
   });
 

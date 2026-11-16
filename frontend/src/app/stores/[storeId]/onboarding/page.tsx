@@ -73,8 +73,8 @@ export default async function OnboardingPage({
     );
   const integrations = storePath(storeId, "integrations");
   const primaryLink: Partial<Record<StepCode, string>> = {
-    CONNECT_STORE: integrations,
-    CONNECT_TOOLS: integrations,
+    CONNECT_STORE: `${integrations}/woocommerce`,
+    CONNECT_TOOLS: `${integrations}/meta-ads`,
     BUSINESS_DATA: storePath(storeId, "settings"),
   };
 

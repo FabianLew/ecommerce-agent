@@ -34,7 +34,7 @@ test("a stock drop in WooCommerce becomes a pause proposal waiting for approval 
   test.setTimeout(8 * 60_000);
 
   // 1. Connect the local store with its read-only key.
-  await signIn(page, `/stores/${STORE_B}/integrations`);
+  await signIn(page, `/stores/${STORE_B}/integrations/woocommerce`);
   const card = page.getByTestId("woocommerce-card");
   await expect(card.getByTestId("woocommerce-status"), "store B is already connected: the scenario needs a fresh "
     + "stack (docker compose down -v)").toHaveCount(0);

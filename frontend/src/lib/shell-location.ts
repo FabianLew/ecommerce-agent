@@ -4,7 +4,7 @@ import { isSection, type SectionSlug, storePath } from "./store-path";
 export type ContainerWidth = "standard" | "detail" | "wide";
 
 /** A sub-page below a section, named in the breadcrumbs. */
-export type SubPage = "decision" | "event" | "product" | "adMappings";
+export type SubPage = "decision" | "event" | "product" | "adMappings" | "woocommerce" | "metaAds";
 
 /** A page outside the eight sections that still lives under the store. */
 export type StorePage = "onboarding" | "notifications";
@@ -61,5 +61,7 @@ function subPage(section: SectionSlug, rest: string[]): SubPage | undefined {
   if (section === "activity") return "event";
   if (section === "analytics" && rest[0] === "products") return "product";
   if (section === "integrations" && rest[0] === "ads") return "adMappings";
+  if (section === "integrations" && rest[0] === "woocommerce") return "woocommerce";
+  if (section === "integrations" && rest[0] === "meta-ads") return "metaAds";
   return undefined;
 }

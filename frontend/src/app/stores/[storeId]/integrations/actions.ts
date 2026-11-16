@@ -77,7 +77,7 @@ export async function connectWooCommerce(storeId: string, _previous: FormState, 
   });
   redirectIfUnauthenticated(saved.response.status, path);
   if (!saved.data) {
-    revalidatePath(path);
+    revalidatePath(path, "layout");
     return failure(saved.response.status, saved.error, t);
   }
 
@@ -85,7 +85,7 @@ export async function connectWooCommerce(storeId: string, _previous: FormState, 
     params: { path: { storeId, integrationId } },
   });
   redirectIfUnauthenticated(checked.response.status, path);
-  revalidatePath(path);
+  revalidatePath(path, "layout");
   if (!checked.data) {
     return failure(checked.response.status, checked.error, t);
   }
@@ -101,7 +101,7 @@ export async function checkConnection(storeId: string, integrationId: string): P
     params: { path: { storeId, integrationId } },
   });
   redirectIfUnauthenticated(checked.response.status, path);
-  revalidatePath(path);
+  revalidatePath(path, "layout");
 }
 
 function failure(
@@ -133,7 +133,7 @@ export async function startSync(storeId: string, integrationId: string): Promise
     body: { scope: "INITIAL_14_DAYS" },
   });
   redirectIfUnauthenticated(started.response.status, path);
-  revalidatePath(path);
+  revalidatePath(path, "layout");
 }
 
 export type WebhookSecretState = { status: "idle" | "error" | "saved"; message?: string };
@@ -160,7 +160,7 @@ export async function saveWebhookSecret(
     body: { secret },
   });
   redirectIfUnauthenticated(saved.response.status, path);
-  revalidatePath(path);
+  revalidatePath(path, "layout");
   if (saved.data) {
     return { status: "saved", message: t.secretSaved };
   }
