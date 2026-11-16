@@ -248,6 +248,7 @@
   .chart-svg {
     width: 100%;
     height: auto;
+    max-height: 240px;
   }
 
   .chart-bar {
@@ -1174,6 +1175,259 @@
   .setup-secondary .button.ghost:hover {
     background: none;
     text-decoration: underline;
+  }
+
+  /* ---------- Analytics (R11) ---------- */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: var(--space-3) var(--space-6);
+  }
+
+  .toolbar .tabs {
+    margin: 0;
+  }
+
+  .period-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--space-3);
+  }
+
+  .period-form .field label {
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  .period-form input {
+    min-height: var(--control-h);
+  }
+
+  .period-line {
+    margin: 0;
+  }
+
+  .sort-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .sort-row .tabs {
+    margin: 0;
+  }
+
+  .table-card {
+    padding: 0;
+    overflow-x: auto;
+  }
+
+  .table-card .data-table td a {
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .table-card .data-table td a:hover {
+    text-decoration: underline;
+  }
+
+  /* ---------- Settings (R11) ---------- */
+  .settings-layout {
+    display: grid;
+    gap: var(--space-4);
+    align-items: start;
+  }
+
+  .settings-nav {
+    display: none;
+  }
+
+  @media (min-width: 1280px) {
+    .settings-layout {
+      grid-template-columns: 200px minmax(0, 1fr);
+      gap: var(--space-8);
+    }
+
+    .settings-nav {
+      display: block;
+      position: sticky;
+      top: calc(var(--space-16) + var(--space-4));
+    }
+  }
+
+  .settings-nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 2px;
+  }
+
+  .settings-nav a {
+    display: block;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+  }
+
+  .settings-nav a:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+  }
+
+  .settings-sections {
+    display: grid;
+    gap: var(--space-4);
+    min-width: 0;
+  }
+
+  .settings-sections > div,
+  .settings-sections > section {
+    scroll-margin-top: var(--space-20, 80px);
+  }
+
+  .settings-sections .card {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .settings-sections .card > * {
+    margin: 0;
+  }
+
+  /* ---------- Activity (R11) ---------- */
+  .stack-card {
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .stack-card > * {
+    margin: 0;
+  }
+
+  .details-row {
+    display: contents;
+  }
+
+  .page-header .setup-eyebrow {
+    margin: 0;
+  }
+
+  .feed-card {
+    padding: 0;
+  }
+
+  .feed-day + .feed-day {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .feed-day-title {
+    margin: 0 !important;
+    padding: var(--space-3) var(--space-5) var(--space-2);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    background: var(--color-surface-subtle);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .feed-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .feed-row {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2) var(--space-4);
+    align-items: center;
+    padding: var(--space-3) var(--space-5);
+  }
+
+  .feed-row + .feed-row {
+    border-top: 1px solid var(--color-border);
+  }
+
+  .feed-row:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .feed-row:has(.feed-link:focus-visible) {
+    box-shadow: inset var(--focus-ring);
+  }
+
+  .feed-main {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .feed-link {
+    color: var(--color-text);
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .feed-link::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  .feed-link:focus-visible {
+    outline: none;
+  }
+
+  .feed-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    color: var(--color-text-secondary);
+  }
+
+  .feed-side {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+  }
+
+  .feed-extra {
+    position: relative;
+    z-index: 1;
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    font-weight: 500;
+  }
+
+  .feed-time {
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    color: var(--color-text-tertiary);
+    font-variant-numeric: tabular-nums;
+    min-width: 44px;
+    text-align: right;
+  }
+
+  @media (max-width: 639px) {
+    .feed-row {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .feed-side {
+      justify-content: space-between;
+    }
   }
 
   /* ---------- Integrations (plan 4.E) ---------- */

@@ -339,6 +339,7 @@ export const en = {
     } as Record<string, string>,
   },
   activity: {
+    timezoneNote: (timezone: string) => `Everything the operator and your team did in this store. Times in ${timezone}.`,
     startOver: "Show the latest activity",
     title: "Activity",
     emptyTitle: "No activity yet",
@@ -460,6 +461,10 @@ export const en = {
   },
   analytics: {
     tabs: { sales: "Sales", products: "Products" } as Record<"sales" | "products", string>,
+    dayForms: { one: "day", other: "days" } as PluralForms,
+    periodTitle: "Period",
+    sortLabel: "Sort products",
+    perDay: (value: string) => `${value}/day`,
     from: "From",
     to: "To",
     apply: "Show",
@@ -850,6 +855,7 @@ export const en = {
     failed: (requestId: string) => `The setting could not be changed (request ID ${requestId}).`,
     done: "Saved.",
   },
+  settingsNav: { label: "Settings sections" },
   profile: {
     title: "Business profile",
     intro:

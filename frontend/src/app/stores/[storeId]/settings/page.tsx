@@ -52,17 +52,34 @@ export default async function SettingsPage({ params }: { params: Promise<{ store
   return (
     <>
       <PageHeading>{messages.sections.settings}</PageHeading>
-      <StoreSummary store={store.data} messages={messages} />
+      <div className="settings-layout">
+      <nav className="settings-nav" aria-label={messages.settingsNav.label}>
+        <ul>
+          <li><a href="#settings-store">{messages.store.summary}</a></li>
+          {stop.data ? <li><a href="#settings-stop">{messages.mutationStop.title}</a></li> : null}
+          {permission.data ? <li><a href="#settings-ads">{messages.actionPermission.title}</a></li> : null}
+          {alerts.data ? <li><a href="#settings-alerts">{messages.alertDeputy.title}</a></li> : null}
+          <li><a href="#settings-profile">{t.title}</a></li>
+        </ul>
+      </nav>
+      <div className="settings-sections">
+      <div id="settings-store"><StoreSummary store={store.data} messages={messages} /></div>
       {stop.data ? (
-        <MutationStopCard storeId={storeId} stop={stop.data} timezone={store.data.timezone} locale={locale}
-          t={messages.mutationStop} />
+        <div id="settings-stop">
+          <MutationStopCard storeId={storeId} stop={stop.data} timezone={store.data.timezone} locale={locale}
+            t={messages.mutationStop} />
+        </div>
       ) : null}
       {permission.data ? (
-        <ActionPermissionCard storeId={storeId} permission={permission.data} timezone={store.data.timezone}
-          locale={locale} t={messages.actionPermission} />
+        <div id="settings-ads">
+          <ActionPermissionCard storeId={storeId} permission={permission.data} timezone={store.data.timezone}
+            locale={locale} t={messages.actionPermission} />
+        </div>
       ) : null}
-      {alerts.data ? <AlertDeputyCard storeId={storeId} setting={alerts.data} t={messages.alertDeputy} /> : null}
-      <section className="card" aria-labelledby="profile-title" data-testid="profile-card">
+      {alerts.data ? (
+        <div id="settings-alerts"><AlertDeputyCard storeId={storeId} setting={alerts.data} t={messages.alertDeputy} /></div>
+      ) : null}
+      <section className="card" id="settings-profile" aria-labelledby="profile-title" data-testid="profile-card">
         <div className="card-header">
           <h2 id="profile-title">{t.title}</h2>
           {approved ? <StatusBadge tone="success">{t.approvedTitle(approved.version)}</StatusBadge> : null}
@@ -83,6 +100,8 @@ export default async function SettingsPage({ params }: { params: Promise<{ store
           <p className="muted">{t.readOnly}</p>
         )}
       </section>
+      </div>
+      </div>
     </>
   );
 }

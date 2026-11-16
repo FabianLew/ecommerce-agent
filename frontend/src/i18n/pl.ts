@@ -315,6 +315,7 @@ export const pl: Messages = {
     },
   },
   activity: {
+    timezoneNote: (timezone) => `Wszystko, co operator i Twój zespół zrobili w tym sklepie. Godziny w strefie ${timezone}.`,
     startOver: "Pokaż najnowszą aktywność",
     title: "Aktywność",
     emptyTitle: "Brak aktywności",
@@ -425,6 +426,10 @@ export const pl: Messages = {
     dataUntil: (at: string) => `Dane do ${at}`,
   },
   analytics: {
+    dayForms: { one: "dzień", few: "dni", many: "dni", other: "dnia" },
+    periodTitle: "Okres",
+    sortLabel: "Sortuj produkty",
+    perDay: (value) => `${value}/dzień`,
     tabs: { sales: "Sprzedaż", products: "Produkty" },
     from: "Od",
     to: "Do",
@@ -806,6 +811,7 @@ export const pl: Messages = {
     failed: (requestId) => `Nie udało się zmienić ustawienia (identyfikator zgłoszenia ${requestId}).`,
     done: "Zapisano.",
   },
+  settingsNav: { label: "Sekcje ustawień" },
   profile: {
     title: "Profil biznesowy",
     intro:

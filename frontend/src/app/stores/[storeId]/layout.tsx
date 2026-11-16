@@ -3,7 +3,8 @@ import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/shell/AppShell";
 import type { ShellStatus } from "@/components/shell/Sidebar";
-import { StatePanel } from "@/components/StatePanel";
+import { StandaloneState, StatePanel } from "@/components/StatePanel";
+import { PRODUCT_NAME } from "@/lib/brand";
 import { getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 
@@ -41,15 +42,16 @@ export default async function StoreLayout({
   if (store.response.status === 404 || store.response.status === 403) {
     const t = await getMessages();
     return (
-      <main className="centered">
+      <StandaloneState productName={PRODUCT_NAME}>
         <StatePanel
+          level={1}
           tone="warning"
           title={t.store.unavailableTitle}
           description={t.store.unavailableDescription}
         >
           <Link href="/" className="button primary">{t.common.goToStores}</Link>
         </StatePanel>
-      </main>
+      </StandaloneState>
     );
   }
   if (!me.data || !stores.data || !store.data) {

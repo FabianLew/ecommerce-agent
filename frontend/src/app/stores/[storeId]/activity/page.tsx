@@ -4,8 +4,7 @@ import { notFound } from "next/navigation";
 import type { components } from "@/api/schema";
 import { PageHeading } from "@/components/PageHeading";
 import { StatePanel } from "@/components/StatePanel";
-import { formatInstant } from "@/i18n/format";
-import type { Messages } from "@/i18n/messages";
+import { INTL_TAGS, type Locale } from "@/i18n/locale";
 import { getLocale, getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { decisionPath, storePath } from "@/lib/store-path";
@@ -51,7 +50,10 @@ export default async function ActivityPage({
 
   return (
     <>
-      <PageHeading>{t.title}</PageHeading>
+      <header className="page-header">
+        <PageHeading>{t.title}</PageHeading>
+        <p className="page-sub">{t.timezoneNote(data.meta.timezone)}</p>
+      </header>
       <nav className="tabs" aria-label={t.filterLabel}>
         {[undefined, ...TYPES].map((item) => (
           <Link
@@ -67,34 +69,40 @@ export default async function ActivityPage({
       {data.items.length === 0 ? (
         <StatePanel tone="info" title={t.emptyTitle} description={t.emptyDescription} />
       ) : (
-        <table className="table card" data-testid="activity-list">
-          <tbody>
-            {data.items.map((item) => (
-              <tr key={item.id}>
-                <td className="nowrap">
-                  <Link href={`${path}/${encodeURIComponent(item.id)}`}>
-                    {formatInstant(item.occurredAt, data.meta.timezone, locale)}
-                  </Link>
-                </td>
-                <td>
-                  <span className="badge">{t.types[item.type]}</span>
-                </td>
-                <td>
-                  {describe(item, messages)}
-                  {proposalLink(item) ? (
-                    <>
-                      {" "}
-                      <Link href={decisionPath(storeId, proposalLink(item)!)}>{t.openDecision}</Link>
-                    </>
-                  ) : null}
-                </td>
-                <td className="muted">
-                  {item.actor.type === "USER" ? (item.actor.displayName ?? t.you) : t.system}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="card feed-card" data-testid="activity-list">
+          {groupByDay(data.items, data.meta.timezone, locale).map(([day, items]) => (
+            <section key={day} className="feed-day" aria-label={day}>
+              <h2 className="feed-day-title">{day}</h2>
+              <ul className="feed-list">
+                {items.map((item) => {
+                  const proposal = proposalLink(item);
+                  return (
+                    <li key={item.id} className="feed-row">
+                      <div className="feed-main">
+                        <Link href={`${path}/${encodeURIComponent(item.id)}`} className="feed-link">
+                          {describe(item, messages)}
+                        </Link>
+                        <span className="feed-meta">
+                          <span className="feed-type" data-type={item.type}>{t.types[item.type]}</span>
+                          <span aria-hidden="true">·</span>
+                          <span>{item.actor.type === "USER" ? (item.actor.displayName ?? t.you) : t.system}</span>
+                        </span>
+                      </div>
+                      <div className="feed-side">
+                        {proposal ? (
+                          <Link href={decisionPath(storeId, proposal)} className="feed-extra">{t.openDecision}</Link>
+                        ) : null}
+                        <time dateTime={item.occurredAt} className="feed-time">
+                          {formatTime(item.occurredAt, data.meta.timezone, locale)}
+                        </time>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
       )}
       {data.hasMore && data.nextCursor ? (
         <Link
@@ -106,6 +114,21 @@ export default async function ActivityPage({
       ) : null}
     </>
   );
+}
+
+/** Items grouped under their local day in the store's time zone, keeping the newest-first order. */
+function groupByDay(items: Activity[], timezone: string, locale: Locale): [string, Activity[]][] {
+  const format = new Intl.DateTimeFormat(INTL_TAGS[locale], { dateStyle: "full", timeZone: timezone });
+  const groups = new Map<string, Activity[]>();
+  for (const item of items) {
+    const day = format.format(new Date(item.occurredAt));
+    groups.set(day, [...(groups.get(day) ?? []), item]);
+  }
+  return [...groups.entries()];
+}
+
+function formatTime(value: string, timezone: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(INTL_TAGS[locale], { timeStyle: "short", timeZone: timezone }).format(new Date(value));
 }
 
 function proposalLink(item: Activity): string | undefined {
