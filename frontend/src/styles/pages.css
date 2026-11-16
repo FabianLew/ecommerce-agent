@@ -1,0 +1,155 @@
+/*
+ * Page-specific styles still shared by several screens. Each block moves into a domain component when its screen is
+ * redesigned (R4–R11) and is deleted here when its last user is gone.
+ */
+@layer pages {
+  /* Integrations: import, health and webhooks (B-12..B-14) */
+  .sync-empty {
+    margin-top: var(--space-4);
+  }
+
+  .sync .badge {
+    margin: 0 0 var(--space-3);
+  }
+
+  .webhook-setup code {
+    overflow-wrap: anywhere;
+  }
+
+  .webhook-setup .inline-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    margin-top: 0;
+  }
+
+  .webhook-setup .inline-form input {
+    flex: 1 1 16rem;
+    min-width: 0;
+  }
+
+  /* Decision Inbox and Detail (04 §5) */
+  .decision-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .decision-row h2 a {
+    color: var(--color-text);
+  }
+
+  .decision-actions {
+    margin-top: var(--space-4);
+    display: grid;
+    gap: var(--space-3);
+    justify-items: start;
+  }
+
+  .timeline {
+    list-style: none;
+    margin: 0;
+    padding: 0 0 0 20px;
+    border-left: 2px solid var(--color-border);
+    display: grid;
+    gap: var(--space-4);
+  }
+
+  .timeline-step {
+    position: relative;
+  }
+
+  .timeline-step::before {
+    content: "";
+    position: absolute;
+    left: -28px;
+    top: 3px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-surface);
+    border: 2px solid var(--color-border-strong);
+  }
+
+  .timeline-step.done::before {
+    background: var(--color-success);
+    border-color: var(--color-success);
+  }
+
+  .timeline-step.problem::before {
+    background: var(--color-warning);
+    border-color: var(--color-warning);
+  }
+
+  /* Analytics and Overview KPIs (B-34) */
+  .metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-4);
+  }
+
+  .metric-card {
+    display: grid;
+    gap: var(--space-2);
+    align-content: start;
+  }
+
+  .metric-label {
+    margin: 0 !important;
+    font-size: var(--text-ui);
+    line-height: var(--leading-ui);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  .metric-value {
+    margin: 0;
+    font-size: var(--text-kpi);
+    line-height: var(--leading-kpi);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .metric-reasons,
+  .metric-definition {
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+  }
+
+  .chart {
+    margin: 0;
+  }
+
+  .chart-title {
+    font-weight: 600;
+    margin-bottom: var(--space-3);
+  }
+
+  .chart-svg {
+    width: 100%;
+    height: auto;
+  }
+
+  .chart-bar {
+    fill: var(--color-chart-series);
+  }
+
+  .chart-axis {
+    stroke: var(--color-border-strong);
+    stroke-width: 1;
+  }
+
+  .chart-gap {
+    stroke: var(--color-border-strong);
+    stroke-width: 2;
+    stroke-dasharray: 2 3;
+  }
+
+  .chart-tick {
+    font-size: 11px;
+    fill: var(--color-text-tertiary);
+  }
+}

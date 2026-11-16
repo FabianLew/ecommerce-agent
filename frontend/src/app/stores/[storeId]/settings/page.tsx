@@ -13,6 +13,7 @@ import { ActionPermissionForm } from "./ActionPermissionForm";
 import { AlertDeputyForm } from "./AlertDeputyForm";
 import { MutationStopForm } from "./MutationStopForm";
 import { ProfileForm } from "./ProfileForm";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 
 export const dynamic = "force-dynamic";
 
@@ -62,7 +63,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ store
       <section className="card" aria-labelledby="profile-title" data-testid="profile-card">
         <div className="card-header">
           <h2 id="profile-title">{t.title}</h2>
-          {approved ? <span className="badge badge-connected">{t.approvedTitle(approved.version)}</span> : null}
+          {approved ? <StatusBadge tone="success">{t.approvedTitle(approved.version)}</StatusBadge> : null}
         </div>
         <p className="muted">{t.intro}</p>
         {approved ? (
@@ -147,9 +148,9 @@ function MutationStopCard({
     <section className="card" aria-labelledby="stop-title" data-testid="mutation-stop-card">
       <div className="card-header">
         <h2 id="stop-title">{t.title}</h2>
-        <span className={`badge ${stop.stopped || stop.globallyStopped ? "badge-error" : "badge-connected"}`}>
+        <StatusBadge tone={stop.stopped || stop.globallyStopped ? "danger" : "success"}>
           {stop.stopped || stop.globallyStopped ? t.stopped : t.running}
-        </span>
+        </StatusBadge>
       </div>
       <p className="muted">{t.intro}</p>
       {stop.globallyStopped ? <p className="form-message warning">{t.globallyStopped}</p> : null}
@@ -226,10 +227,9 @@ function ActionPermissionCard({
     <section className="card" aria-labelledby="permission-title" data-testid="action-permission-card">
       <div className="card-header">
         <h2 id="permission-title">{t.title}</h2>
-        <span className={`badge ${executable ? "badge-connected" : "badge-pending"}`}
-          data-testid="action-permission-effective">
+        <StatusBadge tone={executable ? "success" : "info"} data-testid="action-permission-effective">
           {t.effective}: {t.levels[permission.effectiveLevel].split(":")[0]}
-        </span>
+        </StatusBadge>
       </div>
       <p className="muted">{t.intro}</p>
       <dl className="details">

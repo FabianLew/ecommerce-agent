@@ -7,6 +7,8 @@ import type { Messages } from "@/i18n/messages";
 import { formatInstant } from "./labels";
 import { checkMeta } from "./meta-actions";
 import { MetaForm } from "./MetaForm";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { CONNECTION_STATUS_TONE, toneOf } from "@/components/ui/tones";
 
 type Envelope = components["schemas"]["MetaConnectionEnvelope"];
 
@@ -33,9 +35,9 @@ export function MetaAdsCard({
       <div className="card-header">
         <h2 id="meta-title">{t.title}</h2>
         {connection ? (
-          <span className={`badge badge-${connection.status.toLowerCase()}`} data-testid="meta-status">
+          <StatusBadge tone={toneOf(CONNECTION_STATUS_TONE, connection.status)} data-testid="meta-status">
             {t.status[connection.status]}
-          </span>
+          </StatusBadge>
         ) : null}
       </div>
       {connection ? (

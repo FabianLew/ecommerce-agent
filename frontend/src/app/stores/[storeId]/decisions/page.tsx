@@ -9,6 +9,8 @@ import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { decisionPath, storePath } from "@/lib/store-path";
 
 import { coverText, GROUPS, isGroup, label, problemTitle, recommendationText } from "./labels";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { PROPOSAL_STATUS_TONE, toneOf } from "@/components/ui/tones";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +72,7 @@ export default async function DecisionsPage({
                 <h2>
                   <Link href={decisionPath(storeId, item.proposalId)}>{problemTitle(item, t)}</Link>
                 </h2>
-                <span className="badge">{t.proposalStatus[item.status]}</span>
+                <StatusBadge tone={toneOf(PROPOSAL_STATUS_TONE, item.status)}>{t.proposalStatus[item.status]}</StatusBadge>
               </div>
               <dl className="details">
                 <dt>{t.recommendation}</dt>

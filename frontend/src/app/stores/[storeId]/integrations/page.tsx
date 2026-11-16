@@ -14,6 +14,9 @@ import { MetaAdsCard } from "./MetaAdsCard";
 import { RefreshWhileRunning } from "./RefreshWhileRunning";
 import { WebhookSetup } from "./WebhookSetup";
 import { WooCommerceForm } from "./WooCommerceForm";
+import { Callout } from "@/components/ui/Callout";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { CONNECTION_STATUS_TONE, HEALTH_STATUS_TONE, SYNC_STATUS_TONE, toneOf } from "@/components/ui/tones";
 
 export const dynamic = "force-dynamic";
 
@@ -44,9 +47,9 @@ export default async function IntegrationsPage({ params }: { params: Promise<{ s
         <div className="card-header">
           <h2 id="woocommerce-title">WooCommerce</h2>
           {woo ? (
-            <span className={`badge badge-${woo.status.toLowerCase()}`} data-testid="woocommerce-status">
+            <StatusBadge tone={toneOf(CONNECTION_STATUS_TONE, woo.status)} data-testid="woocommerce-status">
               {t.status[woo.status]}
-            </span>
+            </StatusBadge>
           ) : null}
         </div>
         {woo ? <ConnectionDetails integration={woo} timezone={store.data.timezone} locale={locale} t={t} /> : (
@@ -115,9 +118,9 @@ function ConnectionDetails({ integration, timezone, locale, t }: DetailsProps) {
   return (
     <>
       {integration.lastErrorCode && integration.status === "ERROR" ? (
-        <p className="form-message error" role="alert" data-testid="woocommerce-error">
+        <Callout tone="danger" role="alert" data-testid="woocommerce-error">
           {t.errorHelp[integration.lastErrorCode]}
-        </p>
+        </Callout>
       ) : null}
       {integration.warnings.map((warning) => (
         <p key={warning} className="form-message warning">
@@ -147,9 +150,9 @@ function HealthDetails({ integration, timezone, locale, t }: DetailsProps) {
   return (
     <section className="sync" aria-labelledby="health-title" data-testid="woocommerce-health">
       <h3 id="health-title" className="subheading">{t.health}</h3>
-      <p className={`badge badge-health-${health.status.toLowerCase()}`} role="status" data-testid="health-status">
+      <StatusBadge as="p" tone={toneOf(HEALTH_STATUS_TONE, health.status)} role="status" data-testid="health-status">
         {t.healthStatus[health.status]}
-      </p>
+      </StatusBadge>
       {health.reasons.map((reason) => (
         <p
           key={reason}
@@ -185,9 +188,9 @@ function SyncDetails({ integration, timezone, locale, t }: DetailsProps) {
     <section className="sync" aria-labelledby="sync-title" data-testid="woocommerce-sync">
       <RefreshWhileRunning running={job.status === "RUNNING"} />
       <h3 id="sync-title" className="subheading">{t.sync}</h3>
-      <p className={`badge badge-sync-${job.status.toLowerCase()}`} role="status" data-testid="sync-status">
+      <StatusBadge as="p" tone={toneOf(SYNC_STATUS_TONE, job.status)} role="status" data-testid="sync-status">
         {t.syncStatus[job.status]}
-      </p>
+      </StatusBadge>
       {help ? <p className="form-message error">{help}</p> : null}
       <dl className="details">
         <dt>{t.orderWindow}</dt>

@@ -11,6 +11,9 @@ import { decisionPath, storePath } from "@/lib/store-path";
 import { coverText, label, problemTitle, recommendationText } from "../labels";
 import { DecisionCommands } from "./DecisionCommands";
 import { ExecutionTimeline } from "./ExecutionTimeline";
+import { Callout } from "@/components/ui/Callout";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { PROPOSAL_STATUS_TONE, toneOf } from "@/components/ui/tones";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +54,9 @@ export default async function DecisionDetailPage({
       </p>
       <PageHeading>{problemTitle(decision, t)}</PageHeading>
       <p className="badges">
-        <span className="badge" data-testid="decision-status">{t.proposalStatus[decision.status]}</span>
+        <StatusBadge tone={toneOf(PROPOSAL_STATUS_TONE, decision.status)} data-testid="decision-status">
+          {t.proposalStatus[decision.status]}
+        </StatusBadge>
         <span className="badge">{t.disposition[decision.disposition]}</span>
         <span className="muted">{t.revision(decision.revision)}</span>
       </p>
@@ -92,9 +97,15 @@ export default async function DecisionDetailPage({
         {decision.action && decision.status === "PROPOSED" ? (
           <div className="decision-actions">
             {blocked ? (
-              <p id="approval-blocked" className="form-message warning" role="note" data-testid="approval-blocked">
-                <strong>{blockedTitle(blocked, t, messages)}:</strong> {blockedText(blocked, t, messages)}
-              </p>
+              <Callout
+                id="approval-blocked"
+                tone={blocked === "MUTATIONS_STOPPED" ? "danger" : "warning"}
+                role="note"
+                data-testid="approval-blocked"
+                title={blockedTitle(blocked, t, messages)}
+              >
+                {blockedText(blocked, t, messages)}
+              </Callout>
             ) : null}
             {decision.allowedActions.length > 0 ? (
               <DecisionCommands

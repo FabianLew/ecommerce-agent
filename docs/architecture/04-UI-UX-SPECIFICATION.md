@@ -45,9 +45,9 @@ The header contains breadcrumbs, the store name, the time zone, the period filte
 
 ### Visual direction and design system
 
-A minimalist, light SaaS: background `#F6F8F7`, surfaces `#FFFFFF`, text `#172B25`, secondary text `#52665E`, accent `#16734B`, a subtle green background `#EAF5EE`, border `#DFE7E2`. Green marks the main action and success, not all positive values. Amber signals attention, red an error; a status also has text and an icon. The palette is a proposal that needs a contrast measurement before implementation.
+A minimalist, light SaaS (ADR-0029, `docs/ui/ui-ux-redesign-plan.md`): background `#F6F8F7`, surfaces `#FFFFFF`, text `#172B25`, secondary text `#52665E`, tertiary text `#617269`, accent `#16734B`, a subtle green background `#EAF5EE`, borders `#E3E9E5` (decorative) and `#74867E` (controls). Green marks the main action and success, not all positive values. Status tones: success (green), warning (`#8A5A00` on `#FFF6E0`), danger (`#B42318` on `#FDECEB`), info (`#1D4F86` on `#EEF4FB`) and neutral; a status always has text and an icon as well as colour. Measured contrast ratios are in `frontend/README.md`.
 
-Typography: Inter or a system fallback, body 16 px/1.5, tables 14 px, secondary labels at least 12 px, page heading 28 px; tabular numbers right-aligned. Spacing scale 4/8/12/16/24/32 px, card radius 12 px. Sidebar about 232 px, a content grid with a 24 px gap. One main action per context; "Approve" describes the scope, e.g. "Approve ad pause". The product name stays Autonomous E-commerce Operator; the name "Commerce OS" from the prototype is not approved branding.
+Typography: Inter (self-hosted) with a system fallback; interface text 14 px/20, reading text (explanations, evidence) 15 px/24, secondary labels at least 12 px, page heading 24 px, KPI values 28 px; tabular numbers right-aligned. Spacing scale 4/8/12/16/24/32 px, radii 6/8/12 px, control heights 32/36/40 px (44 px touch targets on coarse pointers). Sidebar 248 px; content containers of 760 (reading), 1280 (standard), 1440 (detail) and 1680 px (wide), so a wide screen gets more columns rather than longer lines. One main action per context; "Approve" describes the scope, e.g. "Approve ad pause". Branding does not depend on the product name, which is temporary; the name "Commerce OS" from the prototype is not approved branding. Light theme only; a dark theme comes later and only if justified.
 
 Desktop: a full sidebar and tables; tablet: collapsible navigation and narrower columns; phone: a navigation drawer, cards in one column, a conversation as a separate screen. Tables keep the key fields and a controlled horizontal scroll, and do not lose data by hiding columns without a way to read them. Details with a durable address open as a page; a drawer may serve as a quick preview. On a small screen the Support view goes list → conversation → context.
 
@@ -426,3 +426,9 @@ The existing financial forms update their source system; the Store Profile refer
 ## Changes in version 1.1
 
 Added the Store Business Profile configuration, the distinction of decision kinds, metric provenance/maturity and the Outcome presentation. Extended the requirements of the existing screens and the DTO/API, keeping the eight views and the "Simple by default. Powerful by design." principle.
+
+## Changes in version 1.2
+
+Section 2 "Visual direction and design system" follows the approved UI/UX redesign (ADR-0029): a 14/15 px type base
+instead of 16 px, extended status tones, measured tertiary text and border colours, content containers for wide
+screens, and branding that does not depend on the temporary product name.

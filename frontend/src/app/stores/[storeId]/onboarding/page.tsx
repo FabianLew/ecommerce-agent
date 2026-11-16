@@ -9,6 +9,7 @@ import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { storePath } from "@/lib/store-path";
 
 import { startMonitoring, updateOnboarding } from "./actions";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 
 export const dynamic = "force-dynamic";
 
@@ -55,9 +56,12 @@ export default async function OnboardingPage({ params }: { params: Promise<{ sto
           <li key={step.step} className="card" data-testid={`onboarding-${step.step}`}>
             <div className="card-header">
               <h2>{t.steps[step.step]}</h2>
-              <span className={`badge ${step.complete ? "badge-connected" : ""}`} data-testid="step-status">
+              <StatusBadge
+                tone={step.complete ? "success" : step.step === data.nextStep ? "info" : "neutral"}
+                data-testid="step-status"
+              >
                 {step.complete ? t.done : step.step === data.nextStep ? t.next : t.todo}
-              </span>
+              </StatusBadge>
             </div>
             {step.step === "START_MONITORING" ? (
               <>

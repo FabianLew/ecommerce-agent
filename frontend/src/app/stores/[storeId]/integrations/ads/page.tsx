@@ -9,6 +9,8 @@ import { storePath } from "@/lib/store-path";
 
 import { revokeMapping } from "./actions";
 import { MappingForm } from "./MappingForm";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { MAPPING_STATE_TONE, toneOf } from "@/components/ui/tones";
 
 export const dynamic = "force-dynamic";
 
@@ -49,9 +51,9 @@ export default async function AdMappingsPage({ params }: { params: Promise<{ sto
             <li key={ad.id} className="card" data-testid={`ad-${ad.externalId}`}>
               <div className="card-header">
                 <h2>{ad.name}</h2>
-                <span className={`badge badge-mapping-${ad.mappingState.toLowerCase()}`} data-testid="mapping-state">
+                <StatusBadge tone={toneOf(MAPPING_STATE_TONE, ad.mappingState)} data-testid="mapping-state">
                   {t.state[ad.mappingState]}
-                </span>
+                </StatusBadge>
               </div>
               <dl className="details">
                 <dt>{t.adColumn}</dt>

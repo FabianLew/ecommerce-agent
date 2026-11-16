@@ -1,0 +1,667 @@
+/*
+ * Shared primitives (plan section 3.1). Class names already used by the pages are kept and restyled here, so this
+ * is the single place a primitive is defined; React wrappers live in src/components/ui/.
+ */
+@layer components {
+  /* ---------- Text helpers ---------- */
+  .muted {
+    color: var(--color-text-secondary);
+  }
+
+  .subtle {
+    color: var(--color-text-tertiary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+  }
+
+  .num,
+  .nowrap {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .nowrap {
+    white-space: nowrap;
+  }
+
+  .lead {
+    font-size: var(--text-read);
+    line-height: var(--leading-read);
+    font-weight: 600;
+  }
+
+  .page-title {
+    margin: 0;
+    font-size: var(--text-h1);
+    line-height: var(--leading-h1);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .page-title:focus {
+    outline: none;
+  }
+
+  .subheading {
+    margin: var(--space-5) 0 var(--space-2);
+    font-size: var(--text-h3);
+    line-height: var(--leading-h3);
+    font-weight: 600;
+  }
+
+  .plain-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  .stack {
+    display: grid;
+    gap: var(--space-3);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* ---------- Icon ---------- */
+  .icon {
+    width: 16px;
+    height: 16px;
+    flex: none;
+  }
+
+  .icon-sm {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* ---------- Card ---------- */
+  .card,
+  .state-panel {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-5);
+    min-width: 0;
+  }
+
+  .card h2 {
+    margin: 0 0 var(--space-3);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  .card-header h2 {
+    margin: 0;
+  }
+
+  /* ---------- Description list ---------- */
+  .details {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: var(--space-2) var(--space-6);
+    margin: 0;
+  }
+
+  .details dt {
+    color: var(--color-text-secondary);
+  }
+
+  .details dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  @media (max-width: 639px) {
+    .details {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2px;
+    }
+
+    .details dd {
+      margin-bottom: var(--space-2);
+    }
+  }
+
+  /* ---------- State panel (empty / error / restricted) ---------- */
+  .state-panel {
+    max-width: var(--container-readable);
+  }
+
+  .state-title {
+    margin: 0 0 var(--space-1);
+    font-size: 16px;
+    line-height: 24px;
+    font-weight: 600;
+  }
+
+  .state-panel p {
+    color: var(--color-text-secondary);
+  }
+
+  .state-warning {
+    border-color: var(--color-warning-border);
+    background: var(--color-warning-bg);
+  }
+
+  .state-error {
+    border-color: var(--color-danger-border);
+    background: var(--color-danger-bg);
+  }
+
+  .state-actions {
+    margin-top: var(--space-4);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  /* ---------- Button ---------- */
+  .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: var(--control-h);
+    padding: 0 14px;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
+    font: inherit;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--duration-fast) ease-out, border-color var(--duration-fast) ease-out;
+  }
+
+  .button:hover {
+    text-decoration: none;
+  }
+
+  .button.primary {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  .button.primary:hover {
+    background: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+  }
+
+  /* A button without a variant is a secondary one. */
+  .button:not(.primary):not(.danger):not(.ghost),
+  .button.secondary {
+    background: var(--color-surface);
+    border-color: var(--color-border-strong);
+    color: var(--color-text);
+  }
+
+  .button:not(.primary):not(.danger):not(.ghost):hover,
+  .button.secondary:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .button.danger {
+    background: var(--color-danger);
+    border-color: var(--color-danger);
+    color: var(--color-on-accent);
+  }
+
+  .button.ghost {
+    background: none;
+    color: var(--color-text-secondary);
+  }
+
+  .button.ghost:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+  }
+
+  .button.sm {
+    min-height: var(--control-h-sm);
+    padding: 0 10px;
+  }
+
+  .button.lg {
+    min-height: var(--control-h-lg);
+    padding: 0 18px;
+  }
+
+  .button:disabled,
+  .button[aria-disabled="true"] {
+    background: var(--color-neutral-bg);
+    border-color: var(--color-neutral-border);
+    color: var(--color-text-tertiary);
+    cursor: not-allowed;
+  }
+
+  .link-button {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    font: inherit;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .link-button:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  @media (pointer: coarse) {
+    .button,
+    .nav-link {
+      min-height: 44px;
+    }
+  }
+
+  /* ---------- Badge / status badge ---------- */
+  .badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    align-items: center;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 22px;
+    padding: 0 var(--space-2);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-neutral-border);
+    background: var(--color-neutral-bg);
+    color: var(--color-neutral);
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    font-weight: 500;
+    width: fit-content;
+  }
+
+  .badge .icon {
+    width: 13px;
+    height: 13px;
+  }
+
+  .tone-success {
+    color: var(--color-success);
+    background: var(--color-success-bg);
+    border-color: var(--color-success-border);
+  }
+
+  .tone-warning {
+    color: var(--color-warning);
+    background: var(--color-warning-bg);
+    border-color: var(--color-warning-border);
+  }
+
+  .tone-danger {
+    color: var(--color-danger);
+    background: var(--color-danger-bg);
+    border-color: var(--color-danger-border);
+  }
+
+  .tone-info {
+    color: var(--color-info);
+    background: var(--color-info-bg);
+    border-color: var(--color-info-border);
+  }
+
+  .tone-neutral {
+    color: var(--color-neutral);
+    background: var(--color-neutral-bg);
+    border-color: var(--color-neutral-border);
+  }
+
+  /* ---------- Callout (form-message is the older name of the same primitive) ---------- */
+  .callout,
+  .form-message {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0;
+    padding: 10px var(--space-3);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-success-border);
+    background: var(--color-success-bg);
+    color: var(--color-text);
+  }
+
+  .callout .icon {
+    margin-top: 2px;
+  }
+
+  .callout-body {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .callout-title {
+    font-weight: 600;
+  }
+
+  .callout.tone-success .callout-title,
+  .callout.tone-success > .icon {
+    color: var(--color-success);
+  }
+
+  .callout.tone-warning,
+  .form-message.warning {
+    border-color: var(--color-warning-border);
+    background: var(--color-warning-bg);
+  }
+
+  .callout.tone-warning .callout-title,
+  .callout.tone-warning > .icon,
+  .form-message.warning {
+    color: var(--color-warning);
+  }
+
+  .callout.tone-danger,
+  .form-message.error {
+    border-color: var(--color-danger-border);
+    background: var(--color-danger-bg);
+  }
+
+  .callout.tone-danger .callout-title,
+  .callout.tone-danger > .icon,
+  .form-message.error {
+    color: var(--color-danger);
+  }
+
+  .callout.tone-info {
+    border-color: var(--color-info-border);
+    background: var(--color-info-bg);
+  }
+
+  .callout.tone-info .callout-title,
+  .callout.tone-info > .icon {
+    color: var(--color-info);
+  }
+
+  .callout.tone-neutral {
+    border-color: var(--color-neutral-border);
+    background: var(--color-neutral-bg);
+  }
+
+  .form-message {
+    display: block;
+    margin: 0 0 var(--space-3);
+  }
+
+  /* ---------- Forms ---------- */
+  .form {
+    display: grid;
+    gap: var(--space-4);
+    max-width: 520px;
+  }
+
+  .form.compact {
+    margin-top: var(--space-3);
+  }
+
+  .field {
+    display: grid;
+    gap: var(--space-1);
+  }
+
+  fieldset.field {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+  }
+
+  .form > *,
+  .field > * {
+    min-width: 0;
+  }
+
+  .field label,
+  .field legend {
+    font-weight: 600;
+  }
+
+  .field input,
+  .field select,
+  .field textarea {
+    min-height: var(--control-h);
+    padding: 0 var(--space-3);
+    font: inherit;
+    color: var(--color-text);
+    background: var(--color-surface);
+    border: 1px solid var(--color-control-border);
+    border-radius: var(--radius-sm);
+    max-width: 100%;
+  }
+
+  .field textarea {
+    padding: var(--space-2) var(--space-3);
+    resize: vertical;
+  }
+
+  .field input:focus-visible,
+  .field select:focus-visible,
+  .field textarea:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: 0;
+    border-color: var(--color-accent);
+  }
+
+  .field input[aria-invalid="true"] {
+    border-color: var(--color-danger);
+  }
+
+  .field-hint {
+    margin: 0;
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    color: var(--color-text-secondary);
+  }
+
+  .field-error {
+    margin: 0;
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+    color: var(--color-danger);
+  }
+
+  .choice {
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+    font-weight: normal;
+  }
+
+  .choice input {
+    min-height: 0;
+    margin-top: 3px;
+    accent-color: var(--color-accent);
+  }
+
+  .form-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .inline-form {
+    margin-top: var(--space-4);
+  }
+
+  /* ---------- Tabs (link-based segmented control) ---------- */
+  .tabs {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 3px;
+    width: fit-content;
+    max-width: 100%;
+    background: var(--color-neutral-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+
+  .tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  .tab:hover {
+    color: var(--color-text);
+    text-decoration: none;
+  }
+
+  .tab[aria-current="page"] {
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: 0 1px 2px rgb(23 43 37 / 8%);
+  }
+
+  .tab-count {
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-tertiary);
+    font-size: var(--text-xs);
+  }
+
+  /* ---------- Tables ---------- */
+  .table,
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .table th,
+  .table td,
+  .data-table th,
+  .data-table td {
+    text-align: left;
+    vertical-align: top;
+    padding: 10px var(--space-3);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .table th,
+  .data-table tbody th {
+    font-weight: 500;
+  }
+
+  .data-table thead th {
+    font-size: var(--text-xs);
+    line-height: var(--leading-xs);
+    font-weight: 500;
+    color: var(--color-text-tertiary);
+    background: var(--color-surface-subtle);
+  }
+
+  .table tr:last-child > *,
+  .data-table tbody tr:last-child > * {
+    border-bottom: 0;
+  }
+
+  .table th .badge {
+    margin-left: var(--space-2);
+  }
+
+  @media (max-width: 639px) {
+    .table,
+    .table tbody,
+    .table tr,
+    .table th,
+    .table td {
+      display: block;
+    }
+
+    .table tr {
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .table th,
+    .table td {
+      padding: 2px 0;
+      border: 0;
+    }
+  }
+
+  /* ---------- Disclosure ---------- */
+  details > summary {
+    cursor: pointer;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  details > summary:hover {
+    color: var(--color-text);
+  }
+
+  /* ---------- Code and quotes ---------- */
+  .json {
+    max-width: 100%;
+    overflow-x: auto;
+    margin: var(--space-2) 0;
+    padding: var(--space-3);
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+  }
+
+  .quote {
+    margin: 0;
+    padding: var(--space-1) var(--space-4);
+    border-left: 2px solid var(--color-border-strong);
+    color: var(--color-text-secondary);
+  }
+
+  /* ---------- Dialog ---------- */
+  .dialog {
+    width: min(480px, calc(100vw - 32px));
+    padding: var(--space-6);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-overlay);
+  }
+
+  .dialog h2 {
+    font-size: 16px;
+    line-height: 24px;
+    margin-bottom: var(--space-3);
+  }
+
+  .dialog form {
+    display: grid;
+    gap: var(--space-3);
+  }
+
+  .dialog .form-actions {
+    justify-content: flex-start;
+    flex-direction: row-reverse;
+    margin-top: var(--space-2);
+  }
+
+  .dialog::backdrop {
+    background: rgb(23 43 37 / 40%);
+  }
+}

@@ -9,6 +9,8 @@ import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { decisionPath } from "@/lib/store-path";
 
 import { markNotificationRead } from "./actions";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { SEVERITY_TONE, toneOf } from "@/components/ui/tones";
 
 export const dynamic = "force-dynamic";
 
@@ -47,9 +49,9 @@ export default async function NotificationsPage({
             const ad = p.adName ? `${p.adName} (${p.adExternalId ?? ""})` : (p.adExternalId ?? "—");
             return (
               <li key={item.id} className={item.read ? "muted" : undefined}>
-                <span className={`badge${item.severity === "CRITICAL" ? " badge-error" : ""}`}>
+                <StatusBadge tone={toneOf(SEVERITY_TONE, item.severity)}>
                   {t.severity[item.severity] ?? item.severity}
-                </span>{" "}
+                </StatusBadge>{" "}
                 {t.text(
                   item.kind,
                   ad,

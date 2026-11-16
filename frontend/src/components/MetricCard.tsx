@@ -2,6 +2,8 @@ import type { components } from "@/api/schema";
 import type { Locale } from "@/i18n/locale";
 import { INTL_TAGS } from "@/i18n/locale";
 import type { Messages } from "@/i18n/messages";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { QUALITY_TONE, toneOf } from "@/components/ui/tones";
 
 export type Metric = components["schemas"]["MetricDto"];
 
@@ -25,7 +27,7 @@ export function MetricCard({ metric, locale, t }: { metric: Metric; locale: Loca
       <h2 className="metric-label">{t.metricNames[metric.key] ?? metric.key}</h2>
       <p className="metric-value" data-testid="metric-value">{metricText(metric, locale, t)}</p>
       <p>
-        <span className={`badge badge-quality-${metric.quality.toLowerCase()}`}>{t.quality[metric.quality]}</span>
+        <StatusBadge tone={toneOf(QUALITY_TONE, metric.quality)}>{t.quality[metric.quality]}</StatusBadge>
       </p>
       {metric.missingComponents.length ? (
         <p className="muted metric-reasons">
