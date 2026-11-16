@@ -18,6 +18,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 export const dynamic = "force-dynamic";
 
 type Profile = components["schemas"]["ProfileResponse"];
+type StoreDetails = components["schemas"]["StoreResponse"];
 type Stop = components["schemas"]["MutationStopResponse"];
 type Permission = components["schemas"]["ActionPermissionResponse"];
 type AlertSetting = components["schemas"]["AlertSettingResponse"];
@@ -51,6 +52,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ store
   return (
     <>
       <PageHeading>{messages.sections.settings}</PageHeading>
+      <StoreSummary store={store.data} messages={messages} />
       {stop.data ? (
         <MutationStopCard storeId={storeId} stop={stop.data} timezone={store.data.timezone} locale={locale}
           t={messages.mutationStop} />
@@ -82,6 +84,30 @@ export default async function SettingsPage({ params }: { params: Promise<{ store
         )}
       </section>
     </>
+  );
+}
+
+/** The store and the user's access in it (moved here from the Overview in R7). */
+function StoreSummary({ store, messages }: { store: StoreDetails; messages: Messages }) {
+  const t = messages.store;
+  return (
+    <section className="card" aria-labelledby="store-summary" data-testid="store-summary">
+      <h2 id="store-summary">{t.summary}</h2>
+      <dl className="details">
+        <dt>{t.name}</dt>
+        <dd>{store.name}</dd>
+        <dt>{t.organization}</dt>
+        <dd>{store.organizationName}</dd>
+        <dt>{t.currency}</dt>
+        <dd>{store.currency}</dd>
+        <dt>{t.timezone}</dt>
+        <dd>{store.timezone}</dd>
+        <dt>{t.roles}</dt>
+        <dd>{store.roles.map((role) => t.roleLabels[role] ?? role).join(", ")}</dd>
+        <dt>{t.permissions}</dt>
+        <dd>{store.permissions.map((permission) => t.permissionLabels[permission] ?? permission).join(", ")}</dd>
+      </dl>
+    </section>
   );
 }
 

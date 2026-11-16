@@ -65,6 +65,8 @@ test("screens at every width, without serious accessibility violations", async (
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: width < 600 ? 844 : 1000 });
       await page.goto(path);
+      // A streamed page first shows the loading skeleton; capture the page, not the placeholder.
+      await expect(page.locator(".skeleton-page")).toHaveCount(0);
       await page.evaluate(() => document.fonts.ready);
       await page.screenshot({ path: `${DIR}/${section}-${width}.png`, fullPage: true });
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);

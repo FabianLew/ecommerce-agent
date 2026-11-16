@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import type { components } from "@/api/schema";
 import type { Locale } from "@/i18n/locale";
 import { INTL_TAGS } from "@/i18n/locale";
@@ -20,13 +22,25 @@ export function metricText(metric: Metric, locale: Locale, t: Messages["analytic
 }
 
 /** A KPI card (04 §3): value, quality badge, the reasons that limit it and the comparison. Never a fake zero. */
-export function MetricCard({ metric, locale, t }: { metric: Metric; locale: Locale; t: Messages["analytics"] }) {
+export function MetricCard({
+  metric,
+  locale,
+  t,
+  unlock,
+}: {
+  metric: Metric;
+  locale: Locale;
+  t: Messages["analytics"];
+  /** Where to go when the value is unavailable, e.g. to connect the source it needs. */
+  unlock?: { href: string; label: string };
+}) {
   const comparison = metric.comparison;
+  const unavailable = metric.value === undefined || metric.value === null;
   return (
-    <section className="card metric-card" data-testid={`metric-${metric.key}`}>
+    <section className="card metric-card" data-unavailable={unavailable || undefined} data-testid={`metric-${metric.key}`}>
       <h2 className="metric-label">{t.metricNames[metric.key] ?? metric.key}</h2>
       <p className="metric-value" data-testid="metric-value">{metricText(metric, locale, t)}</p>
-      <p>
+      <p className="metric-quality">
         <StatusBadge tone={toneOf(QUALITY_TONE, metric.quality)}>{t.quality[metric.quality]}</StatusBadge>
       </p>
       {metric.missingComponents.length ? (
@@ -39,9 +53,13 @@ export function MetricCard({ metric, locale, t }: { metric: Metric; locale: Loca
           {comparison.percentDifference ? t.versus(comparison.percentDifference) : t.versusNoPercent}
         </p>
       ) : null}
-      <p className="muted metric-definition">
-        {t.definition}: {metric.definitionVersion}
-      </p>
+      {unavailable && unlock ? (
+        <Link href={unlock.href} className="metric-unlock">{unlock.label}</Link>
+      ) : null}
+      <details className="metric-definition">
+        <summary>{t.definition}</summary>
+        <code>{metric.definitionVersion}</code>
+      </details>
     </section>
   );
 }

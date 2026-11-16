@@ -32,7 +32,10 @@ test("owner signs in, lands in their store and switches to another store", async
   await expect(page).toHaveURL(`/stores/${STORE_A}/dashboard`);
   await expect(page.getByTestId("store-name")).toHaveText("Sklep A");
   await expect(page.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByText("Manage the store")).toBeVisible();
+  // Roles and permissions live in Settings, in the store summary.
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await expect(page.getByTestId("store-summary")).toContainText("Manage the store");
+  await page.getByRole("link", { name: "Overview" }).click();
 
   // Stores the user cannot access are not offered at all.
   const switcher = await openMenu(page, "store-switcher");
@@ -48,8 +51,9 @@ test("owner signs in, lands in their store and switches to another store", async
   await expect(page).toHaveURL(`/stores/${STORE_C}/activity`);
   await page.getByRole("link", { name: "Overview" }).click();
   await expect(page.getByTestId("store-name")).toHaveText("Sklep C");
-  await expect(page.getByText("Read store data")).toBeVisible();
-  await expect(page.getByText("Manage the store")).toHaveCount(0);
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await expect(page.getByTestId("store-summary")).toContainText("Read store data");
+  await expect(page.getByTestId("store-summary")).not.toContainText("Manage the store");
 });
 
 test("a link to a store without access shows a safe state and does not switch stores", async ({ page }) => {
