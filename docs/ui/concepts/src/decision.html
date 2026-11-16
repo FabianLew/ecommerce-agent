@@ -109,6 +109,19 @@
 .step.stop .node { border-color: var(--danger); background: var(--danger-bg); }
 .step strong { font-weight: 500; }
 .step .subtle { display: block; margin-top: 1px; }
+/* Mobile action bar: content first, decision second, but the main command stays one tap away. */
+.action-bar { display: none; }
+@media (max-width: 899px) {
+  .action-bar { display: flex; align-items: center; gap: 12px; position: fixed; z-index: 15; left: 0; right: 0; bottom: 0;
+    padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+    background: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -4px 16px rgb(23 43 37 / 6%); }
+  .action-bar .ab-text { display: grid; min-width: 0; flex: 1; }
+  .action-bar .ab-text strong { font-weight: 600; font-size: 13px; line-height: 18px; }
+  .action-bar .ab-text span { font-size: 12px; line-height: 16px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .action-bar .ab-text .bad { color: var(--danger); font-weight: 500; }
+  .page { padding-bottom: 120px; }
+  .review-bar { bottom: auto; top: calc(64px + env(safe-area-inset-top, 0px)); }
+}
 </style>
 
 <div class="container detail">
@@ -331,6 +344,14 @@
   </div>
 </div>
 
+<div class="action-bar" role="region" aria-label="Decision" data-when="waiting blocked check-failed">
+  <div class="ab-text" data-when="waiting"><strong>Pause 1 ad</strong><span>Decide by Tue 11:02 · in 23 h</span></div>
+  <div class="ab-text" data-when="blocked" hidden><strong>Pause 1 ad</strong><span class="bad">Blocked: ad changes are stopped</span></div>
+  <div class="ab-text" data-when="check-failed" hidden><strong>Pause 1 ad</strong><span class="bad">Blocked: a safety check failed</span></div>
+  <a class="btn btn-secondary" href="#a-title" data-when="blocked check-failed" hidden>See why</a>
+  <button class="btn btn-primary" type="button" data-when="waiting">Approve ad pause</button>
+</div>
+
 <div class="review-bar" role="group" aria-label="Concept preview state">
   <span>Concept state</span>
   <button type="button" data-state="waiting">Waiting</button>
@@ -354,9 +375,9 @@
     if (op) op.classList.toggle("is-stopped", stopped);
   }
   document.querySelectorAll(".review-bar [data-state]").forEach(function (b) {
-    b.addEventListener("click", function () { location.hash = b.getAttribute("data-state"); apply(b.getAttribute("data-state")); });
+    b.addEventListener("click", function () { history.replaceState(null, "", "#" + b.getAttribute("data-state")); apply(b.getAttribute("data-state")); });
   });
-  window.addEventListener("hashchange", function () { apply(location.hash.slice(1)); });
+  window.addEventListener("hashchange", function () { var h = location.hash.slice(1); if (states.indexOf(h) >= 0) apply(h); });
   apply(location.hash.slice(1));
 })();
 </script>

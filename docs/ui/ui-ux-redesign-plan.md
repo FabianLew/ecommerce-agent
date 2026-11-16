@@ -357,8 +357,16 @@ Reference: `docs/ui/concepts/decision-detail.html`, which shows the waiting, cha
 executed states. The page separates five parts, each in its own titled section: **Problem**, **Business impact**,
 **Recommended action** (with what changes, what does not change, and what is deliberately left running),
 **Evidence** (with **Safety checks**), and **Approval and execution** (side rail). Technical data is in a
-disclosure; failed safety checks, the action scope and blocking reasons are always visible. On phones the approval
-panel follows the evidence, so the owner reads before deciding; on tablets it sits above the content.
+disclosure; failed safety checks, the action scope and blocking reasons are always visible. On phones the full
+approval panel follows the evidence ("content first, then the decision"), and a compact sticky action bar keeps the
+main command one tap away: the action, the deadline and "Approve ad pause", or, when approval is blocked, the
+short reason and "See why" instead of the button. The bar opens the same confirmation dialog as the panel. On
+tablets the panel sits above the content.
+
+**Data rule (owner decision, 2026-11-16):** the implementation shows only data the API returns today. Counters such
+as "products watched", "active ads" or "last check N minutes ago" are not shown; existing statuses replace them
+(monitoring start time, orders complete until, ads last read, integration health, decision group counts). Any
+counter that needs a new API field is proposed separately and is not part of the redesign.
 
 The core of the product. Two layers: what an owner needs to decide, then advanced detail. Layout: main column +
 sticky side rail at ≥ 1280 px.

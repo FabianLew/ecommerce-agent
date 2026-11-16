@@ -11,7 +11,7 @@ FONTS = (
 )
 OP_ON = """<div class="op-state"%s>
       <div class="op-state-row"><span class="dot"></span>Monitoring on</div>
-      <p>Ad changes need your approval (L1). Last check 11:17.</p>
+      <p>Ad changes need your approval (L1).</p>
     </div>"""
 OP_STOPPED = """<div class="op-state" data-when="blocked" hidden>
       <div class="op-state-row" style="color:var(--danger)"><span class="dot danger"></span>Ad changes stopped</div>
