@@ -551,6 +551,24 @@ Implementation notes:
   `onboarding`), measured page TTFB 55–76 ms median locally. **Not done:** the data freshness indicator in the top
   bar, because no store-level "data as of" value exists in the API (data rule); it stays on the pages that return
   it (e.g. integration health). A store-level freshness read would be a separate API proposal.
+- **R3 (done):** plural-aware formatters (`plural`, `formatDays`, `formatCount`, `formatRelative`); notifications as
+  rows; activity wording in terms of a "case"; product name in one constant (`lib/brand.ts`).
+- **R4 (done):** decision inbox as a scannable list (problem, recommendation, status, deadline; whole row opens).
+- **R5–R6 (done):** Decision Detail around the decision: fact tiles, why, recommendation with scope, execution,
+  typed evidence values, checks with failures first, a sticky decision panel and a mobile action bar.
+- **R7 (done):** Overview as an operations cockpit: setup callout, status band, needs-attention rows (to-approve
+  decisions from the decisions API), business pulse (KPI tiles, chart with a table view), sources and recent
+  activity. The store summary (roles, permissions) moved to Settings.
+- **R8 (done):** Store setup as a stepper and one step panel (why it matters, what we check, blockers, one primary
+  action, secondary choices with their consequence); start monitoring disabled with its reason until allowed.
+- **R9–R10 (done):** integrations catalog from `integration-catalog.ts` with the tested tile status mapping;
+  `/integrations/woocommerce` and `/integrations/meta-ads` detail pages with a guided connect flow; ad mappings
+  show the mapping first and the form on demand. Server actions revalidate the whole integrations subtree.
+- **R11 (done):** analytics toolbar, unit-aware metric values, activity feed grouped by day, activity and product
+  detail headers, settings section navigation, state panels with icons and standalone pages with the product name.
+- **R12:** not done; dark mode needs an owner decision (D5).
+- **R13 (done):** demo readiness check, see `docs/ui/demo-readiness.md`.
+- **R14 (done):** usability test script, see `docs/ui/usability-test-script.md`.
 
 Order rationale: foundations and shell first so later PRs only compose primitives; Decisions before Overview
 because it is the core and Overview reuses its rows; onboarding and integrations last among the big four because

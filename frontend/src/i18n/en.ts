@@ -731,7 +731,7 @@ export const en = {
       REVISION_MISMATCH: "A newer revision exists. Open it and decide again.",
       PROPOSAL_EXPIRED: "The recommendation expired.",
       SHADOW_MODE: "Execution is not switched on for this deployment.",
-      MONITORING_NOT_STARTED: "Monitoring has not been started for this store (onboarding, step 4).",
+      MONITORING_NOT_STARTED: "Monitoring has not been started for this store (Store setup, step 4).",
       ACTION_NOT_PERMITTED: "Ad pauses are not allowed for this store. A store manager can allow them in the settings.",
       META_NOT_CONNECTED: "Meta is not connected. Rejecting is still possible.",
       META_WRITE_PERMISSION_MISSING: "The Meta connection can read but not change ads. Rejecting is still possible.",
@@ -827,7 +827,7 @@ export const en = {
       APPROVAL_REQUIRED: "After approval: a person approves each pause before it is sent (L1).",
     } as Record<"OFF" | "PROPOSE_ONLY" | "APPROVAL_REQUIRED", string>,
     caps: {
-      MONITORING_NOT_STARTED: "Monitoring has not been started (onboarding, step 4).",
+      MONITORING_NOT_STARTED: "Monitoring has not been started (Store setup, step 4).",
       ACTION_NOT_PERMITTED: "The store setting is below approval.",
       SHADOW_MODE: "Execution is not switched on for this deployment.",
       META_NOT_CONNECTED: "Meta is not connected.",
@@ -848,7 +848,7 @@ export const en = {
     changed: "Someone changed the setting meanwhile. The current state is shown; try again if needed.",
     noPermission: "You do not have permission to do this.",
     notReady: {
-      MONITORING_NOT_STARTED: "Start monitoring first (onboarding, step 4).",
+      MONITORING_NOT_STARTED: "Start monitoring first (Store setup, step 4).",
       META_NOT_CONNECTED: "Connect Meta first.",
       META_WRITE_PERMISSION_MISSING: "The Meta connection needs permission to change ads first.",
     } as Record<string, string>,

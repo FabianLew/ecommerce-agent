@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 /**
  * Screenshot matrix and accessibility check for the UI redesign (docs/ui/ui-ux-redesign-plan.md, section 7.1).
  * Runs against the local stack after the Inventory Guardian scenario has filled store B, so it is opt-in:
- * E2E_SCREENS=1 SCREENS_DIR=<folder> pnpm test:e2e e2e/screens.spec.ts
+ * E2E_SCREENS=1 SCREENS_DIR=<folder> [SCREENS_LOCALE=pl] pnpm test:e2e e2e/screens.spec.ts
  * Each page is captured at every width; axe must report no serious or critical violation.
  */
 const STORE_B = "00000000-0000-4000-8000-00000000000b";
@@ -58,6 +58,10 @@ async function pathOf(page: Page, section: (typeof SECTIONS)[number]): Promise<s
 test("screens at every width, without serious accessibility violations", async ({ page }) => {
   test.setTimeout(10 * 60_000);
   mkdirSync(DIR, { recursive: true });
+  if (process.env.SCREENS_LOCALE) {
+    // The same cookie the language switcher sets.
+    await page.context().addCookies([{ name: "op_locale", value: process.env.SCREENS_LOCALE, url: "http://localhost:3000" }]);
+  }
   await signIn(page);
   const violations: string[] = [];
   for (const section of SECTIONS) {

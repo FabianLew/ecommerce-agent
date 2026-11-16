@@ -118,8 +118,8 @@ export const pl: Messages = {
       STORE_MANAGE: "Zarządzanie sklepem",
       DECISION_APPROVE: "Zatwierdzanie decyzji i wstrzymywanie zmian",
     },
-    monitoringOffTitle: "Monitorowanie sklepu nie jest jeszcze uruchomione",
-    monitoringOffDescription: "Monitorowanie zacznie się po połączeniu WooCommerce i imporcie danych w sekcji Integracje.",
+    monitoringOffTitle: "Monitoring sklepu nie jest jeszcze uruchomiony",
+    monitoringOffDescription: "Monitoring zacznie się po połączeniu WooCommerce i imporcie danych w sekcji Integracje.",
   },
   decisions: {
     groups: { TO_APPROVE: "Do akceptacji", MONITORING: "Monitorowane", COMPLETED: "Zakończone" },
@@ -357,7 +357,7 @@ export const pl: Messages = {
       ACTION_VERIFIED: "Pauzę potwierdzono odczytem reklamy",
       ACTION_OUTCOME_RECORDED: "Zapisano wynik",
       MUTATIONS_STOPPED: "Wstrzymano zmiany w reklamach",
-      MONITORING_STARTED: "Uruchomiono monitorowanie",
+      MONITORING_STARTED: "Uruchomiono monitoring",
       MUTATIONS_RESUMED: "Wznowiono zmiany w reklamach",
     },
     opportunityStatus: {
@@ -495,7 +495,7 @@ export const pl: Messages = {
     otherCurrencyOrders: (count) => `Pominięto zamówienia w innych walutach: ${count}.`,
   },
   onboarding: {
-    title: "Konfiguracja sklepu",
+    title: "Przygotowanie sklepu",
     intro:
       "Cztery kroki do uruchomienia monitoringu. Krok jest oznaczony jako gotowy dopiero wtedy, gdy operator widzi działające połączenie lub dane, a nie po wysłaniu formularza.",
     steps: {
@@ -558,7 +558,7 @@ export const pl: Messages = {
       PROFILE_NOT_APPROVED: "Zatwierdź profil biznesowy.",
       NO_VERIFIED_MAPPING: "Potwierdź co najmniej jedną reklamę jednego wariantu albo zdecyduj, że zrobisz to później.",
       EARLIER_STEPS_INCOMPLETE: "Najpierw zakończ powyższe kroki.",
-      MONITORING_NOT_STARTED: "Sprawdź zakres poniżej i uruchom monitorowanie. Reklamy są wstrzymywane dopiero po zatwierdzeniu przez osobę.",
+      MONITORING_NOT_STARTED: "Sprawdź zakres poniżej i uruchom monitoring. Reklamy są wstrzymywane dopiero po zatwierdzeniu przez osobę.",
     },
     domainsTitle: "Gotowość",
     domains: {
@@ -578,9 +578,9 @@ export const pl: Messages = {
     skipMeta: "Pomiń na razie Meta",
     undoSkipMeta: "Jednak połącz Meta",
     mappingsLater: "Zmapuj reklamy później",
-    startMonitoring: "Uruchom monitorowanie",
-    monitoringStarted: (when: string) => `Monitorowanie uruchomiono ${when}.`,
-    scopeTitle: "Co obejmuje monitorowanie",
+    startMonitoring: "Uruchom monitoring",
+    monitoringStarted: (when: string) => `Monitoring uruchomiono ${when}.`,
+    scopeTitle: "Co obejmuje monitoring",
     scopeStore: "Analizy i rekomendacje dla sklepu",
     scopeAds: "Reklamy",
     adsScope: {
@@ -589,7 +589,7 @@ export const pl: Messages = {
       APPROVAL_REQUIRED: "Każde wstrzymanie zatwierdza osoba, zanim zostanie wysłane (L1).",
     },
     adsConsent:
-      "Uruchomienie monitorowania pozwala tylko na analizy i rekomendacje. Wstrzymywanie reklam po zatwierdzeniu włącza się osobno w ustawieniach.",
+      "Uruchomienie monitoringu pozwala tylko na analizy i rekomendacje. Wstrzymywanie reklam po zatwierdzeniu włącza się osobno w ustawieniach.",
     changed: "Postęp zmieniono w innym miejscu; strona pokazuje bieżący stan.",
     readOnly: "Wdrożenie może zmieniać tylko właściciel sklepu lub menedżer.",
   },
@@ -616,7 +616,7 @@ export const pl: Messages = {
     },
     codes: {
       AUTHORIZATION_EXPIRED: "Krótka autoryzacja wygasła, zanim zmiana mogła zostać wysłana.",
-      MONITORING_NOT_STARTED: "Monitorowanie tego sklepu nie zostało uruchomione.",
+      MONITORING_NOT_STARTED: "Monitoring tego sklepu nie został uruchomiony.",
       ACTION_NOT_PERMITTED: "Wstrzymywanie reklam nie jest dozwolone w tym sklepie (ustawienia).",
       SHADOW_MODE: "Wykonywanie zmian nie jest włączone w tym wdrożeniu.",
       META_NOT_CONNECTED: "Meta nie jest połączona.",
@@ -687,7 +687,7 @@ export const pl: Messages = {
       REVISION_MISMATCH: "Istnieje nowsza rewizja. Otwórz ją i zdecyduj ponownie.",
       PROPOSAL_EXPIRED: "Rekomendacja wygasła.",
       SHADOW_MODE: "Wykonywanie zmian nie jest włączone w tym wdrożeniu.",
-      MONITORING_NOT_STARTED: "Monitorowanie tego sklepu nie zostało uruchomione (wdrożenie, krok 4).",
+      MONITORING_NOT_STARTED: "Monitoring tego sklepu nie został uruchomiony (Przygotowanie sklepu, krok 4).",
       ACTION_NOT_PERMITTED: "Wstrzymywanie reklam nie jest dozwolone w tym sklepie. Menedżer sklepu może je włączyć w ustawieniach.",
       META_NOT_CONNECTED: "Meta nie jest połączona. Odrzucenie jest nadal możliwe.",
       META_WRITE_PERMISSION_MISSING: "Połączenie z Meta pozwala czytać reklamy, ale nie zmieniać. Odrzucenie jest nadal możliwe.",
@@ -774,7 +774,7 @@ export const pl: Messages = {
   actionPermission: {
     title: "Wstrzymywanie reklam",
     intro:
-      "Czy operator może wstrzymać dedykowaną reklamę w tym sklepie po zatwierdzeniu przez osobę. Samo monitorowanie nigdy na to nie pozwala.",
+      "Czy operator może wstrzymać dedykowaną reklamę w tym sklepie po zatwierdzeniu przez osobę. Sam monitoring nigdy na to nie pozwala.",
     level: "Ustawienie sklepu",
     effective: "Obowiązuje teraz",
     levels: {
@@ -783,7 +783,7 @@ export const pl: Messages = {
       APPROVAL_REQUIRED: "Po zatwierdzeniu: każde wstrzymanie zatwierdza osoba, zanim zostanie wysłane (L1).",
     },
     caps: {
-      MONITORING_NOT_STARTED: "Monitorowanie nie zostało uruchomione (wdrożenie, krok 4).",
+      MONITORING_NOT_STARTED: "Monitoring nie został uruchomiony (Przygotowanie sklepu, krok 4).",
       ACTION_NOT_PERMITTED: "Ustawienie sklepu jest niższe niż zatwierdzanie.",
       SHADOW_MODE: "Wykonywanie zmian nie jest włączone w tym wdrożeniu.",
       META_NOT_CONNECTED: "Meta nie jest połączona.",
@@ -804,7 +804,7 @@ export const pl: Messages = {
     changed: "Ktoś w międzyczasie zmienił ustawienie. Widać bieżący stan; spróbuj ponownie w razie potrzeby.",
     noPermission: "Nie masz uprawnień do tej operacji.",
     notReady: {
-      MONITORING_NOT_STARTED: "Najpierw uruchom monitorowanie (wdrożenie, krok 4).",
+      MONITORING_NOT_STARTED: "Najpierw uruchom monitoring (Przygotowanie sklepu, krok 4).",
       META_NOT_CONNECTED: "Najpierw połącz Meta.",
       META_WRITE_PERMISSION_MISSING: "Połączenie z Meta musi najpierw mieć uprawnienie do zmiany reklam.",
     },
