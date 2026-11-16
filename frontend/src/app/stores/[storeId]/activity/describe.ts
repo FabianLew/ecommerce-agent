@@ -11,7 +11,7 @@ export function describe(item: Activity, messages: Messages): string {
   const base = label(t.actions, item.action);
   const to = item.details.to;
   if (item.action === "OPPORTUNITY_STATUS_CHANGED" && to) {
-    return `${base}: ${label(t.opportunityStatus, to)}`;
+    return label(t.opportunityStatus, to);
   }
   if (item.action === "PROPOSAL_STATUS_CHANGED" && to) {
     return `${base}: ${label(messages.decisions.proposalStatus, to)}`;

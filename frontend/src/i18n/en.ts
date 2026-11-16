@@ -1,3 +1,4 @@
+import type { PluralForms } from "./format";
 import type { components } from "@/api/schema";
 
 type Integration = components["schemas"]["IntegrationResponse"];
@@ -17,6 +18,7 @@ type ActivityType = Schemas["ActivitySummary"]["type"];
  */
 export const en = {
   common: {
+    dayForms: { one: "day", other: "days" } as PluralForms,
     signOut: "Sign out",
     signIn: "Sign in",
     goToStores: "Go to your stores",
@@ -150,7 +152,6 @@ export const en = {
     problem: "Problem",
     recommendation: "Recommendation",
     cover: "Cover",
-    coverDays: (days: string) => `${days} days`,
     coverUnknown: "unknown",
     stockUnits: (units: number) => `${units} units in stock`,
     created: "Created",
@@ -284,12 +285,12 @@ export const en = {
       SETTINGS: "Settings",
     } satisfies Record<ActivityType, string>,
     actions: {
-      OPPORTUNITY_OPENED: "A risk episode was opened",
+      OPPORTUNITY_OPENED: "A low-stock risk was detected",
       OPPORTUNITY_STATUS_CHANGED: "The episode status changed",
-      PROPOSAL_CREATED: "A proposal was created",
-      PROPOSAL_INVALID: "A proposal was rejected as invalid",
-      PROPOSAL_STATUS_CHANGED: "The proposal status changed",
-      POLICY_EVALUATED: "The policy was evaluated",
+      PROPOSAL_CREATED: "Recommendation ready",
+      PROPOSAL_INVALID: "A recommendation failed validation and was discarded",
+      PROPOSAL_STATUS_CHANGED: "Recommendation status",
+      POLICY_EVALUATED: "Safety checks done",
       DECISION_APPROVED: "A proposal was approved",
       DECISION_REJECTED: "A proposal was rejected",
       INTEGRATION_CONNECTION_CREATED: "An integration connection was created",
@@ -315,15 +316,16 @@ export const en = {
       MUTATIONS_RESUMED: "Changes to ads were resumed",
       MONITORING_STARTED: "Monitoring was started",
     } as Record<string, string>,
+    /** Full sentences for a case status change (plan section 5.1: "Case closed", not "status changed: closed"). */
     opportunityStatus: {
-      OPEN: "open",
-      ANALYZING: "analysing",
-      AWAITING_DECISION: "awaiting a decision",
-      MONITORING: "monitoring",
-      WAITING_DATA: "waiting for data",
-      ACTING: "acting",
-      RESOLVED: "resolved",
-      CLOSED: "closed",
+      OPEN: "Case opened",
+      ANALYZING: "Analysing the case",
+      AWAITING_DECISION: "The case is waiting for a decision",
+      MONITORING: "The case is being monitored",
+      WAITING_DATA: "The case is waiting for data",
+      ACTING: "Acting on the case",
+      RESOLVED: "Case resolved",
+      CLOSED: "Case closed",
     } satisfies Record<OpportunityStatus, string>,
   },
   dashboard: {
@@ -596,7 +598,9 @@ export const en = {
   notifications: {
     title: "Notifications",
     unread: (n: number) => `${n} unread`,
-    empty: "No notifications yet.",
+    empty: "No notifications yet",
+    emptyDescription: "Low stock warnings, decisions waiting for you and the results of ad changes appear here.",
+    unreadLabel: "Unread",
     markRead: "Mark as read",
     read: "Read",
     open: "Open the decision",
@@ -604,7 +608,7 @@ export const en = {
     severity: { INFO: "Info", WARNING: "Warning", CRITICAL: "Needs attention" } as Record<string, string>,
     text: (kind: string, ad: string, product: string, code: string, cover = "—", warningDays = "—") =>
       ({
-        STOCK_WARNING: `Low stock: ${product} covers about ${cover} days of sales (warning below ${warningDays} days). Nothing is proposed yet.`,
+        STOCK_WARNING: `Low stock: ${product} covers about ${cover} of sales (warning below ${warningDays}). Nothing is proposed yet.`,
         DECISION_NEEDED: `Decision needed: pause ${ad} to protect the stock of ${product}?`,
         ACTION_VERIFIED: `${ad} was paused and the pause was confirmed.`,
         ACTION_NOOP: `${ad} was already paused; nothing changed.`,

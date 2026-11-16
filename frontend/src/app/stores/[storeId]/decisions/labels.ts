@@ -1,6 +1,6 @@
 import type { components } from "@/api/schema";
 import type { Locale } from "@/i18n/locale";
-import { formatNumber } from "@/i18n/format";
+import { formatDays } from "@/i18n/format";
 import type { Messages } from "@/i18n/messages";
 
 export type DecisionSummary = components["schemas"]["DecisionSummary"];
@@ -30,9 +30,11 @@ export function recommendationText(decision: Decision, t: Messages["decisions"])
   return t.disposition[decision.disposition];
 }
 
-export function coverText(decision: Decision, t: Messages["decisions"], locale: Locale): string {
+export function coverText(decision: Decision, messages: Messages, locale: Locale): string {
   const days = decision.facts?.daysOfCover;
-  return days === undefined || days === null ? t.coverUnknown : t.coverDays(formatNumber(days, locale));
+  return days === undefined || days === null
+    ? messages.decisions.coverUnknown
+    : formatDays(days, locale, messages.common.dayForms);
 }
 
 /** A code through a catalog; an unknown code is shown as is rather than hidden. */

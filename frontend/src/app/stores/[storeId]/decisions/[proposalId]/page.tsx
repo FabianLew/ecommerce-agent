@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageHeading } from "@/components/PageHeading";
-import { formatInstant, formatNumber } from "@/i18n/format";
+import { formatDays, formatInstant, formatNumber } from "@/i18n/format";
 import type { Messages } from "@/i18n/messages";
 import { getLocale, getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
@@ -76,15 +76,15 @@ export default async function DecisionDetailPage({
             </>
           ) : null}
           <dt>{t.cover}</dt>
-          <dd data-testid="decision-cover">{coverText(decision, t, locale)}</dd>
+          <dd data-testid="decision-cover">{coverText(decision, messages, locale)}</dd>
           <dt>{t.facts.threshold}</dt>
-          <dd>{t.coverDays(formatNumber(facts.thresholdDays, locale))}</dd>
+          <dd>{formatDays(facts.thresholdDays, locale, messages.common.dayForms)}</dd>
           <dt>{t.facts.available}</dt>
           <dd>{facts.availableToSell ?? "—"}</dd>
           <dt>{t.facts.unitsSold}</dt>
           <dd>{formatNumber(facts.unitsSold, locale, 0)}</dd>
           <dt>{t.facts.velocity}</dt>
-          <dd>{formatNumber(facts.velocityPerDay, locale, 2)}</dd>
+          <dd>{formatNumber(facts.velocityPerDay, locale, 1)}</dd>
           <dt>{t.facts.stockConfirmed}</dt>
           <dd>{at(facts.stockConfirmedAt)}</dd>
           <dt>{t.facts.replenishment}</dt>

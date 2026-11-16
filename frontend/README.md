@@ -100,3 +100,24 @@ status is always icon + text + colour: `StatusBadge` and `Callout` in `src/compo
 The screenshot matrix and the accessibility check of the redesign run against the local stack after the scenario:
 `E2E_SCREENS=1 SCREENS_DIR=<folder> pnpm test:e2e e2e/screens.spec.ts` (widths in `SCREENS_WIDTHS`, default
 390, 1024, 1440, 1920, 2560). It fails on a serious or critical axe violation and reports sideways scrolling.
+
+## Content rules and terminology (plan section 5)
+
+Numbers go through `src/i18n/format.ts`: days with `formatDays` (one decimal, correct word form), counts with
+`formatCount`, money with `formatMoney`, other decimals with `formatNumber` (one decimal by default). Raw decimals
+from the API are never printed. Plurals use `plural()` on `Intl.PluralRules` with per-language word forms (`*Forms`
+keys in the catalogs; Polish has one/few/many and `other` for fractions).
+
+| Concept | English | Polish | Avoid |
+| --- | --- | --- | --- |
+| A detected problem the operator tracks (opportunity) | case | sprawa | episode, opportunity |
+| What the operator suggests (proposal) | recommendation | rekomendacja | proposal (except in technical details) |
+| A person's yes to a recommendation | approval / approve | zatwierdzenie / zatwierdź | accept, confirm |
+| Stopping an ad | pause | wstrzymanie / wstrzymaj | disable, turn off |
+| Watching the store's data | monitoring | monitoring | tracking |
+| Policy evaluation shown to people | safety checks | kontrole bezpieczeństwa | policy, guardrails |
+| WooCommerce, Meta and later providers in general | data source, store, advertising account | źródło danych, sklep, konto reklamowe | provider names outside their own tile |
+| Stopping all changes | changes stopped | zmiany wstrzymane | kill switch, mutations |
+
+Provider names appear only on the provider's own tile, form and target names. Technical codes, versions and IDs live
+in "Technical details" disclosures.

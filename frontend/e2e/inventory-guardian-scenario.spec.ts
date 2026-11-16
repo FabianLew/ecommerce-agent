@@ -111,7 +111,7 @@ test("a stock drop in WooCommerce becomes a pause proposal waiting for approval 
   // 7. Activity shows the detection, the recommendation and the policy steps of the same episode.
   await page.goto(`/stores/${STORE_B}/activity`);
   const activity = page.getByTestId("activity-list");
-  await expect(activity.getByText("A risk episode was opened").first()).toBeVisible();
-  await expect(activity.getByText("A proposal was created").first()).toBeVisible();
-  await expect(activity.getByText("The policy was evaluated").first()).toBeVisible();
+  await expect(activity.getByText("A low-stock risk was detected").first()).toBeVisible();
+  await expect(activity.getByText("Recommendation ready").first()).toBeVisible();
+  await expect(activity.getByText("Safety checks done").first()).toBeVisible();
 });

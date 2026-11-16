@@ -16,6 +16,7 @@ import { usePathname } from "next/navigation";
 import { type KeyboardEvent, useEffect, useRef } from "react";
 
 import { useMessages } from "@/i18n/LocaleProvider";
+import { PRODUCT_NAME } from "@/lib/brand";
 import { shellLocation } from "@/lib/shell-location";
 import { NAV_GROUPS, type SectionSlug, storePath } from "@/lib/store-path";
 
@@ -102,7 +103,7 @@ export function Sidebar({
     >
       <div className="sidebar-top">
         <span className="product-mark" aria-hidden="true" />
-        <span className="product-name">E-commerce Operator</span>
+        <span className="product-name">{PRODUCT_NAME}</span>
         <button type="button" className="button ghost drawer-close" aria-label={t.shell.closeMenu} onClick={close}>
           <Icon icon={X} />
         </button>

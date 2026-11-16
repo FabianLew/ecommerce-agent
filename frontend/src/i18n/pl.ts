@@ -3,6 +3,7 @@ import type { Messages } from "./en";
 /** Polish messages (ADR-0013). The `Messages` type makes the catalog complete or the build fails. */
 export const pl: Messages = {
   common: {
+    dayForms: { one: "dzień", few: "dni", many: "dni", other: "dnia" },
     signOut: "Wyloguj się",
     signIn: "Zaloguj się",
     goToStores: "Przejdź do swoich sklepów",
@@ -131,7 +132,6 @@ export const pl: Messages = {
     problem: "Problem",
     recommendation: "Rekomendacja",
     cover: "Pokrycie",
-    coverDays: (days) => `${days} dnia`,
     coverUnknown: "nieznane",
     stockUnits: (units) => `${units} szt. na stanie`,
     created: "Utworzono",
@@ -259,12 +259,12 @@ export const pl: Messages = {
     types: { DETECTION: "Wykrycie", RECOMMENDATION: "Rekomendacja", POLICY: "Polityka", ACTION: "Działanie",
       INTEGRATION: "Integracja", SETTINGS: "Ustawienia" },
     actions: {
-      OPPORTUNITY_OPENED: "Otwarto epizod ryzyka",
+      OPPORTUNITY_OPENED: "Wykryto ryzyko niskiego zapasu",
       OPPORTUNITY_STATUS_CHANGED: "Zmienił się status epizodu",
-      PROPOSAL_CREATED: "Powstała propozycja",
-      PROPOSAL_INVALID: "Propozycja odrzucona jako nieprawidłowa",
-      PROPOSAL_STATUS_CHANGED: "Zmienił się status propozycji",
-      POLICY_EVALUATED: "Oceniono politykę",
+      PROPOSAL_CREATED: "Rekomendacja gotowa",
+      PROPOSAL_INVALID: "Rekomendacja nie przeszła walidacji i została odrzucona",
+      PROPOSAL_STATUS_CHANGED: "Status rekomendacji",
+      POLICY_EVALUATED: "Kontrole bezpieczeństwa wykonane",
       DECISION_APPROVED: "Zatwierdzono propozycję",
       DECISION_REJECTED: "Odrzucono propozycję",
       INTEGRATION_CONNECTION_CREATED: "Utworzono połączenie integracji",
@@ -291,14 +291,14 @@ export const pl: Messages = {
       MUTATIONS_RESUMED: "Wznowiono zmiany w reklamach",
     },
     opportunityStatus: {
-      OPEN: "otwarty",
-      ANALYZING: "w analizie",
-      AWAITING_DECISION: "czeka na decyzję",
-      MONITORING: "monitorowany",
-      WAITING_DATA: "czeka na dane",
-      ACTING: "w działaniu",
-      RESOLVED: "rozwiązany",
-      CLOSED: "zamknięty",
+      OPEN: "Sprawa otwarta",
+      ANALYZING: "Analiza sprawy",
+      AWAITING_DECISION: "Sprawa czeka na decyzję",
+      MONITORING: "Sprawa jest monitorowana",
+      WAITING_DATA: "Sprawa czeka na dane",
+      ACTING: "Trwa działanie w sprawie",
+      RESOLVED: "Sprawa rozwiązana",
+      CLOSED: "Sprawa zamknięta",
     },
   },
   dashboard: {
@@ -561,7 +561,9 @@ export const pl: Messages = {
   notifications: {
     title: "Powiadomienia",
     unread: (n) => `Nieprzeczytane: ${n}`,
-    empty: "Brak powiadomień.",
+    empty: "Brak powiadomień",
+    emptyDescription: "Tutaj pojawią się ostrzeżenia o niskim zapasie, decyzje czekające na Ciebie i wyniki zmian w reklamach.",
+    unreadLabel: "Nieprzeczytane",
     markRead: "Oznacz jako przeczytane",
     read: "Przeczytane",
     open: "Otwórz decyzję",
@@ -569,7 +571,7 @@ export const pl: Messages = {
     severity: { INFO: "Informacja", WARNING: "Ostrzeżenie", CRITICAL: "Wymaga uwagi" },
     text: (kind, ad, product, code, cover = "—", warningDays = "—") =>
       ({
-        STOCK_WARNING: `Niski zapas: ${product} wystarczy na około ${cover} dni sprzedaży (ostrzeżenie poniżej ${warningDays} dni). Na razie nic nie jest proponowane.`,
+        STOCK_WARNING: `Niski zapas: ${product} wystarczy na około ${cover} sprzedaży (ostrzeżenie poniżej ${warningDays}). Na razie nic nie jest proponowane.`,
         DECISION_NEEDED: `Potrzebna decyzja: wstrzymać ${ad}, aby chronić zapas ${product}?`,
         ACTION_VERIFIED: `Wstrzymano ${ad} i potwierdzono pauzę.`,
         ACTION_NOOP: `${ad} była już wstrzymana; nic nie zmieniono.`,

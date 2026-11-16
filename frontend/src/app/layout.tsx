@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { getLocale } from "@/i18n/server";
+import { PRODUCT_NAME } from "@/lib/brand";
 
 // Fonts are bundled with the app (ADR-0029): no request to a font CDN, and offline Docker builds work.
 import "@fontsource-variable/inter";
@@ -15,8 +16,8 @@ import "@/styles/components.css";
 import "@/styles/pages.css";
 
 export const metadata: Metadata = {
-  // Working name from document 04 §2; branding is not decided yet (O5).
-  title: "Autonomous E-commerce Operator",
+  // Working name (plan section 5.8); branding is not decided yet (O5).
+  title: PRODUCT_NAME,
   robots: { index: false, follow: false },
 };
 

@@ -78,7 +78,7 @@ export default async function DecisionsPage({
                 <dt>{t.recommendation}</dt>
                 <dd data-testid="decision-recommendation">{recommendationText(item, t)}</dd>
                 <dt>{t.cover}</dt>
-                <dd data-testid="decision-cover">{coverText(item, t, locale)}</dd>
+                <dd data-testid="decision-cover">{coverText(item, messages, locale)}</dd>
                 {item.policyOutcome ? (
                   <>
                     <dt>{t.policy}</dt>
