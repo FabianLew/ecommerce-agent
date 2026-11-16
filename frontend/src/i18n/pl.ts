@@ -483,15 +483,52 @@ export const pl: Messages = {
     otherCurrencyOrders: (count) => `Pominięto zamówienia w innych walutach: ${count}.`,
   },
   onboarding: {
-    title: "Przygotuj sklep",
+    title: "Konfiguracja sklepu",
     intro:
-      "Połącz istniejący sklep i jego narzędzia. Każdy krok jest sprawdzany na podstawie rzeczywistego połączenia i danych, więc jest ukończony dopiero wtedy, gdy widzi to backend.",
+      "Cztery kroki do uruchomienia monitoringu. Krok jest oznaczony jako gotowy dopiero wtedy, gdy operator widzi działające połączenie lub dane, a nie po wysłaniu formularza.",
     steps: {
-      CONNECT_STORE: "1. Połącz WooCommerce",
-      CONNECT_TOOLS: "2. Połącz Meta Ads",
-      BUSINESS_DATA: "3. Uzupełnij dane biznesowe",
-      START_MONITORING: "4. Rozpocznij monitorowanie",
+      CONNECT_STORE: "Połącz sklep",
+      CONNECT_TOOLS: "Połącz reklamy",
+      BUSINESS_DATA: "Uzupełnij dane biznesowe",
+      START_MONITORING: "Uruchom monitoring",
     },
+    stepsLabel: "Kroki konfiguracji",
+    progress: (done, total) => `Gotowe: ${done} z ${total}`,
+    stepNumber: (number) => `Krok ${number}`,
+    current: "Bieżący krok",
+    why: "Dlaczego to ważne",
+    checks: "Co sprawdzamy",
+    purpose: {
+      CONNECT_STORE:
+        "Produkty, stany i zamówienia są podstawą każdej analizy. Bez nich operator nie zobaczy ryzyka braku towaru.",
+      CONNECT_TOOLS:
+        "Z kontem reklamowym operator rozpozna, kiedy reklama wydaje pieniądze na produkt, który się kończy.",
+      BUSINESS_DATA:
+        "Twoje cele i reklamy potwierdzone dla pojedynczych produktów pozwalają dopasować rekomendacje do sposobu prowadzenia sklepu.",
+      START_MONITORING:
+        "Od tej chwili operator analizuje sklep i przygotowuje dla Ciebie decyzje. Sam niczego nie zmienia.",
+    },
+    checked: {
+      CONNECT_STORE: "Udany test połączenia i zakończony import ostatnich 14 dni.",
+      CONNECT_TOOLS: "Udany test konta reklamowego albo Twoja decyzja, by na razie pominąć reklamy.",
+      BUSINESS_DATA:
+        "Zatwierdzony profil biznesowy oraz co najmniej jedna reklama potwierdzona dla jednego produktu albo decyzja, by zmapować reklamy później.",
+      START_MONITORING: "Wszystkie wcześniejsze kroki są gotowe.",
+    },
+    actions: {
+      CONNECT_STORE: "Połącz WooCommerce",
+      CONNECT_TOOLS: "Połącz Meta Ads",
+      BUSINESS_DATA: "Otwórz dane biznesowe",
+    },
+    reviewStep: "Otwórz",
+    confirmAds: "Potwierdź reklamy",
+    skipMetaConsequence: "Ochrona reklam pozostaje wyłączona, dopóki nie połączysz konta reklamowego.",
+    mappingsLaterConsequence: "Żadna reklama nie zostanie wstrzymana, dopóki nie potwierdzisz, jaki produkt promuje.",
+    startDisabled: "Monitoring można uruchomić, gdy wszystkie wcześniejsze kroki są gotowe.",
+    doneTitle: "Konfiguracja zakończona",
+    doneText: (when) => `Monitoring działa od ${when}.`,
+    goToOverview: "Przejdź do przeglądu",
+    stepDoneText: "Ten krok jest gotowy.",
     done: "Gotowe",
     todo: "Do zrobienia",
     next: "Następny krok",

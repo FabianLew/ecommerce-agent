@@ -523,15 +523,52 @@ export const en = {
     otherCurrencyOrders: (count: number) => `${count} orders in other currencies were left out.`,
   },
   onboarding: {
-    title: "Get the store ready",
+    title: "Store setup",
     intro:
-      "Connect the existing store and its tools. Each step is checked against the real connection and data, so it is complete only when the backend sees it.",
+      "Four steps to start monitoring. A step is marked done only when the operator sees the working connection or data, not when a form is sent.",
     steps: {
-      CONNECT_STORE: "1. Connect WooCommerce",
-      CONNECT_TOOLS: "2. Connect Meta Ads",
-      BUSINESS_DATA: "3. Complete the business data",
-      START_MONITORING: "4. Start monitoring",
+      CONNECT_STORE: "Connect your store",
+      CONNECT_TOOLS: "Connect advertising",
+      BUSINESS_DATA: "Add business details",
+      START_MONITORING: "Start monitoring",
     } as Record<"CONNECT_STORE" | "CONNECT_TOOLS" | "BUSINESS_DATA" | "START_MONITORING", string>,
+    stepsLabel: "Setup steps",
+    progress: (done: number, total: number) => `${done} of ${total} done`,
+    stepNumber: (number: number) => `Step ${number}`,
+    current: "Current step",
+    why: "Why it matters",
+    checks: "What we check",
+    purpose: {
+      CONNECT_STORE:
+        "Products, stock and orders are the basis of every analysis. Without them the operator cannot see a stock risk.",
+      CONNECT_TOOLS:
+        "With an ad account the operator can tell when an ad spends money on a product that is running out.",
+      BUSINESS_DATA:
+        "Your goals and the ads confirmed for single products let recommendations fit the way you run the store.",
+      START_MONITORING:
+        "From this moment the operator analyses the store and prepares decisions for you. It changes nothing on its own.",
+    } as Record<"CONNECT_STORE" | "CONNECT_TOOLS" | "BUSINESS_DATA" | "START_MONITORING", string>,
+    checked: {
+      CONNECT_STORE: "A successful connection check and a finished import of the last 14 days.",
+      CONNECT_TOOLS: "A successful check of the ad account, or your decision to skip advertising for now.",
+      BUSINESS_DATA:
+        "An approved business profile, and at least one confirmed single-product ad or your decision to map ads later.",
+      START_MONITORING: "All earlier steps are done.",
+    } as Record<"CONNECT_STORE" | "CONNECT_TOOLS" | "BUSINESS_DATA" | "START_MONITORING", string>,
+    actions: {
+      CONNECT_STORE: "Connect WooCommerce",
+      CONNECT_TOOLS: "Connect Meta Ads",
+      BUSINESS_DATA: "Open business details",
+    } as Record<"CONNECT_STORE" | "CONNECT_TOOLS" | "BUSINESS_DATA", string>,
+    reviewStep: "Open",
+    confirmAds: "Confirm ads",
+    skipMetaConsequence: "Ad protection stays off until an ad account is connected.",
+    mappingsLaterConsequence: "Ads are not paused for any product until you confirm which ad promotes it.",
+    startDisabled: "Monitoring can start when every earlier step is done.",
+    doneTitle: "Setup is complete",
+    doneText: (when: string) => `Monitoring is on since ${when}.`,
+    goToOverview: "Go to the Overview",
+    stepDoneText: "This step is done.",
     done: "Done",
     todo: "To do",
     next: "Next step",
