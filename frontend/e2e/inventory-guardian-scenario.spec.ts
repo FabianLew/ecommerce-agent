@@ -92,7 +92,7 @@ test("a stock drop in WooCommerce becomes a pause proposal waiting for approval 
   const summary = page.getByTestId("decision-summary");
   await expect(summary.getByText("ad-9001")).toBeVisible();
   await expect(summary.getByText("18", { exact: true })).toBeVisible();
-  await expect(summary.getByText("49", { exact: true })).toBeVisible();
+  await expect(summary).toContainText("49 sold in the last 7 days");
   // ADR-0025: the first cap a person can fix is shown; monitoring was not started, and the deployment is in shadow
   // mode on top (the backend tests cover each cap).
   await expect(page.getByTestId("approval-blocked")).toContainText("Monitoring has not been started");
@@ -101,7 +101,7 @@ test("a stock drop in WooCommerce becomes a pause proposal waiting for approval 
   const why = page.getByTestId("decision-why");
   await expect(why.getByText("Catalog ads also promote other products, so they are not paused.")).toBeVisible();
   await expect(page.getByTestId("excluded-ads")).toContainText("Katalog – wszystkie produkty: also promotes other products");
-  await expect(why.getByRole("heading", { name: "Policy checks: Requires approval" })).toBeVisible();
+  await expect(page.getByTestId("decision-checks")).toContainText("Requires approval");
   await expect(page.getByTestId("policy-checks").getByRole("row")).toHaveCount(7);
 
   const evidence = page.getByTestId("decision-evidence");

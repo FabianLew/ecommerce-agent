@@ -10,7 +10,8 @@ const INITIAL: DecisionFormState = { status: "idle" };
 
 /**
  * Approve and reject with a confirmation dialog (04 §5, UX-05). Each dialog carries one idempotency key; the
- * button is disabled while the command is pending, and the result is never shown as a paused ad.
+ * button is disabled while the command is pending, and the result is never shown as a paused ad. The optional
+ * mobile action bar opens the same approve dialog, so there is one path to an approval.
  */
 export function DecisionCommands({
   storeId,
@@ -20,6 +21,7 @@ export function DecisionCommands({
   adLabel,
   canApprove,
   canReject,
+  bar,
 }: {
   storeId: string;
   proposalId: string;
@@ -28,6 +30,8 @@ export function DecisionCommands({
   adLabel: string;
   canApprove: boolean;
   canReject: boolean;
+  /** Below 900 px: a compact sticky bar with the action, the deadline and the same approve dialog (plan 4.C). */
+  bar?: { action: string; deadline: string };
 }) {
   const t = useMessages().approval;
   const approveDialog = useRef<HTMLDialogElement>(null);
@@ -71,6 +75,18 @@ export function DecisionCommands({
         >
           {result.message}
         </p>
+      ) : null}
+
+      {bar && canApprove ? (
+        <div className="action-bar" data-testid="action-bar">
+          <div className="action-bar-text">
+            <strong>{bar.action}</strong>
+            <span>{bar.deadline}</span>
+          </div>
+          <button type="button" className="button primary" onClick={() => approveDialog.current?.showModal()}>
+            {t.approve}
+          </button>
+        </div>
       ) : null}
 
       <dialog ref={approveDialog} className="dialog" aria-labelledby="approve-title">
