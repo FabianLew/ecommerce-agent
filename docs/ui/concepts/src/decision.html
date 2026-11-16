@@ -1,0 +1,362 @@
+<style>
+.dd-head { margin-bottom: 24px; display: grid; gap: 10px; }
+.dd-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; color: var(--text-2); font-size: 13px; }
+.dd-meta .sep { width: 3px; height: 3px; border-radius: 50%; background: var(--border-strong); }
+.dd-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; align-items: start; }
+.dd-main { display: grid; gap: 16px; min-width: 0; }
+.rail { position: sticky; top: 80px; display: grid; gap: 16px; }
+@media (max-width: 1279px) {
+  .dd-grid { grid-template-columns: minmax(0, 1fr); }
+  .rail { position: static; order: -1; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+}
+@media (max-width: 899px) { .rail { grid-template-columns: minmax(0, 1fr); order: 0; } }
+
+.sec-head { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.sec-ic { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; background: var(--neutral-bg); color: var(--text-2); flex: none; }
+.sec-ic .icon { width: 15px; height: 15px; }
+.sec-head .meta { margin-left: auto; }
+.lead { font-size: 15px; line-height: 24px; max-width: 72ch; }
+
+.facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.fact { border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 14px; display: grid; gap: 2px; background: var(--surface-subtle); }
+.fact .l { font-size: 12px; line-height: 16px; color: var(--text-2); font-weight: 500; }
+.fact .v { font-size: 22px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; }
+.fact .v small { font-size: 13px; font-weight: 500; color: var(--text-2); letter-spacing: 0; }
+.fact .s { font-size: 12px; line-height: 16px; color: var(--text-3); }
+.fact.alert { background: var(--warning-bg); border-color: var(--warning-border); }
+.fact.alert .v { color: var(--warning); }
+@media (max-width: 899px) { .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.meter { margin-top: 22px; }
+.meter-top { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
+.track { position: relative; height: 8px; border-radius: 999px; background: var(--neutral-bg); border: 1px solid var(--neutral-border); }
+.fill { position: absolute; inset: -1px auto -1px -1px; border-radius: 999px; background: var(--warning); }
+.mark { position: absolute; top: -6px; bottom: -6px; width: 2px; background: var(--text); border-radius: 1px; }
+.mark.soft { background: var(--border-strong); }
+.mark-labels { position: relative; height: 32px; margin-top: 6px; font-size: 12px; line-height: 16px; }
+.mark-labels span { position: absolute; transform: translateX(-50%); white-space: nowrap; color: var(--text-2); text-align: center; }
+.mark-labels strong { display: block; color: var(--text); font-weight: 600; }
+
+.impact { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.impact li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 12px; max-width: 80ch; }
+.impact li .icon { margin-top: 3px; color: var(--text-2); }
+.impact strong { font-weight: 600; font-size: 15px; line-height: 22px; }
+.impact p { grid-column: 2; color: var(--text-2); }
+.impact li.na strong { font-weight: 500; color: var(--text-2); }
+
+.action-line { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; align-items: center; padding: 16px; border-radius: var(--r-md);
+  border: 1px solid var(--border-strong); background: var(--surface-subtle); }
+.action-ic { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--surface); border: 1px solid var(--border);
+  grid-row: span 2; color: var(--text); }
+.action-line strong { font-size: 16px; line-height: 24px; font-weight: 600; }
+.scope { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; margin-top: 18px; }
+.scope h3 { font-size: 13px; color: var(--text-2); font-weight: 600; margin-bottom: 8px; }
+.scope ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.scope li { display: flex; gap: 8px; align-items: flex-start; }
+.scope li .icon { margin-top: 2px; }
+@media (max-width: 639px) { .scope { grid-template-columns: minmax(0, 1fr); } }
+.after { margin-top: 18px; color: var(--text-2); max-width: 80ch; }
+
+.ev { width: 100%; border-collapse: collapse; }
+.ev th, .ev td { text-align: left; padding: 11px 20px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.ev thead th { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--text-3); background: var(--surface-subtle); padding-block: 9px; }
+.ev tbody th { font-weight: 500; white-space: nowrap; }
+.ev td.src { color: var(--text-2); white-space: nowrap; }
+.ev tr:last-child th, .ev tr:last-child td { border-bottom: 0; }
+.table-wrap { overflow-x: auto; }
+@media (max-width: 639px) {
+  .ev thead { display: none; }
+  .ev, .ev tbody, .ev tr, .ev th, .ev td { display: block; }
+  .ev tr { padding: 10px 16px; border-bottom: 1px solid var(--border); }
+  .ev th, .ev td { padding: 0; border: 0; white-space: normal; }
+  .ev td.src { font-size: 12px; }
+}
+
+.checks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+.checks li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
+.checks li .icon { margin-top: 2px; }
+.checks li .subtle { grid-column: 2; }
+.checks li.ok .icon { color: var(--success); }
+.checks li.fail { grid-column: 1 / -1; }
+.checks li.fail .icon { color: var(--danger); }
+.checks li.fail strong { color: var(--danger); }
+@media (max-width: 899px) { .checks { grid-template-columns: minmax(0, 1fr); } }
+
+.tech { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 24px; margin: 0; padding: 4px 20px 20px; }
+.tech dt { color: var(--text-2); }
+.tech dd { margin: 0; overflow-wrap: anywhere; }
+
+/* Rail */
+.panel-body { padding: 18px 20px; display: grid; gap: 14px; }
+.panel-title { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--text-3); }
+.panel-action { display: grid; gap: 2px; }
+.panel-action strong { font-size: 15px; line-height: 22px; font-weight: 600; }
+.deadline { display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 13px; }
+.btns { display: grid; gap: 8px; }
+.fine { font-size: 12px; line-height: 18px; color: var(--text-2); }
+.who { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 12px; color: var(--text-2); }
+
+.steps { list-style: none; margin: 0; padding: 4px 20px 18px; display: grid; }
+.step { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 0 12px; position: relative; padding-bottom: 14px; }
+.step:last-child { padding-bottom: 0; }
+.step::before { content: ""; position: absolute; left: 9px; top: 22px; bottom: 2px; width: 2px; background: var(--border); }
+.step:last-child::before { display: none; }
+.step .node { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--border-strong); background: var(--surface); display: grid; place-items: center; margin-top: 1px; }
+.step.done .node { background: var(--success); border-color: var(--success); color: #fff; }
+.step.done .node .icon { width: 12px; height: 12px; stroke-width: 3; }
+.step.done::before { background: var(--success-border); }
+.step.now .node { border-color: var(--warning); box-shadow: inset 0 0 0 4px var(--warning-bg); }
+.step.stop .node { border-color: var(--danger); background: var(--danger-bg); }
+.step strong { font-weight: 500; }
+.step .subtle { display: block; margin-top: 1px; }
+</style>
+
+<div class="container detail">
+  <header class="dd-head">
+    <p class="eyebrow"><svg class="icon icon-sm"><use href="#i-package"/></svg>Inventory protection · Decision</p>
+    <h1>Hydrating Serum 30 ml will sell out in about 2 days</h1>
+    <div class="dd-meta">
+      <span class="badge tone-warning" data-when="waiting"><svg class="icon"><use href="#i-clock"/></svg>Waiting for your approval</span>
+      <span class="badge tone-danger" data-when="blocked" hidden><svg class="icon"><use href="#i-stop"/></svg>Blocked: ad changes are stopped</span>
+      <span class="badge tone-danger" data-when="check-failed" hidden><svg class="icon"><use href="#i-x"/></svg>Blocked: a safety check failed</span>
+      <span class="badge tone-success" data-when="executed" hidden><svg class="icon"><use href="#i-check"/></svg>Ad paused and confirmed</span>
+      <span>Variant SERUM-30</span><span class="sep" aria-hidden="true"></span>
+      <span>Proposed today at 11:02</span><span class="sep" aria-hidden="true"></span>
+      <span>Approval required (L1)</span>
+    </div>
+  </header>
+
+  <div class="dd-grid">
+    <div class="dd-main">
+      <!-- 1. Problem -->
+      <section class="card" aria-labelledby="p-title">
+        <div class="sec-head"><span class="sec-ic"><svg class="icon"><use href="#i-package"/></svg></span><h2 id="p-title">Problem</h2>
+          <span class="meta subtle">Stock confirmed today at 11:01</span></div>
+        <div class="card-body">
+          <p class="lead">Stock is running out faster than it can be replenished. At the current pace, the 16 units left will last about 2.3 days, which is below your 3-day limit, and no restock date is known.</p>
+          <div class="facts">
+            <div class="fact"><span class="l">Available to sell</span><span class="v num">16 <small>units</small></span><span class="s">From your store</span></div>
+            <div class="fact"><span class="l">Selling</span><span class="v num">~7 <small>per day</small></span><span class="s">49 sold in the last 7 full days</span></div>
+            <div class="fact alert"><span class="l">Lasts about</span><span class="v num">2.3 <small>days</small></span><span class="s">Your limit: 3 days</span></div>
+            <div class="fact"><span class="l">Restock date</span><span class="v" style="font-size:17px;line-height:30px">Unknown</span><span class="s">No date in the store</span></div>
+          </div>
+          <div class="meter" aria-hidden="true">
+            <div class="meter-top"><span>Days of stock left</span><span class="num">0–7 days</span></div>
+            <div class="track">
+              <div class="fill" style="width:32.9%"></div>
+              <div class="mark" style="left:42.86%"></div>
+              <div class="mark soft" style="left:71.43%"></div>
+            </div>
+            <div class="mark-labels">
+              <span style="left:32.9%"><strong class="num">2.3</strong>now</span>
+              <span style="left:47%">limit 3</span>
+              <span style="left:71.43%">warning 5</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Business impact -->
+      <section class="card" aria-labelledby="i-title">
+        <div class="sec-head"><span class="sec-ic"><svg class="icon"><use href="#i-impact"/></svg></span><h2 id="i-title">Business impact</h2></div>
+        <div class="card-body">
+          <ul class="impact">
+            <li><svg class="icon"><use href="#i-clock"/></svg><strong>Expected to sell out around Wednesday, 18 November</strong>
+              <p>16 units at about 7 a day. Without a restock date, the product is likely to be unavailable for some time.</p></li>
+            <li><svg class="icon"><use href="#i-ads"/></svg><strong>A dedicated ad keeps sending buyers to this product</strong>
+              <p>“Serum 30 ml – dedicated ad” is active and promotes only this variant. After the sell-out, its clicks lead to a product that cannot be bought.</p></li>
+            <li class="na"><svg class="icon"><use href="#i-info"/></svg><strong>Spend on this ad is not available yet</strong>
+              <p>We only show figures read from your store and ad account. We do not estimate lost revenue or savings.</p></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 3. Recommended action -->
+      <section class="card" aria-labelledby="r-title">
+        <div class="sec-head"><span class="sec-ic"><svg class="icon"><use href="#i-target"/></svg></span><h2 id="r-title">Recommended action</h2></div>
+        <div class="card-body">
+          <div class="action-line">
+            <span class="action-ic"><svg class="icon icon-lg"><use href="#i-pause"/></svg></span>
+            <strong>Pause the ad “Serum 30 ml – dedicated ad”</strong>
+            <span class="subtle">Meta Ads · campaign “Serums – always on” · ad <span class="mono">120001</span></span>
+          </div>
+          <div class="scope">
+            <div>
+              <h3>What changes</h3>
+              <ul><li><svg class="icon" style="color:var(--accent)"><use href="#i-pause"/></svg>This one ad is paused.</li></ul>
+            </div>
+            <div>
+              <h3>What does not change</h3>
+              <ul>
+                <li><svg class="icon muted"><use href="#i-tick"/></svg>Other ads, ad sets and campaigns</li>
+                <li><svg class="icon muted"><use href="#i-tick"/></svg>Budgets and bids</li>
+                <li><svg class="icon muted"><use href="#i-tick"/></svg>The product, its price and stock in your store</li>
+              </ul>
+            </div>
+          </div>
+          <div class="callout tone-neutral" style="margin-top:18px">
+            <svg class="icon"><use href="#i-info"/></svg><strong>Left running on purpose</strong>
+            <p>“Skincare bestsellers – carousel” also shows this serum, but it promotes 6 products, so it is not paused.</p>
+          </div>
+          <p class="after">After approval, the operator checks stock and the ad again, sends the pause and reads the ad back to confirm it. You can resume the ad in Ads Manager at any time.</p>
+        </div>
+      </section>
+
+      <!-- 4. Evidence -->
+      <section class="card" aria-labelledby="e-title">
+        <div class="sec-head"><span class="sec-ic"><svg class="icon"><use href="#i-file"/></svg></span><h2 id="e-title">Evidence</h2>
+          <span class="meta subtle">Data as of today, 11:01</span></div>
+        <div class="table-wrap">
+          <table class="ev">
+            <thead><tr><th scope="col">Data point</th><th scope="col">Value</th><th scope="col">Source and time</th></tr></thead>
+            <tbody>
+              <tr><th scope="row">Stock reading</th><td class="num">16 available to sell (18 in stock, 2 reserved)</td><td class="src">WooCommerce · 11:01</td></tr>
+              <tr><th scope="row">Units sold</th><td class="num">49 in 7 full days (9–15 Nov)</td><td class="src">WooCommerce · 11:01</td></tr>
+              <tr><th scope="row">Sales per day</th><td class="num">7.0 on average</td><td class="src">Calculated · 11:01</td></tr>
+              <tr><th scope="row">Days of stock left</th><td class="num">2.3 (limit 3, warning 5)</td><td class="src">Calculated · 11:01</td></tr>
+              <tr><th scope="row">Restock date</th><td>Not set</td><td class="src">WooCommerce · 11:01</td></tr>
+              <tr><th scope="row">Ad state</th><td>Active, delivering</td><td class="src">Meta Ads · 11:00</td></tr>
+              <tr><th scope="row">Ad and product link</th><td>Promotes only SERUM-30 · confirmed</td><td class="src">Maja Nowak · 14 Nov</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <details class="disclosure">
+          <summary><svg class="icon icon-sm chev"><use href="#i-chev"/></svg>Raw evidence records</summary>
+          <pre class="mono" style="margin:0;padding:0 20px 20px;white-space:pre-wrap;color:var(--text-2)">{ "type": "STOCK_READING", "availableToSell": 16, "stockQuantity": 18, "reserved": 2,
+  "observedAt": "2026-11-16T10:01:12Z", "contentHash": "sha256:9f2c…41ab" }</pre>
+        </details>
+      </section>
+
+      <!-- 5. Safety checks: failures are never collapsed. -->
+      <section class="card" aria-labelledby="s-title">
+        <div class="sec-head"><span class="sec-ic"><svg class="icon"><use href="#i-shield"/></svg></span><h2 id="s-title">Safety checks</h2>
+          <span class="meta">
+            <span class="badge tone-success" data-when="waiting blocked executed"><svg class="icon"><use href="#i-check"/></svg>7 of 7 passed</span>
+            <span class="badge tone-danger" data-when="check-failed" hidden><svg class="icon"><use href="#i-x"/></svg>1 failed</span>
+          </span></div>
+        <div class="card-body" style="padding-top:8px">
+          <ul class="checks">
+            <li class="fail" data-when="check-failed" hidden><svg class="icon"><use href="#i-x"/></svg><strong>Stock and ad data are current</strong>
+              <span class="subtle">Failed: the stock reading is 3 hours old (limit 60 minutes). The operator reads it again before this can be approved.</span></li>
+            <li class="ok"><svg class="icon"><use href="#i-check"/></svg><span>The ad belongs to this store</span></li>
+            <li class="ok"><svg class="icon"><use href="#i-check"/></svg><span>Store and ad integrations are healthy</span></li>
+            <li class="ok" data-when="waiting blocked executed"><svg class="icon"><use href="#i-check"/></svg><span>Stock and ad data are current</span></li>
+            <li class="ok"><svg class="icon"><use href="#i-check"/></svg><span>The stock risk is confirmed and the data is complete</span></li>
+            <li class="ok"><svg class="icon"><use href="#i-check"/></svg><span>The ad promotes only this variant</span></li>
+            <li class="ok"><svg class="icon"><use href="#i-check"/></svg><span>The ad is still running</span></li>
+            <li class="ok"><svg class="icon"><use href="#i-check"/></svg><span>Autonomy level allows this with approval (L1)</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <details class="card disclosure" style="border-top:1px solid var(--border)">
+        <summary><svg class="icon icon-sm chev"><use href="#i-chev"/></svg>Technical details</summary>
+        <dl class="tech">
+          <dt>Proposed by</dt><dd><span class="mono">inventory-baseline@1.2.0</span></dd>
+          <dt>Policy</dt><dd><span class="mono">inventory-protection@3 · EXECUTE_ON_APPROVAL</span></dd>
+          <dt>Proposal</dt><dd><span class="mono">prp_01JD7Q4X9M2K8V</span> · revision 1</dd>
+          <dt>Opportunity</dt><dd><span class="mono">opp_01JD7Q4W3T6N1C</span></dd>
+          <dt>Evidence snapshot</dt><dd><span class="mono">snp_01JD7Q4VZ0R5HE</span></dd>
+          <dt>Request ID</dt><dd><span class="mono">req_7f3a9c21</span></dd>
+          <dt>Original summary</dt><dd>Stock covers 2.3 days against a threshold of 3 days. We propose pausing the dedicated ad 120001.</dd>
+        </dl>
+      </details>
+    </div>
+
+    <!-- Approval and execution: always in view on desktop. -->
+    <aside class="rail" aria-label="Approval and execution">
+      <section class="card" aria-labelledby="a-title">
+        <div class="sec-head"><span class="sec-ic"><svg class="icon"><use href="#i-user"/></svg></span><h2 id="a-title">Your approval</h2></div>
+        <div class="panel-body">
+          <div class="panel-action">
+            <span class="panel-title">Action</span>
+            <strong>Pause 1 ad in Meta Ads</strong>
+          </div>
+
+          <div data-when="waiting" class="btns">
+            <span class="deadline"><svg class="icon icon-sm"><use href="#i-clock"/></svg>Decide by Tue 17 Nov, 11:02 · in 23 h</span>
+            <button class="btn btn-primary btn-lg btn-block" type="button">Approve ad pause</button>
+            <button class="btn btn-secondary btn-block" type="button">Reject</button>
+          </div>
+
+          <div data-when="blocked" class="btns" hidden>
+            <div class="callout tone-danger" role="note" id="why-blocked">
+              <svg class="icon"><use href="#i-stop"/></svg><strong>Ad changes are stopped for this store</strong>
+              <p>Reason: “Warehouse stock count in progress” · Maja Nowak, today 10:40. Resume changes in Settings to approve.</p>
+            </div>
+            <button class="btn btn-lg btn-block" type="button" disabled aria-describedby="why-blocked">Approve ad pause</button>
+            <button class="btn btn-secondary btn-block" type="button">Reject</button>
+          </div>
+
+          <div data-when="check-failed" class="btns" hidden>
+            <div class="callout tone-danger" role="note" id="why-failed">
+              <svg class="icon"><use href="#i-x"/></svg><strong>A safety check failed</strong>
+              <p>The stock reading is too old to act on. Nothing can be approved until the operator reads fresh data.</p>
+            </div>
+            <button class="btn btn-lg btn-block" type="button" disabled aria-describedby="why-failed">Approve ad pause</button>
+            <button class="btn btn-secondary btn-block" type="button">Reject</button>
+          </div>
+
+          <div data-when="executed" class="btns" hidden>
+            <div class="callout tone-success" role="status">
+              <svg class="icon"><use href="#i-check"/></svg><strong>Paused and confirmed</strong>
+              <p>Reading the ad back at 11:21 shows it paused.</p>
+            </div>
+          </div>
+
+          <p class="fine" data-when="waiting blocked check-failed">Nothing is sent before stock and the ad are checked again. If anything changed, the pause is not sent and you see why.</p>
+          <div class="who"><svg class="icon icon-sm"><use href="#i-shield"/></svg><span data-when="waiting blocked check-failed">You can approve as Owner. Level L1: a person approves every ad change.</span><span data-when="executed" hidden>Approved by Maja Nowak today at 11:20.</span></div>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="x-title">
+        <div class="sec-head"><span class="sec-ic"><svg class="icon"><use href="#i-activity"/></svg></span><h2 id="x-title">Execution</h2></div>
+        <ol class="steps" data-when="waiting blocked check-failed">
+          <li class="step now" data-when="waiting"><span class="node"></span><span><strong>Your approval</strong><span class="subtle">Waiting</span></span></li>
+          <li class="step stop" data-when="blocked check-failed" hidden><span class="node"></span><span><strong>Your approval</strong><span class="subtle">Blocked until the reason above is resolved</span></span></li>
+          <li class="step"><span class="node"></span><span><strong>Re-check and authorization</strong><span class="subtle">Not started</span></span></li>
+          <li class="step"><span class="node"></span><span><strong>Pause sent to Meta Ads</strong><span class="subtle">Not started</span></span></li>
+          <li class="step"><span class="node"></span><span><strong>Confirmed by reading the ad</strong><span class="subtle">Not started</span></span></li>
+          <li class="step"><span class="node"></span><span><strong>Results check</strong><span class="subtle">After 24 hours and after 7 days</span></span></li>
+        </ol>
+        <ol class="steps" data-when="executed" hidden>
+          <li class="step done"><span class="node"><svg class="icon"><use href="#i-tick"/></svg></span><span><strong>Approved</strong><span class="subtle">Maja Nowak · 11:20</span></span></li>
+          <li class="step done"><span class="node"><svg class="icon"><use href="#i-tick"/></svg></span><span><strong>Re-checked and authorized</strong><span class="subtle">Stock and ad unchanged · 11:20</span></span></li>
+          <li class="step done"><span class="node"><svg class="icon"><use href="#i-tick"/></svg></span><span><strong>Pause sent to Meta Ads</strong><span class="subtle">1 attempt · 11:21</span></span></li>
+          <li class="step done"><span class="node"><svg class="icon"><use href="#i-tick"/></svg></span><span><strong>Confirmed by reading the ad</strong><span class="subtle">Ad shows as paused · 11:21</span></span></li>
+          <li class="step now"><span class="node"></span><span><strong>Results check</strong><span class="subtle">After 24 h due Tue 11:21 · after 7 days due 23 Nov</span></span></li>
+        </ol>
+      </section>
+    </aside>
+  </div>
+</div>
+
+<div class="review-bar" role="group" aria-label="Concept preview state">
+  <span>Concept state</span>
+  <button type="button" data-state="waiting">Waiting</button>
+  <button type="button" data-state="blocked">Changes stopped</button>
+  <button type="button" data-state="check-failed">Check failed</button>
+  <button type="button" data-state="executed">Executed</button>
+</div>
+<script>
+(function () {
+  var states = ["waiting", "blocked", "check-failed", "executed"];
+  function apply(state) {
+    if (states.indexOf(state) < 0) state = "waiting";
+    document.querySelectorAll("[data-when]").forEach(function (el) {
+      el.hidden = el.getAttribute("data-when").split(" ").indexOf(state) < 0;
+    });
+    document.querySelectorAll(".review-bar [data-state]").forEach(function (b) {
+      b.setAttribute("aria-pressed", String(b.getAttribute("data-state") === state));
+    });
+    var stopped = state === "blocked";
+    var op = document.querySelector(".op-state");
+    if (op) op.classList.toggle("is-stopped", stopped);
+  }
+  document.querySelectorAll(".review-bar [data-state]").forEach(function (b) {
+    b.addEventListener("click", function () { location.hash = b.getAttribute("data-state"); apply(b.getAttribute("data-state")); });
+  });
+  window.addEventListener("hashchange", function () { apply(location.hash.slice(1)); });
+  apply(location.hash.slice(1));
+})();
+</script>

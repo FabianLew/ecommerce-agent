@@ -1,6 +1,7 @@
 # UI/UX Redesign Plan: Demo-Ready Product Experience
 
-- Status: Proposed (waiting for the owner's approval; no implementation starts before it)
+- Status: Direction approved 2026-11-16 (decisions in section 9). Implementation is gated on the Visual Concept
+  Gate (section 6.1): no R1 work before the owner approves the concepts.
 - Date: 2026-11-16
 - Branch: `pilot` (frontend at 3df0b2b)
 - Inputs: Product Readiness Audit of 2026-11-15 (screenshots 01–37), `docs/architecture/04-UI-UX-SPECIFICATION.md`,
@@ -179,7 +180,8 @@ Breakpoints: `sm` 640, `md` 900 (existing), `lg` 1280, `xl` 1600, `2xl` 2200.
 | Container | Max width | Used by |
 | --- | --- | --- |
 | `readable` | 760 px | Forms, settings sections, onboarding step body, long text |
-| `standard` | 1280 px | Lists (Decisions, Activity, Notifications), detail pages with a side rail |
+| `standard` | 1280 px | Lists (Decisions, Activity, Notifications) |
+| `detail` | 1440 px | Detail pages with a side rail (Decision Detail, Integration detail) |
 | `wide` | 1680 px | Overview, Analytics, Integrations catalog, wide tables |
 
 - Content uses a 12-column grid with a 24 px gutter (16 px below `md`), page padding 32 px (`lg`+), 24 px (`md`),
@@ -307,7 +309,17 @@ Screenshots referenced are in the audit folder (`product-readiness-audit/screens
 
 ### A. Overview (`/dashboard`; screenshots 04, 09, 34)
 
-Purpose: in ten seconds, "is my business OK and what do I need to do?"
+The Overview is an **operations cockpit** (owner decision, 2026-11-16). It answers, in this order:
+
+1. Is the operator monitoring my store? (operator status band: monitoring state, ad change mode, stop state, data
+   source health)
+2. Does anything need my attention? (decisions to approve, integration problems)
+3. What was detected recently? (low stock warnings, proposals, confirmations, mapping changes)
+4. Which actions are pending, executed or not executed?
+
+Sales KPIs and the chart sit below as "Business pulse": important, but they do not define the product. The
+concept in `docs/ui/concepts/overview.html` is the reference layout; the list below is the original outline and is
+superseded where the concept differs.
 
 1. **Header**: "Overview", period ("Last 7 full days · 8–14 Nov") and the freshness indicator.
 2. **Setup banner** (only while onboarding is incomplete): "Finish setup to start monitoring · 3 of 4 steps done"
@@ -340,6 +352,13 @@ Purpose: in ten seconds, "is my business OK and what do I need to do?"
 - Pagination ("Show more") kept; a stale cursor keeps the current recovery path.
 
 ### C. Decision Detail (`/decisions/:proposalId`; screenshots 15, 28–31)
+
+Reference: `docs/ui/concepts/decision-detail.html`, which shows the waiting, changes-stopped, check-failed and
+executed states. The page separates five parts, each in its own titled section: **Problem**, **Business impact**,
+**Recommended action** (with what changes, what does not change, and what is deliberately left running),
+**Evidence** (with **Safety checks**), and **Approval and execution** (side rail). Technical data is in a
+disclosure; failed safety checks, the action scope and blocking reasons are always visible. On phones the approval
+panel follows the evidence, so the owner reads before deciding; on tablets it sits above the content.
 
 The core of the product. Two layers: what an owner needs to decide, then advanced detail. Layout: main column +
 sticky side rail at ≥ 1280 px.
@@ -419,8 +438,9 @@ Target: a **catalog** and a **detail flow per connection**.
 - **Catalog** (`/integrations`): sections in a fixed order: **Commerce, Advertising, Analytics, Marketing,
   Support**. A section lists the integrations the product supports today (from a static frontend registry
   `integration-catalog.ts`: provider → category, name, one-line description, detail route). Today: WooCommerce in
-  Commerce, Meta Ads in Advertising. Sections with nothing supported yet show one muted line, "No integrations in
-  this category yet", without buttons, logos or "coming soon" cards (decision D-4).
+  Commerce, Meta Ads in Advertising. **Categories with no supported integration are hidden entirely** (decision
+  D-4): today the catalog shows only Commerce and Advertising, and Analytics, Marketing and Support appear when their
+  first real integration ships. No placeholders, logos or "coming soon" cards.
 - **Tile**: neutral monogram (no third-party logo files), name, description, one of three statuses: **Connected**
   (success), **Not connected** (neutral), **Attention required** (warning/danger) plus "Data until …" or the short
   reason. The mapping from the backend statuses (`status`, `health.status`, sync state, Meta status) to these three
@@ -470,10 +490,23 @@ state.
    that nothing is needed.
 7. **Provider-neutral wording**: "store", "advertising account", "data source"; provider names only on the
    provider's own tile, form and target names.
-8. **Names**: the working product name stays "E-commerce Operator" in one constant until branding is decided (04 §2,
-   O5).
+8. **Names and branding**: "E-commerce Operator" is a temporary working name (04 §2, O5). The UI keeps it in one
+   constant and one wordmark slot; the mark is a neutral geometric glyph and no colour, shape or copy depends on
+   the name. The target brand is global, English-language and premium, so the interface avoids local idioms and
+   puns on the current name.
 
 ## 6. Implementation plan: small PRs
+
+### 6.1 Visual Concept Gate (before R1, owner decision D-6)
+
+Two static HTML/CSS concepts with realistic demo data, not connected to the backend and not touching production
+components: `docs/ui/concepts/overview.html` and `docs/ui/concepts/decision-detail.html` (sources in
+`docs/ui/concepts/src/`, assembled by `build.py`, no dependencies). They apply the tokens of section 2 and are
+reviewed at 1440, 1920 and 390 px. The Decision Detail concept has a review-only switch for its four states. R1
+starts only after the owner approves the concepts; agreed corrections are made in the concepts first, and the
+implementation PRs then match them.
+
+### 6.2 Iterations
 
 Every PR targets `pilot`, is frontend + docs only, and ends with: before/after screenshots from the real app (local
 stack with the demo data used in the audit) at 1440, 1920 and 2560 px plus 390 px (phone) and 1024 px (tablet);
@@ -496,6 +529,7 @@ stop for approval.
 | **R11** | Consistency pass: Analytics, Activity detail, Settings sub-navigation, auth/error/not-found pages | Medium. |
 | **R12** | Optional: dark theme (token set + chart check) | Small. Only if approved. |
 | **R13** | Demo readiness check: full screenshot matrix EN + PL, a11y report, copy review, list of remaining gaps | Report, small fixes only. |
+| **R14** | Usability test script (section 10) for 2–3 store owners or people outside IT, run after R4–R8 | Docs only. |
 
 Order rationale: foundations and shell first so later PRs only compose primitives; Decisions before Overview
 because it is the core and Overview reuses its rows; onboarding and integrations last among the big four because
@@ -538,7 +572,7 @@ they share the new integration status mapping.
   are inside "Technical details".
 - **Onboarding**: each step shows purpose, what is checked, blockers and exactly one primary action; refreshing the
   page keeps the state (backend-driven); "Start monitoring" is disabled with a reason until the backend allows it.
-- **Integrations**: five categories shown in order; only real integrations listed; every tile has one of three
+- **Integrations**: categories in the fixed order, only those with a supported integration; only real integrations listed; every tile has one of three
   statuses derived by the tested mapping; no button without a working action; connection forms are on the detail
   page.
 - **Content**: no raw decimals (e.g. "2.4286") anywhere; plurals correct in EN and PL; no "view not ready" reachable
@@ -563,9 +597,32 @@ they share the new integration status mapping.
 
 | # | Question | Recommendation |
 | --- | --- | --- |
-| D-1 | Base UI text 14 px (reading text 15 px), changing 04 §2's 16 px | Yes. It is the main reason the screens look like a prototype; accessibility kept via contrast, 12 px minimum and browser zoom. |
-| D-2 | Icons from `lucide-react` (new dependency) or our own inline SVGs | `lucide-react`, wrapped in one `Icon` component. |
-| D-3 | Remove Customer support and Automations from the navigation until built | Yes; routes stay with an honest state. |
-| D-4 | Integration categories with no integration: show the category with "No integrations in this category yet" or hide it | Show it (the brief lists the five categories), with no buttons or fake tiles. |
-| D-5 | Dark mode | Semantic tokens now, dark theme as optional R12 after the light version is approved. |
-| D-6 | Visual mock before code (static HTML of Overview and Decision Detail with the tokens above) | Optional; R1 already produces real before/after screenshots. |
+| D-1 | Base UI text 14 px (reading text 15 px), changing 04 §2's 16 px | **Approved.** |
+| D-2 | Icons from `lucide-react` (new dependency) | **Approved**, wrapped in one `Icon` component. |
+| D-3 | Remove Customer support and Automations from the navigation until built | **Approved**; routes stay with an honest state. |
+| D-4 | Integration categories with no integration | **Changed by the owner: hide such categories entirely.** |
+| D-5 | Dark mode | **Approved as later and optional**, only if it proves justified. Tokens stay semantic. |
+| D-6 | Visual concepts before code | **Approved and mandatory**: the Visual Concept Gate (6.1) precedes R1. |
+
+Decided 2026-11-16 by the owner. Additional requirements from the same review: the Overview is an operations
+cockpit (4.A), Decision Detail separates problem, impact, action, evidence and approval/execution (4.C), branding
+stays name-independent (5.8), and a usability test follows the core screens (section 10).
+
+## 10. Usability test (after the core screens)
+
+After R4–R8, a short moderated test with 2–3 store owners or people outside IT, on the demo stack in English or
+Polish, 30 minutes each, think-aloud, no help with the UI. The script is written as R14 and covers at least:
+
+1. "Is the operator watching your store right now? How do you know?" (Overview status band)
+2. "Is there anything you need to do today?" (needs attention)
+3. Open the waiting decision: "What is the problem, why does it matter, and what exactly will happen if you
+   approve?" Success: names the product, the sell-out timing, the single ad and what is not changed.
+4. "Would you approve it? What would stop you?" Then switch to the changes-stopped state: "Why can't you approve?"
+5. "Where would you check that the pause really happened?"
+6. Onboarding: "What is the next step to finish setup, and why is it needed?"
+7. Integrations: "Which data sources are connected and which need attention?"
+
+Measures: task success, time to first correct answer, wrong turns, words people use for things (fed back into the
+terminology list), and a 1–5 confidence rating for the approval decision. Findings become a short report and
+small follow-up PRs; nothing in the safety invariants (7.2) is changed because of a usability finding without an
+explicit owner decision.

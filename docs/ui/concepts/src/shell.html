@@ -1,0 +1,48 @@
+<div class="app">
+  <aside class="sidebar" aria-label="Sidebar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><span></span></div>
+      <span class="brand-name">E-commerce Operator</span>
+    </div>
+    <button class="store-switch" type="button" aria-haspopup="menu" aria-expanded="false">
+      <span class="store-avatar" aria-hidden="true">NB</span>
+      <span class="store-text"><strong>Northfield Botanics</strong><span>Northfield Group</span></span>
+      <svg class="icon icon-sm muted"><use href="#i-updown"/></svg>
+    </button>
+    <nav class="nav" aria-label="Main navigation">
+      <div class="nav-group">
+        <a href="overview.html" %%CUR_overview%%><svg class="icon"><use href="#i-overview"/></svg>Overview</a>
+        <a href="decision-detail.html" %%CUR_decisions%%><svg class="icon"><use href="#i-decisions"/></svg>Decisions<span class="count num" aria-label="1 waiting for approval">1</span></a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">Insights</div>
+        <a href="#"><svg class="icon"><use href="#i-analytics"/></svg>Analytics</a>
+        <a href="#"><svg class="icon"><use href="#i-activity"/></svg>Activity</a>
+      </div>
+      <div class="nav-group">
+        <div class="nav-label">Setup</div>
+        <a href="#"><svg class="icon"><use href="#i-plug"/></svg>Integrations</a>
+        <a href="#"><svg class="icon"><use href="#i-settings"/></svg>Settings</a>
+      </div>
+    </nav>
+    %%OPSTATE%%
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <button class="icon-btn menu-btn" type="button" aria-label="Open navigation"><svg class="icon icon-lg"><use href="#i-menu"/></svg></button>
+      <nav class="crumbs" aria-label="Breadcrumb">%%CRUMBS%%</nav>
+      <div class="topbar-right">
+        <span class="fresh"><svg class="icon icon-sm"><use href="#i-refresh"/></svg>Data as of 11:20</span>
+        <button class="icon-btn" type="button" aria-label="Notifications, 2 unread"><svg class="icon icon-lg"><use href="#i-bell"/></svg><span class="pip num">2</span></button>
+        <button class="user" type="button" aria-haspopup="menu" aria-expanded="false">
+          <span class="avatar" aria-hidden="true">MN</span>
+          <span class="user-text"><strong>Maja Nowak</strong><span>Owner</span></span>
+        </button>
+      </div>
+    </header>
+    %%BANNER%%
+    <main class="page" id="content">
+%%CONTENT%%
+    </main>
+  </div>
+</div>
