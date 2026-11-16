@@ -664,4 +664,10 @@
   .dialog::backdrop {
     background: rgb(23 43 37 / 40%);
   }
+
+  /* Buttons inside a menu panel (account menu) read as menu rows. */
+  .menu-panel .button {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }

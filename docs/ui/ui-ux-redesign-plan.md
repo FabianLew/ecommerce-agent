@@ -539,6 +539,19 @@ stop for approval.
 | **R13** | Demo readiness check: full screenshot matrix EN + PL, a11y report, copy review, list of remaining gaps | Report, small fixes only. |
 | **R14** | Usability test script (section 10) for 2–3 store owners or people outside IT, run after R4–R8 | Docs only. |
 
+Implementation notes:
+
+- **R1 (done):** ADR-0029; tokens, layers, fonts, icons, `StatusBadge`, `Callout`, tone maps; screenshot + axe spec.
+- **R2 (done):** grouped sidebar (`NAV_GROUPS`) with the "to approve" counter and "Store setup n/4" while
+  monitoring has not been started; store switcher and account menu as `details` disclosures (work without
+  JavaScript); breadcrumbs without resource IDs; notifications button with the unread count; operating state
+  (changes stopped, monitoring, effective ad pause level from `onboarding.monitoring.ads`); safety banner from
+  `mutation-stop`; drawer below 900 px with focus trap and Escape; per-page containers; store `loading.tsx` and
+  `error.tsx`. Four extra reads in parallel (`decisions?limit=1`, `notifications?limit=1`, `mutation-stop`,
+  `onboarding`), measured page TTFB 55–76 ms median locally. **Not done:** the data freshness indicator in the top
+  bar, because no store-level "data as of" value exists in the API (data rule); it stays on the pages that return
+  it (e.g. integration health). A store-level freshness read would be a separate API proposal.
+
 Order rationale: foundations and shell first so later PRs only compose primitives; Decisions before Overview
 because it is the core and Overview reuses its rows; onboarding and integrations last among the big four because
 they share the new integration status mapping.
