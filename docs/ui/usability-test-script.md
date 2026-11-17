@@ -13,7 +13,10 @@ seen the product understands what the operator is doing and can make the approva
 - **Roles:** one moderator, one note-taker. Screen and voice recording only with the participant's consent.
 - **Reset between sessions:** `docker compose down -v`, start the stack, run the scenario spec with
   `E2E_SCENARIO=1`.
-- **Before task 4b:** the moderator switches on "Stop changes to ads" in Settings in another window.
+- **Before task 4b:** the moderator switches on "Stop changes" in Settings in a second (private) window.
+- **Preparation, consent, observation sheet and results template:** see the
+  [facilitator kit](usability/facilitator-kit.md). Problems to watch for are in the
+  [cognitive walkthrough](usability/cognitive-walkthrough-2026-11-17.md).
 
 ## Moderator rules
 
@@ -26,7 +29,8 @@ seen the product understands what the operator is doing and can make the approva
 
 "You run an online shop. This tool watches your store and your ads and suggests what to do. It never changes
 anything without your approval. We are testing the tool, not you. There are no wrong answers. Please say what you
-are thinking as you go."
+are thinking as you go. The store and its ads are a demo with made-up data, so nothing you do here changes a
+real shop or real ads."
 
 ## Tasks
 
@@ -37,11 +41,11 @@ Start every task from the Overview unless stated otherwise.
 | 1 | "Is the tool watching your store right now? How do you know?" | Says monitoring is not started yet (or since when it is on) and points to the status band or the setup callout | Overview |
 | 2 | "Is there anything you need to do today?" | Names the waiting decision about the serum and the next setup step | Overview |
 | 3 | Open the waiting decision. "What is the problem, why does it matter, and what exactly will happen if you approve?" | Names the product, that stock runs out in about 2.6 days, that only the one dedicated ad is paused, and that the catalog ad and budgets are not changed | Decision Detail |
-| 4a | "Would you approve it? What would stop you?" | Gives a reason based on what the page shows; notices that approval is not possible yet and why | Decision Detail |
-| 4b | (Changes stopped) "Why can't you approve now?" | Points to the stop banner or the reason in the decision panel | Decision Detail |
+| 4a | "Would you approve it if you could? What would make you hesitate?" Stop after the answer; do not let the participant change settings (in the demo approval is never possible) | Gives a reason based on what the page shows; notices that approval is not possible now and names the reason shown | Decision Detail |
+| 4b | (Changes stopped; reload the page) "Has anything changed? What does the tool tell you now?" | Notices the red "Changes are stopped" banner and says that the operator sends no change to the ads | Decision Detail |
 | 5 | "If you had approved, where would you check that the pause really happened?" | Finds the execution section on the decision or the Activity page | Decision Detail, Activity |
 | 6 | "What is the next step to finish setting up the store, and why is it needed?" | Opens Store setup, names "Connect advertising" and gives the reason from the panel | Store setup |
-| 7 | "Which data sources are connected, and which need attention?" | WooCommerce connected, Meta Ads not connected | Integrations |
+| 7 | "Which data sources are connected, and which need attention?" | WooCommerce connected, Meta Ads not connected. Note whether the participant asks how the tool knows about the ads (walkthrough W-1) | Integrations |
 | 8 | (Phone) "Open the waiting decision and find the button to decide." | Reaches the decision and the action bar without help | Decisions, mobile |
 
 ## Measures
