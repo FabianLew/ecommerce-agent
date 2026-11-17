@@ -23,14 +23,14 @@ describe("decision labels", () => {
   it("names the problem, the action and the cover in both languages", () => {
     expect(problemTitle(decision, en.decisions)).toBe("Low stock: Serum 30 ml (SERUM-30)");
     expect(recommendationText(decision, en.decisions)).toBe("Pause the ad “Serum dedicated”");
-    expect(coverText(decision, en.decisions, "en")).toBe("2.6 days");
-    expect(coverText(decision, pl.decisions, "pl")).toBe("2,6 dnia");
+    expect(coverText(decision, en, "en")).toBe("2.6 days");
+    expect(coverText(decision, pl, "pl")).toBe("2,6 dnia");
   });
 
   it("falls back to the disposition and to unknown cover", () => {
     const none = { ...decision, action: undefined, disposition: "MONITOR" as const, facts: undefined };
     expect(recommendationText(none, en.decisions)).toBe("Keep monitoring");
-    expect(coverText(none, en.decisions, "en")).toBe("unknown");
+    expect(coverText(none, en, "en")).toBe("unknown");
   });
 
   it("shows unknown codes as they are, also for prototype keys", () => {

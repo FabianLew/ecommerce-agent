@@ -12,28 +12,48 @@ async function signIn(page: Page, user: "owner-a" | "owner-b", path = "/") {
   await page.locator("#kc-login").click();
 }
 
+/** The store switcher and the account menu are disclosures (plan section 2.6); open one unless it is open. */
+async function openMenu(page: Page, testId: "store-switcher" | "user-menu") {
+  const menu = page.getByTestId(testId);
+  if (!(await menu.evaluate((element) => (element as HTMLDetailsElement).open))) {
+    await menu.locator("summary").click();
+  }
+  return menu;
+}
+
+async function switchStore(page: Page, name: string) {
+  const menu = await openMenu(page, "store-switcher");
+  await menu.getByRole("link", { name: new RegExp(`^${name}`) }).click();
+}
+
 test("owner signs in, lands in their store and switches to another store", async ({ page }) => {
   await signIn(page, "owner-a");
 
   await expect(page).toHaveURL(`/stores/${STORE_A}/dashboard`);
   await expect(page.getByTestId("store-name")).toHaveText("Sklep A");
   await expect(page.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByText("Manage the store")).toBeVisible();
+  // Roles and permissions live in Settings, in the store summary.
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await expect(page.getByTestId("store-summary")).toContainText("Manage the store");
+  await page.getByRole("link", { name: "Overview" }).click();
 
   // Stores the user cannot access are not offered at all.
-  const switcher = page.getByLabel("Store", { exact: true });
-  await expect(switcher.locator("option")).toHaveText(["Sklep A · Demo", "Sklep C · Demo"]);
+  const switcher = await openMenu(page, "store-switcher");
+  await expect(switcher.getByRole("link")).toHaveText([/Sklep A\s*Demo$/, /Sklep C\s*Demo$/]);
+  await expect(switcher.getByRole("link", { name: /^Sklep A/ })).toHaveAttribute("aria-current", "true");
+  await page.keyboard.press("Escape");
 
   await page.getByRole("link", { name: "Activity", exact: true }).click();
   await expect(page).toHaveURL(`/stores/${STORE_A}/activity`);
 
-  await switcher.selectOption(STORE_C);
+  await switchStore(page, "Sklep C");
   // The section is kept, the store changes, and the analyst role has read-only permissions.
   await expect(page).toHaveURL(`/stores/${STORE_C}/activity`);
   await page.getByRole("link", { name: "Overview" }).click();
   await expect(page.getByTestId("store-name")).toHaveText("Sklep C");
-  await expect(page.getByText("Read store data")).toBeVisible();
-  await expect(page.getByText("Manage the store")).toHaveCount(0);
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await expect(page.getByTestId("store-summary")).toContainText("Read store data");
+  await expect(page.getByTestId("store-summary")).not.toContainText("Manage the store");
 });
 
 test("a link to a store without access shows a safe state and does not switch stores", async ({ page }) => {
@@ -67,7 +87,7 @@ test("sign-out ends the provider session", async ({ page }) => {
   await signIn(page, "owner-a");
   await expect(page.getByTestId("store-name")).toHaveText("Sklep A");
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await (await openMenu(page, "user-menu")).getByRole("button", { name: "Sign out" }).click();
   await expect(page).toHaveURL("/signed-out");
   await expect(page.getByRole("heading", { name: "Signed out" })).toBeVisible();
 
@@ -101,8 +121,12 @@ test("an expiring access token is refreshed transparently", async ({ page, conte
 test("owner saves a WooCommerce key and sees the check result; analyst gets a read-only card", async ({ page }) => {
   await signIn(page, "owner-a", `/stores/${STORE_A}/integrations`);
   await expect(page).toHaveURL(`/stores/${STORE_A}/integrations`);
+  // The catalog shows one tile per supported integration; the tile opens the connection page.
+  await expect(page.getByTestId("tile-meta-ads")).toBeVisible();
+  await page.getByRole("link", { name: "WooCommerce" }).click();
+  await expect(page).toHaveURL(`/stores/${STORE_A}/integrations/woocommerce`);
+  await expect(page.getByRole("heading", { level: 1, name: "WooCommerce" })).toBeVisible();
   const card = page.getByTestId("woocommerce-card");
-  await expect(card.getByRole("heading", { name: "WooCommerce" })).toBeVisible();
 
   // Client-side format check: the key and the secret are easy to swap.
   const storeUrl = card.getByLabel("Store address");
@@ -124,8 +148,9 @@ test("owner saves a WooCommerce key and sees the check result; analyst gets a re
   // Secrets are never rendered back, not even in the form.
   expect(await page.content()).not.toContain("cs_e2e0000000000000000000000000000000000001");
 
-  await page.getByLabel("Store", { exact: true }).selectOption(STORE_C);
+  await switchStore(page, "Sklep C");
   await expect(page).toHaveURL(`/stores/${STORE_C}/integrations`);
+  await page.getByRole("link", { name: "WooCommerce" }).click();
   await expect(page.getByRole("heading", { name: "View only" })).toBeVisible();
   await expect(page.getByLabel("Consumer key")).toHaveCount(0);
 });
@@ -138,16 +163,16 @@ test("the interface is in English by default and the user can switch to Polish a
 
   await page.getByRole("link", { name: "Activity", exact: true }).click();
   await expect(page).toHaveURL(`/stores/${STORE_A}/activity`);
-  await page.getByRole("button", { name: "Polski" }).click();
+  await (await openMenu(page, "user-menu")).getByRole("button", { name: "Polski" }).click();
   // The page stays the same; only the language changes, and the choice survives a reload.
   await expect(page.getByRole("link", { name: "Aktywność", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page).toHaveURL(`/stores/${STORE_A}/activity`);
   await expect(page.locator("html")).toHaveAttribute("lang", "pl");
   await page.reload();
-  await expect(page.getByRole("button", { name: "Wyloguj się" })).toBeVisible();
+  await expect((await openMenu(page, "user-menu")).getByRole("button", { name: "Wyloguj się" })).toBeVisible();
   expect((await context.cookies()).find((cookie) => cookie.name === "op_locale")?.value).toBe("pl");
 
-  await page.getByRole("button", { name: "English" }).click();
+  await (await openMenu(page, "user-menu")).getByRole("button", { name: "English" }).click();
   await expect(page.getByRole("link", { name: "Activity", exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 });
@@ -173,4 +198,29 @@ test("decision inbox shows its groups and a positive empty state; activity lists
   await page.getByRole("link", { name: "Policy", exact: true }).click();
   await expect(page).toHaveURL(`/stores/${STORE_A}/activity?type=POLICY`);
   await expect(page.getByRole("heading", { name: "No activity yet" })).toBeVisible();
+});
+
+test("the shell offers only available views and shows stopped changes on every page", async ({ page }) => {
+  await signIn(page, "owner-a", `/stores/${STORE_A}/settings`);
+  await expect(page).toHaveURL(`/stores/${STORE_A}/settings`);
+
+  // Customer support and Automations are not offered until they exist (plan section 2.6, decision D-3).
+  const navigation = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(navigation.getByRole("link", { name: "Customer support" })).toHaveCount(0);
+  await expect(navigation.getByRole("link", { name: "Automations" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Breadcrumbs" })).toContainText("Settings");
+  await expect(page.getByTestId("safety-banner")).toHaveCount(0);
+
+  // A stop is visible on every store page while it holds (plan section 7.2, invariant 3), then it is resumed.
+  const form = page.getByTestId("mutation-stop-form");
+  await form.getByLabel("Reason").fill("e2e: shell banner check");
+  await form.getByRole("button", { name: "Stop changes" }).click();
+  await expect(page.getByTestId("safety-banner")).toContainText("Changes are stopped for this store");
+  await page.getByRole("link", { name: "Overview" }).click();
+  await expect(page.getByTestId("safety-banner")).toContainText("e2e: shell banner check");
+  await expect(page.getByTestId("operating-state")).toContainText("Changes stopped");
+
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await page.getByTestId("mutation-stop-form").getByRole("button", { name: "Resume changes" }).click();
+  await expect(page.getByTestId("safety-banner")).toHaveCount(0);
 });

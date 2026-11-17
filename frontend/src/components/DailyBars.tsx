@@ -24,7 +24,7 @@ export function DailyBars({
   const padBottom = 24;
   const max = Math.max(0, ...points.map((point) => point.value ?? 0));
   const slot = width / Math.max(points.length, 1);
-  const barWidth = Math.max(2, Math.min(24, slot - 2));
+  const barWidth = Math.max(2, Math.min(24, slot * 0.6));
   const plot = height - padTop - padBottom;
   const dateFormat = new Intl.DateTimeFormat(INTL_TAGS[locale], { day: "numeric", month: "short", timeZone: "UTC" });
   const labelEvery = Math.ceil(points.length / 6);

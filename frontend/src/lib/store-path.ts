@@ -12,6 +12,18 @@ export const SECTIONS = [
 
 export type SectionSlug = (typeof SECTIONS)[number];
 
+/**
+ * Sidebar groups (plan section 2.6). Only views that exist are listed: Customer support and Automations stay routes
+ * with an honest "not in this version" state, so old links keep working, but they are not offered in the navigation.
+ */
+export const NAV_GROUPS = [
+  { id: "main", sections: ["dashboard", "decisions"] },
+  { id: "insights", sections: ["analytics", "activity"] },
+  { id: "setup", sections: ["integrations", "settings"] },
+] as const satisfies readonly { id: string; sections: readonly SectionSlug[] }[];
+
+export type NavGroupId = (typeof NAV_GROUPS)[number]["id"];
+
 export function isSection(value: string): value is SectionSlug {
   return (SECTIONS as readonly string[]).includes(value);
 }

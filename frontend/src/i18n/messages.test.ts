@@ -6,6 +6,10 @@ import { messagesFor } from "./messages";
 import { pl } from "./pl";
 
 function shape(value: unknown, path = ""): string[] {
+  // Plural word forms differ per language by design (Polish has one/few/many), so only their presence is compared.
+  if (path.endsWith("Forms")) {
+    return [`${path}:forms`];
+  }
   if (value && typeof value === "object") {
     return Object.entries(value).flatMap(([key, child]) => shape(child, `${path}.${key}`));
   }

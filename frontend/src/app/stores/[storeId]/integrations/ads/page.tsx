@@ -1,7 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { PageHeading } from "@/components/PageHeading";
+import { StatePanel } from "@/components/StatePanel";
+import { Callout } from "@/components/ui/Callout";
 import { formatInstant } from "@/i18n/format";
 import { getLocale, getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
@@ -9,6 +10,8 @@ import { storePath } from "@/lib/store-path";
 
 import { revokeMapping } from "./actions";
 import { MappingForm } from "./MappingForm";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { MAPPING_STATE_TONE, toneOf } from "@/components/ui/tones";
 
 export const dynamic = "force-dynamic";
 
@@ -35,59 +38,60 @@ export default async function AdMappingsPage({ params }: { params: Promise<{ sto
 
   return (
     <>
-      <PageHeading>{t.title}</PageHeading>
-      <p className="muted">{t.intro}</p>
-      <p>
-        <Link href={integrations}>{t.backToIntegrations}</Link>
-      </p>
-      {canManage ? null : <p className="form-message">{t.readOnly}</p>}
+      <header className="page-header">
+        <PageHeading>{t.title}</PageHeading>
+        <p className="page-sub">{t.intro}</p>
+      </header>
+      {canManage ? null : <Callout tone="info" role="note">{t.readOnly}</Callout>}
       {ads.data.items.length === 0 ? (
-        <p className="muted" data-testid="ad-mapping-empty">{t.empty}</p>
+        <div data-testid="ad-mapping-empty">
+          <StatePanel tone="info" title={t.title} description={t.empty} />
+        </div>
       ) : (
-        <ul className="stack" data-testid="ad-mapping-list">
-          {ads.data.items.map((ad) => (
-            <li key={ad.id} className="card" data-testid={`ad-${ad.externalId}`}>
-              <div className="card-header">
-                <h2>{ad.name}</h2>
-                <span className={`badge badge-mapping-${ad.mappingState.toLowerCase()}`} data-testid="mapping-state">
-                  {t.state[ad.mappingState]}
-                </span>
-              </div>
-              <dl className="details">
-                <dt>{t.adColumn}</dt>
-                <dd>
-                  {ad.externalId} · {ad.accountExternalId}
-                </dd>
-                <dt>{t.status}</dt>
-                <dd>
-                  {ad.ownStatus} / {ad.effectiveStatus}
-                </dd>
-                <dt>{t.observed}</dt>
-                <dd>{formatInstant(ad.observedAt, timezone, locale)}</dd>
-                <dt>{t.mapping}</dt>
-                <dd data-testid="mapping-summary">
+        <ul className="ad-list" data-testid="ad-mapping-list">
+          {ads.data.items.map((ad) => {
+            const confirmed = ad.mappingState === "VERIFIED";
+            return (
+              <li key={ad.id} className="card ad-row" data-testid={`ad-${ad.externalId}`}>
+                <div className="card-header">
+                  <h2>{ad.name}</h2>
+                  <StatusBadge tone={toneOf(MAPPING_STATE_TONE, ad.mappingState)} data-testid="mapping-state">
+                    {t.state[ad.mappingState]}
+                  </StatusBadge>
+                </div>
+                <p className="ad-meta">
+                  {ad.externalId} · {ad.accountExternalId} · {ad.effectiveStatus} · {t.observed}{" "}
+                  {formatInstant(ad.observedAt, timezone, locale)}
+                </p>
+                <p className="ad-mapping" data-testid="mapping-summary">
+                  <span className="ad-mapping-label">{t.mapping}</span>
                   {ad.mapping ? (
-                    <>
+                    <span>
                       {t.scope[ad.mapping.scope]}:{" "}
-                      {ad.mapping.variants.map((variant) => variant.sku ?? variant.name).join(", ")} (
-                      {t.version(ad.mapping.version)}
-                      {ad.mapping.verifiedAt ? `, ${t.confirmedAt(formatInstant(ad.mapping.verifiedAt, timezone, locale))}` : ""})
-                    </>
+                      <strong>{ad.mapping.variants.map((variant) => variant.sku ?? variant.name).join(", ")}</strong>
+                      <span className="muted">
+                        {" "}({t.version(ad.mapping.version)}
+                        {ad.mapping.verifiedAt ? `, ${t.confirmedAt(formatInstant(ad.mapping.verifiedAt, timezone, locale))}` : ""})
+                      </span>
+                    </span>
                   ) : (
-                    "—"
+                    <span>—</span>
                   )}
-                </dd>
-              </dl>
-              {ad.allowedActions.includes("CONFIRM_MAPPING") ? (
-                <MappingForm storeId={storeId} ad={ad} variants={variants.data.items} />
-              ) : null}
-              {ad.allowedActions.includes("REVOKE_MAPPING") && ad.mapping ? (
-                <form action={revokeMapping.bind(null, storeId, ad.id, ad.mapping.version)}>
-                  <button type="submit" className="button secondary">{t.revoke}</button>
-                </form>
-              ) : null}
-            </li>
-          ))}
+                </p>
+                {ad.allowedActions.includes("CONFIRM_MAPPING") ? (
+                  <details className="ad-edit" open={!confirmed}>
+                    <summary>{confirmed ? t.change : t.confirm}</summary>
+                    <MappingForm storeId={storeId} ad={ad} variants={variants.data.items} />
+                  </details>
+                ) : null}
+                {ad.allowedActions.includes("REVOKE_MAPPING") && ad.mapping ? (
+                  <form action={revokeMapping.bind(null, storeId, ad.id, ad.mapping.version)}>
+                    <button type="submit" className="button ghost sm">{t.revoke}</button>
+                  </form>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
       )}
     </>

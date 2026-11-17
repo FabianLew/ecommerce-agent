@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { StatePanel } from "@/components/StatePanel";
+import { StandaloneState, StatePanel } from "@/components/StatePanel";
+import { PRODUCT_NAME } from "@/lib/brand";
 import { getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { storePath } from "@/lib/store-path";
@@ -21,12 +22,12 @@ export default async function Home() {
   }
   const t = await getMessages();
   return (
-    <main className="centered">
-      <StatePanel tone="info" title={t.home.noStoresTitle} description={t.home.noStoresDescription}>
+    <StandaloneState productName={PRODUCT_NAME}>
+      <StatePanel tone="info" title={t.home.noStoresTitle} description={t.home.noStoresDescription} level={1}>
         <form action="/auth/logout" method="post">
           <button type="submit" className="button secondary">{t.common.signOut}</button>
         </form>
       </StatePanel>
-    </main>
+    </StandaloneState>
   );
 }

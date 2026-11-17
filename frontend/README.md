@@ -73,13 +73,51 @@ The scenario connects store B, so it passes once per fresh stack.
 
 ## Palette contrast (04 §2, §14)
 
-Measured contrast ratios (WCAG 2.x):
+Measured contrast ratios (WCAG 2.x) of the tokens in `src/styles/tokens.css`:
 
 | Pair | Contrast | Use |
 | --- | --- | --- |
 | text `#172B25` on `#FFFFFF` / `#F6F8F7` | 14.91 / 13.98 | content |
-| secondary `#52665E` on `#FFFFFF` / `#F6F8F7` | 6.14 / 5.76 | labels, descriptions |
+| secondary `#52665E` on `#FFFFFF` / `#F6F8F7` / `#F1F4F2` | 6.14 / 5.76 / 5.54 | labels, descriptions |
+| tertiary `#617269` on `#FFFFFF` / `#F6F8F7` / `#F1F4F2` | 5.10 / 4.78 / 4.60 | meta text, small captions |
 | accent `#16734B` on `#FFFFFF`, white on accent | 5.85 | links, primary button |
-| accent `#16734B` on `#EAF5EE` | 5.24 | active menu item |
-| border `#DFE7E2` on `#FFFFFF` | 1.26 | decorative only (cards) |
+| accent `#16734B` on `#EAF5EE` | 5.24 | active menu item, success badge |
+| warning `#8A5A00` on `#FFF6E0` | 5.51 | warning badge and callout |
+| danger `#B42318` on `#FDECEB` | 5.75 | error badge and callout |
+| info `#1D4F86` on `#EEF4FB` | 7.54 | info badge and callout |
+| neutral `#52665E` on `#F1F4F2` | 5.54 | neutral badge |
+| border `#E3E9E5` / `#C9D3CD` on `#FFFFFF` | 1.23 / 1.53 | decorative only (cards, dividers) |
 | control border `#74867E` on `#FFFFFF` | 3.85 | inputs, secondary buttons (3:1 requirement) |
+
+## Styles (ADR-0029)
+
+`src/styles/` holds the whole design system as plain CSS in cascade layers, imported once in `app/layout.tsx`:
+`tokens.css` (colours, type scale, spacing, radii, control heights, containers; declares the layer order),
+`base.css` (reset, typography, links, focus), `layout.css` (app shell), `components.css` (buttons, cards, badges,
+callouts, forms, tables, tabs, dialog) and `pages.css` (styles of single views). Use tokens, never raw values. A
+status is always icon + text + colour: `StatusBadge` and `Callout` in `src/components/ui/`, tones in `tones.ts`.
+
+The screenshot matrix and the accessibility check of the redesign run against the local stack after the scenario:
+`E2E_SCREENS=1 SCREENS_DIR=<folder> pnpm test:e2e e2e/screens.spec.ts` (widths in `SCREENS_WIDTHS`, default
+390, 1024, 1440, 1920, 2560). It fails on a serious or critical axe violation and reports sideways scrolling.
+
+## Content rules and terminology (plan section 5)
+
+Numbers go through `src/i18n/format.ts`: days with `formatDays` (one decimal, correct word form), counts with
+`formatCount`, money with `formatMoney`, other decimals with `formatNumber` (one decimal by default). Raw decimals
+from the API are never printed. Plurals use `plural()` on `Intl.PluralRules` with per-language word forms (`*Forms`
+keys in the catalogs; Polish has one/few/many and `other` for fractions).
+
+| Concept | English | Polish | Avoid |
+| --- | --- | --- | --- |
+| A detected problem the operator tracks (opportunity) | case | sprawa | episode, opportunity |
+| What the operator suggests (proposal) | recommendation | rekomendacja | proposal (except in technical details) |
+| A person's yes to a recommendation | approval / approve | zatwierdzenie / zatwierdź | accept, confirm |
+| Stopping an ad | pause | wstrzymanie / wstrzymaj | disable, turn off |
+| Watching the store's data | monitoring | monitoring | tracking |
+| Policy evaluation shown to people | safety checks | kontrole bezpieczeństwa | policy, guardrails |
+| WooCommerce, Meta and later providers in general | data source, store, advertising account | źródło danych, sklep, konto reklamowe | provider names outside their own tile |
+| Stopping all changes | changes stopped | zmiany wstrzymane | kill switch, mutations |
+
+Provider names appear only on the provider's own tile, form and target names. Technical codes, versions and IDs live
+in "Technical details" disclosures.

@@ -4,10 +4,13 @@ import { notFound } from "next/navigation";
 import { DailyBars } from "@/components/DailyBars";
 import { MetricCard } from "@/components/MetricCard";
 import { PageHeading } from "@/components/PageHeading";
-import { formatInstant } from "@/i18n/format";
+import { formatCount, formatInstant } from "@/i18n/format";
+import { INTL_TAGS } from "@/i18n/locale";
 import { getLocale, getMessages } from "@/i18n/server";
 import { backend, redirectIfUnauthenticated } from "@/lib/api";
 import { decisionPath, storePath } from "@/lib/store-path";
+
+import { label } from "../../../decisions/labels";
 
 export const dynamic = "force-dynamic";
 
@@ -37,19 +40,21 @@ export default async function ProductDetailPage({
     notFound();
   }
   const tz = data.meta.timezone;
+  const dayFormat = new Intl.DateTimeFormat(INTL_TAGS[locale], { dateStyle: "medium", timeZone: "UTC" });
+  const day = (value: string) => dayFormat.format(new Date(`${value}T00:00:00Z`));
   return (
     <>
-      <PageHeading>
-        {`${data.variant.sku ? `${data.variant.sku} · ` : ""}${data.variant.productName} – ${data.variant.name}`}
-      </PageHeading>
-      <p><Link href={`${analytics}?tab=products`}>{t.backToProducts}</Link></p>
-      <p className="muted">{t.period(data.meta.from, data.meta.to, tz)}</p>
+      <header className="page-header">
+        {data.variant.sku ? <p className="setup-eyebrow">{data.variant.sku}</p> : null}
+        <PageHeading>{`${data.variant.productName} – ${data.variant.name}`}</PageHeading>
+        <p className="page-sub">{t.period(day(data.meta.from), day(data.meta.to), tz)}</p>
+      </header>
       <div className="metric-grid">
         <MetricCard metric={data.daysOfCover} locale={locale} t={t} />
         <MetricCard metric={data.salesVelocity} locale={locale} t={t} />
         <section className="card metric-card">
           <h2 className="metric-label">{t.stock}</h2>
-          <p className="metric-value">{data.availableToSell ?? "—"}</p>
+          <p className="metric-value">{formatCount(data.availableToSell, locale)}</p>
         </section>
       </div>
       <section className="card">
@@ -65,7 +70,7 @@ export default async function ProductDetailPage({
               {data.stock.map((point) => (
                 <tr key={point.observedAt}>
                   <td>{formatInstant(point.observedAt, tz, locale)}</td>
-                  <td>{point.availableToSell ?? "—"}</td>
+                  <td className="numeric">{formatCount(point.availableToSell, locale)}</td>
                   <td>{point.stockStatus}</td>
                 </tr>
               ))}
@@ -93,7 +98,7 @@ export default async function ProductDetailPage({
           <ul>
             {data.decisions.map((decision) => (
               <li key={decision.opportunityId}>
-                {formatInstant(decision.openedAt, tz, locale)} · {decision.status}
+                {formatInstant(decision.openedAt, tz, locale)} · {label(messages.activity.opportunityStatus, decision.status)}
                 {decision.latestProposalId ? (
                   <> · <Link href={decisionPath(storeId, decision.latestProposalId)}>{t.openDecision}</Link></>
                 ) : null}

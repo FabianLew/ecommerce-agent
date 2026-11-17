@@ -35,11 +35,12 @@ export default async function ActivityDetailPage({
 
   return (
     <>
-      <p>
-        <Link href={list}>{t.back}</Link>
-      </p>
-      <PageHeading>{t.title}</PageHeading>
-      <section className="card" data-testid="activity-detail">
+      <header className="page-header">
+        <p className="setup-eyebrow">{t.title} · {messages.activity.types[item.type]}</p>
+        <PageHeading>{describe(item, messages)}</PageHeading>
+        <p className="page-sub">{formatInstant(item.occurredAt, data.meta.timezone, locale)} · {actor}</p>
+      </header>
+      <section className="card stack-card" data-testid="activity-detail">
         <dl className="details">
           <dt>{t.what}</dt>
           <dd>{describe(item, messages)}</dd>
@@ -47,40 +48,34 @@ export default async function ActivityDetailPage({
           <dd>{formatInstant(item.occurredAt, data.meta.timezone, locale)}</dd>
           <dt>{t.who}</dt>
           <dd>{actor}</dd>
-          {item.resourceType ? (
-            <>
-              <dt>{t.resource}</dt>
-              <dd>
-                <code>
-                  {item.resourceType}/{item.resourceId}
-                </code>
-              </dd>
-            </>
-          ) : null}
         </dl>
         {data.proposalId ? (
-          <p>
-            <Link href={decisionPath(storeId, data.proposalId)}>
+          <div>
+            <Link href={decisionPath(storeId, data.proposalId)} className="button secondary">
               {data.executionId ? t.openExecution : messages.activity.openDecision}
             </Link>
-          </p>
-        ) : null}
-        {Object.keys(item.details).length > 0 ? (
-          <details>
-            <summary>{t.details}</summary>
-            <dl className="details">
-              {Object.entries(item.details).map(([key, value]) => (
-                <div key={key}>
-                  <dt>
-                    <code>{key}</code>
-                  </dt>
-                  <dd>{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </details>
+          </div>
         ) : null}
       </section>
+      {item.resourceType || Object.keys(item.details).length > 0 ? (
+        <details className="card technical-card">
+          <summary>{t.details}</summary>
+          <dl className="details">
+            {item.resourceType ? (
+              <>
+                <dt>{t.resource}</dt>
+                <dd><code>{item.resourceType}/{item.resourceId}</code></dd>
+              </>
+            ) : null}
+            {Object.entries(item.details).map(([key, value]) => (
+              <div key={key} className="details-row">
+                <dt><code>{key}</code></dt>
+                <dd>{value}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      ) : null}
     </>
   );
 }

@@ -34,7 +34,7 @@ test("a stock drop in WooCommerce becomes a pause proposal waiting for approval 
   test.setTimeout(8 * 60_000);
 
   // 1. Connect the local store with its read-only key.
-  await signIn(page, `/stores/${STORE_B}/integrations`);
+  await signIn(page, `/stores/${STORE_B}/integrations/woocommerce`);
   const card = page.getByTestId("woocommerce-card");
   await expect(card.getByTestId("woocommerce-status"), "store B is already connected: the scenario needs a fresh "
     + "stack (docker compose down -v)").toHaveCount(0);
@@ -90,9 +90,10 @@ test("a stock drop in WooCommerce becomes a pause proposal waiting for approval 
   await expect(page.getByTestId("decision-status")).toHaveText("Waiting");
   await expect(page.getByTestId("decision-cover")).toHaveText("2.6 days");
   const summary = page.getByTestId("decision-summary");
-  await expect(summary.getByText("ad-9001")).toBeVisible();
-  await expect(summary.getByText("18", { exact: true })).toBeVisible();
-  await expect(summary.getByText("49", { exact: true })).toBeVisible();
+  // The target ad and the stock reading; both also appear in the evidence further down.
+  await expect(summary.getByText("ad-9001", { exact: true }).first()).toBeVisible();
+  await expect(summary.getByText("18", { exact: true }).first()).toBeVisible();
+  await expect(summary).toContainText("49 sold in the last 7 days");
   // ADR-0025: the first cap a person can fix is shown; monitoring was not started, and the deployment is in shadow
   // mode on top (the backend tests cover each cap).
   await expect(page.getByTestId("approval-blocked")).toContainText("Monitoring has not been started");
@@ -101,7 +102,7 @@ test("a stock drop in WooCommerce becomes a pause proposal waiting for approval 
   const why = page.getByTestId("decision-why");
   await expect(why.getByText("Catalog ads also promote other products, so they are not paused.")).toBeVisible();
   await expect(page.getByTestId("excluded-ads")).toContainText("Katalog – wszystkie produkty: also promotes other products");
-  await expect(why.getByRole("heading", { name: "Policy checks: Requires approval" })).toBeVisible();
+  await expect(page.getByTestId("decision-checks")).toContainText("Requires approval");
   await expect(page.getByTestId("policy-checks").getByRole("row")).toHaveCount(7);
 
   const evidence = page.getByTestId("decision-evidence");
@@ -111,7 +112,7 @@ test("a stock drop in WooCommerce becomes a pause proposal waiting for approval 
   // 7. Activity shows the detection, the recommendation and the policy steps of the same episode.
   await page.goto(`/stores/${STORE_B}/activity`);
   const activity = page.getByTestId("activity-list");
-  await expect(activity.getByText("A risk episode was opened").first()).toBeVisible();
-  await expect(activity.getByText("A proposal was created").first()).toBeVisible();
-  await expect(activity.getByText("The policy was evaluated").first()).toBeVisible();
+  await expect(activity.getByText("A low-stock risk was detected").first()).toBeVisible();
+  await expect(activity.getByText("Recommendation ready").first()).toBeVisible();
+  await expect(activity.getByText("Safety checks done").first()).toBeVisible();
 });

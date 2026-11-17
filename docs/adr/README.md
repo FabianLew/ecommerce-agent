@@ -35,5 +35,6 @@ Statuses: `Proposed` → `Accepted` (after the owner accepts it in a PR) → opt
 | [0026](0026-inventory-protection-levels-parameters-and-alert-recipients.md) | Inventory protection levels, versioned parameters and alert recipients | Proposed |
 | [0027](0027-ai-cost-governance-budgets-and-abuse-protection.md) | AI cost governance, budget enforcement and abuse protection | Accepted |
 | [0028](0028-lean-hosting-on-a-single-eu-vps.md) | Lean hosting on a single EU VPS for the demo and the first pilot | Proposed |
+| [0029](0029-ui-design-system.md) | UI design system on CSS tokens and cascade layers, without a component framework | Proposed |
 
 Template: [0000-template.md](0000-template.md).

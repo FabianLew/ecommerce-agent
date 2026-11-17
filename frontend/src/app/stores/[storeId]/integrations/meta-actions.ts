@@ -53,14 +53,14 @@ export async function connectMeta(storeId: string, _previous: MetaFormState, for
   });
   redirectIfUnauthenticated(saved.response.status, path);
   if (!saved.data) {
-    revalidatePath(path);
+    revalidatePath(path, "layout");
     return failure(saved.error?.fieldErrors, t);
   }
   const checked = await api.POST("/api/v1/stores/{storeId}/meta-connection/{connectionId}/checks", {
     params: { path: { storeId, connectionId } },
   });
   redirectIfUnauthenticated(checked.response.status, path);
-  revalidatePath(path);
+  revalidatePath(path, "layout");
   return checked.data?.status === "CONNECTED"
     ? { status: "saved", message: t.connected }
     : { status: "error", message: t.checkFailed };
@@ -73,7 +73,7 @@ export async function checkMeta(storeId: string, connectionId: string): Promise<
     params: { path: { storeId, connectionId } },
   });
   redirectIfUnauthenticated(checked.response.status, path);
-  revalidatePath(path);
+  revalidatePath(path, "layout");
 }
 
 function failure(

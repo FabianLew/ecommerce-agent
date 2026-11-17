@@ -1,0 +1,320 @@
+<style>
+.ov-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.span-12 { grid-column: span 12; }
+.span-8 { grid-column: span 8; }
+.span-4 { grid-column: span 4; }
+@media (min-width: 1600px) { .ov-grid { gap: 20px; } }
+@media (max-width: 1279px) { .span-8, .span-4 { grid-column: span 12; } }
+
+/* Operator status */
+.status-band { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); }
+.status-main { display: flex; gap: 14px; align-items: flex-start; padding: 18px 20px; }
+.status-icon { width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center; background: var(--success-bg);
+  color: var(--success); border: 1px solid var(--success-border); flex: none; }
+.status-main h2 { font-size: 16px; }
+.status-main p { color: var(--text-2); margin-top: 2px; }
+.status-fact { padding: 18px 20px; border-left: 1px solid var(--border); display: grid; gap: 4px; align-content: start; }
+.status-fact .label { font-size: 12px; line-height: 16px; color: var(--text-3); font-weight: 500; }
+.status-fact .value { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.status-fact .value .icon { color: var(--success); }
+.status-fact .sub { font-size: 12px; line-height: 16px; color: var(--text-2); }
+@media (max-width: 1279px) {
+  .status-band { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .status-main { grid-column: 1 / -1; border-bottom: 1px solid var(--border); }
+  .status-fact:nth-child(2) { border-left: 0; }
+}
+@media (max-width: 639px) {
+  .status-band { grid-template-columns: minmax(0, 1fr); }
+  .status-fact { border-left: 0; border-top: 1px solid var(--border); padding: 12px 20px; grid-template-columns: 1fr auto; align-items: center; }
+  .status-fact:nth-child(2) { border-top: 0; }
+  .status-fact .sub { grid-column: 1 / -1; }
+}
+
+/* Needs attention */
+.att-list { list-style: none; margin: 0; padding: 0; }
+.att-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 14px; align-items: start; padding: 16px 20px; }
+.att-item + .att-item { border-top: 1px solid var(--border); }
+.sev { width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center; border-width: 1px; border-style: solid; }
+.att-title { font-size: 15px; line-height: 22px; font-weight: 600; }
+.att-text { color: var(--text-2); margin-top: 2px; }
+.att-meta { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 10px; font-size: 13px; color: var(--text-3); }
+.att-meta span { display: inline-flex; align-items: center; gap: 5px; }
+.att-action { align-self: center; }
+@media (max-width: 639px) {
+  .att-item { grid-template-columns: auto minmax(0, 1fr); }
+  .att-action { grid-column: 2; justify-self: start; margin-top: 8px; }
+}
+
+/* Actions */
+.act-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--border); }
+.act-stat { padding: 14px 16px; display: grid; gap: 2px; }
+.act-stat + .act-stat { border-left: 1px solid var(--border); }
+.act-stat .n { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -0.01em; }
+.act-stat .l { font-size: 12px; line-height: 16px; color: var(--text-2); display: flex; align-items: center; gap: 5px; }
+.act-stat .l i { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.act-list { list-style: none; margin: 0; padding: 4px 0; }
+.act-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 10px; padding: 10px 20px; }
+.act-row .icon { margin-top: 2px; }
+.act-row strong { font-weight: 500; }
+.act-row .subtle { grid-column: 2; }
+
+/* Feed */
+.feed { list-style: none; margin: 0; padding: 6px 0; }
+.feed-item { display: grid; grid-template-columns: 76px auto minmax(0, 1fr); gap: 12px; padding: 10px 20px; align-items: start; }
+.feed-time { color: var(--text-3); font-size: 13px; padding-top: 1px; }
+.feed-ic { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; background: var(--neutral-bg); color: var(--text-2); }
+.feed-ic .icon { width: 14px; height: 14px; }
+.feed-item p { color: var(--text); }
+.feed-item p .subtle { display: block; margin-top: 2px; }
+@media (max-width: 639px) { .feed-item { grid-template-columns: auto minmax(0, 1fr); } .feed-time { grid-column: 2; order: 3; padding: 0; } }
+
+/* Sources */
+.src { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 2px 12px; padding: 14px 20px; align-items: center; }
+.src + .src { border-top: 1px solid var(--border); }
+.mono-tile { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-subtle);
+  display: grid; place-items: center; font-size: 12px; font-weight: 600; color: var(--text-2); grid-row: span 2; }
+.src strong { font-weight: 600; }
+.src .subtle { grid-column: 2 / -1; }
+
+/* Business pulse */
+.pulse { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
+.kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-right: 1px solid var(--border); }
+.kpi { padding: 18px 20px; display: grid; gap: 6px; align-content: start; }
+.kpi:nth-child(odd) { border-right: 1px solid var(--border); }
+.kpi:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+.kpi .label { color: var(--text-2); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.kpi .value { font-size: 26px; line-height: 34px; font-weight: 600; letter-spacing: -0.015em; }
+.kpi .value.na { font-size: 15px; line-height: 22px; font-weight: 500; color: var(--text-2); letter-spacing: 0; padding: 6px 0 6px; }
+.kpi .note { font-size: 12px; line-height: 16px; color: var(--text-3); }
+.chart { padding: 18px 20px 14px; display: grid; gap: 12px; min-width: 0; }
+.chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.chart-head .muted { font-size: 13px; }
+.plot { position: relative; height: 200px; margin-left: 52px; }
+.grid-line { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--chart-grid); }
+.grid-line span { position: absolute; right: calc(100% + 8px); top: -8px; font-size: 11px; line-height: 16px; color: var(--text-3); white-space: nowrap; }
+.grid-line.base { border-top: 1px solid var(--border-strong); }
+.bars { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: end; gap: 10%; padding: 0 3%; }
+.bar { background: var(--chart-bar); border-radius: 3px 3px 0 0; position: relative; min-height: 2px; }
+.bar:last-child { background: #2a8a5f; }
+.bar b { position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); font-size: 11px; line-height: 14px;
+  font-weight: 500; color: var(--text-2); white-space: nowrap; }
+.xlabels { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10%; padding: 0 3%; margin-left: 52px;
+  font-size: 12px; color: var(--text-3); text-align: center; }
+@media (max-width: 1279px) { .pulse { grid-template-columns: minmax(0, 1fr); } .kpis { border-right: 0; border-bottom: 1px solid var(--border); } }
+@media (max-width: 639px) { .bar b { display: none; } .kpi .value { font-size: 22px; line-height: 28px; } .kpi { padding: 14px 16px; } }
+.link-row { display: inline-flex; align-items: center; gap: 4px; font-weight: 500; font-size: 13px; }
+</style>
+
+<div class="container wide">
+  <div class="page-head">
+    <div>
+      <h1>Overview</h1>
+      <p class="muted" style="margin-top:2px">Monday, 16 November · Northfield Botanics</p>
+    </div>
+  </div>
+
+  <div class="ov-grid">
+    <!-- 1. Is the operator monitoring the store? -->
+    <section class="card span-12 status-band" aria-label="Operator status">
+      <div class="status-main">
+        <div class="status-icon"><svg class="icon icon-lg"><use href="#i-eye"/></svg></div>
+        <div>
+          <h2>The operator is monitoring your store</h2>
+          <p>Inventory protection is on. Store orders are complete until 11:18; ads were last read at 11:15.</p>
+        </div>
+      </div>
+      <div class="status-fact">
+        <span class="label">Monitoring</span>
+        <span class="value"><svg class="icon icon-sm"><use href="#i-check"/></svg>On since 14 Nov</span>
+        <span class="sub">Inventory protection</span>
+      </div>
+      <div class="status-fact">
+        <span class="label">Ad changes</span>
+        <span class="value"><svg class="icon icon-sm"><use href="#i-shield"/></svg>Need your approval</span>
+        <span class="sub">Level L1 · not stopped</span>
+      </div>
+      <div class="status-fact">
+        <span class="label">Data sources</span>
+        <span class="value"><svg class="icon icon-sm" style="color:var(--warning)"><use href="#i-warn"/></svg>1 of 2 needs attention</span>
+        <span class="sub">Store data is current</span>
+      </div>
+    </section>
+
+    <!-- 2. Does anything need my attention? -->
+    <section class="card span-8" aria-labelledby="att-title">
+      <div class="card-head">
+        <h2 id="att-title">Needs your attention</h2>
+        <span class="badge tone-warning num">2</span>
+      </div>
+      <ul class="att-list">
+        <li class="att-item">
+          <span class="sev tone-warning"><svg class="icon"><use href="#i-package"/></svg></span>
+          <div>
+            <p class="att-title">Hydrating Serum 30 ml will sell out in about 2 days</p>
+            <p class="att-text">Recommended: pause the ad “Serum 30 ml – dedicated ad” until stock is replenished.</p>
+            <div class="att-meta">
+              <span class="badge tone-warning"><svg class="icon"><use href="#i-clock"/></svg>Waiting for your approval</span>
+              <span><svg class="icon icon-sm"><use href="#i-clock"/></svg>Decide by Tue 17 Nov, 11:02</span>
+              <span>16 units left · ~7 sold per day</span>
+            </div>
+          </div>
+          <a class="btn btn-primary att-action" href="decision-detail.html">Review decision<svg class="icon icon-sm"><use href="#i-arrow"/></svg></a>
+        </li>
+        <li class="att-item">
+          <span class="sev tone-warning"><svg class="icon"><use href="#i-plug"/></svg></span>
+          <div>
+            <p class="att-title">2 store updates could not be delivered in the last 24 hours</p>
+            <p class="att-text">Orders and stock still refresh every 5 minutes, so nothing is missing. Check the webhook secret in your store’s settings to restore instant updates.</p>
+            <div class="att-meta"><span>WooCommerce · Commerce</span><span>Last failure 09:47</span></div>
+          </div>
+          <a class="btn btn-secondary att-action" href="#">Open integration</a>
+        </li>
+      </ul>
+    </section>
+
+    <!-- 3. Which actions are pending, executed or blocked? -->
+    <section class="card span-4" aria-labelledby="act-title">
+      <div class="card-head">
+        <h2 id="act-title">Actions</h2>
+      </div>
+      <div class="act-stats">
+        <div class="act-stat"><span class="n num">1</span><span class="l"><i style="background:var(--warning)"></i>To approve</span></div>
+        <div class="act-stat"><span class="n num">1</span><span class="l"><i style="background:var(--info)"></i>Monitoring results</span></div>
+        <div class="act-stat"><span class="n num">3</span><span class="l"><i style="background:var(--neutral)"></i>Completed</span></div>
+      </div>
+      <ul class="act-list">
+        <li class="act-row">
+          <svg class="icon" style="color:var(--warning)"><use href="#i-clock"/></svg>
+          <span><strong>Pause “Serum 30 ml – dedicated ad”</strong></span>
+          <span class="subtle">Waiting for your approval · proposed today 11:02</span>
+        </li>
+        <li class="act-row">
+          <svg class="icon" style="color:var(--success)"><use href="#i-check"/></svg>
+          <span><strong>Paused “Night Cream – carousel”</strong></span>
+          <span class="subtle">Confirmed by reading the ad · 15 Nov, 22:14</span>
+        </li>
+        <li class="act-row">
+          <svg class="icon" style="color:var(--danger)"><use href="#i-x"/></svg>
+          <span><strong>Not paused: “Body Oil – video”</strong></span>
+          <span class="subtle">The ad changed after approval, so nothing was sent · 10 Nov</span>
+        </li>
+        <li class="act-row">
+          <svg class="icon" style="color:var(--success)"><use href="#i-check"/></svg>
+          <span><strong>Paused “Lip Balm – reel”</strong></span>
+          <span class="subtle">Confirmed by reading the ad · 3 Nov, 08:30</span>
+        </li>
+      </ul>
+      <div class="card-foot"><a class="link-row" href="#">All decisions<svg class="icon icon-sm"><use href="#i-arrow"/></svg></a></div>
+    </section>
+
+    <!-- 4. What was detected recently? -->
+    <section class="card span-8" aria-labelledby="det-title">
+      <div class="card-head">
+        <h2 id="det-title">Recently detected</h2>
+        <span class="meta">Today and yesterday</span>
+      </div>
+      <ul class="feed">
+        <li class="feed-item">
+          <span class="feed-time num">11:02</span>
+          <span class="feed-ic" style="background:var(--warning-bg);color:var(--warning)"><svg class="icon"><use href="#i-package"/></svg></span>
+          <p>Hydrating Serum 30 ml covers about 2.3 days of sales, below your 3-day limit. A decision was proposed.
+            <span class="subtle">Inventory protection · SERUM-30</span></p>
+        </li>
+        <li class="feed-item">
+          <span class="feed-time num">08:40</span>
+          <span class="feed-ic" style="background:var(--warning-bg);color:var(--warning)"><svg class="icon"><use href="#i-package"/></svg></span>
+          <p>Vitamin C Toner 100 ml covers about 4.1 days of sales, below the 5-day warning. Nothing is proposed yet.
+            <span class="subtle">Low stock warning · TONER-100</span></p>
+        </li>
+        <li class="feed-item">
+          <span class="feed-time">Yesterday</span>
+          <span class="feed-ic" style="background:var(--success-bg);color:var(--success)"><svg class="icon"><use href="#i-pause"/></svg></span>
+          <p>The pause of “Night Cream – carousel” was confirmed. The first results check is due today at 22:14.
+            <span class="subtle">Executed after approval by Maja Nowak</span></p>
+        </li>
+        <li class="feed-item">
+          <span class="feed-time">Yesterday</span>
+          <span class="feed-ic"><svg class="icon"><use href="#i-link"/></svg></span>
+          <p>The creative of “Body Oil – video” changed. Its product link needs to be confirmed again before it can be paused.
+            <span class="subtle">Ad mapping · Advertising</span></p>
+        </li>
+      </ul>
+      <div class="card-foot"><a class="link-row" href="#">All activity<svg class="icon icon-sm"><use href="#i-arrow"/></svg></a></div>
+    </section>
+
+    <section class="card span-4" aria-labelledby="src-title">
+      <div class="card-head">
+        <h2 id="src-title">Data sources</h2>
+      </div>
+      <div class="src">
+        <span class="mono-tile">Wo</span>
+        <strong>WooCommerce</strong>
+        <span class="badge tone-warning"><svg class="icon"><use href="#i-warn"/></svg>Attention</span>
+        <span class="subtle">Commerce · orders complete until 11:18</span>
+      </div>
+      <div class="src">
+        <span class="mono-tile">Me</span>
+        <strong>Meta Ads</strong>
+        <span class="badge tone-success"><svg class="icon"><use href="#i-check"/></svg>Connected</span>
+        <span class="subtle">Advertising · 4 ads read at 11:15</span>
+      </div>
+      <div class="card-foot"><a class="link-row" href="#">Manage integrations<svg class="icon icon-sm"><use href="#i-arrow"/></svg></a></div>
+    </section>
+
+    <!-- 5. Business pulse: important, but secondary to operations. -->
+    <section class="card span-12" aria-labelledby="pulse-title">
+      <div class="card-head">
+        <h2 id="pulse-title">Business pulse</h2>
+        <span class="meta">Last 7 full days · 9–15 Nov · Europe/Warsaw</span>
+      </div>
+      <div class="pulse">
+        <div class="kpis">
+          <div class="kpi">
+            <span class="label">Net sales</span>
+            <span class="value num">€6,321.40</span>
+            <span><span class="badge tone-warning">Estimated</span></span>
+            <span class="note">Refunds are not included yet</span>
+          </div>
+          <div class="kpi">
+            <span class="label">Orders</span>
+            <span class="value num">49</span>
+            <span><span class="badge tone-success">Confirmed</span></span>
+            <span class="note">No earlier period to compare with yet</span>
+          </div>
+          <div class="kpi">
+            <span class="label">Ad spend</span>
+            <span class="value na">Not available yet</span>
+            <span class="note">Ad spend is imported once spend reading is enabled for your ad account.</span>
+          </div>
+          <div class="kpi">
+            <span class="label">Contribution margin</span>
+            <span class="value na">Not available yet</span>
+            <span class="note"><a href="#">Add product and shipping costs</a> to calculate it.</span>
+          </div>
+        </div>
+        <figure class="chart" style="margin:0">
+          <div class="chart-head">
+            <h3>Net sales per day</h3>
+            <a class="link-row" href="#">Open analytics<svg class="icon icon-sm"><use href="#i-arrow"/></svg></a>
+          </div>
+          <div class="plot" role="img" aria-label="Net sales per day, 9 to 15 November: 812, 1,047, 735, 958, 1,120, 690 and 960 euros.">
+            <div class="grid-line" style="top:0"><span>€1,200</span></div>
+            <div class="grid-line" style="top:33.33%"><span>€800</span></div>
+            <div class="grid-line" style="top:66.67%"><span>€400</span></div>
+            <div class="grid-line base" style="top:100%"><span>€0</span></div>
+            <div class="bars">
+              <div class="bar" style="height:67.7%" title="Mon 9 Nov: €812.30 · 6 orders"><b class="num">€812</b></div>
+              <div class="bar" style="height:87.2%" title="Tue 10 Nov: €1,046.90 · 8 orders"><b class="num">€1,047</b></div>
+              <div class="bar" style="height:61.2%" title="Wed 11 Nov: €734.50 · 6 orders"><b class="num">€735</b></div>
+              <div class="bar" style="height:79.8%" title="Thu 12 Nov: €958.00 · 7 orders"><b class="num">€958</b></div>
+              <div class="bar" style="height:93.4%" title="Fri 13 Nov: €1,120.40 · 9 orders"><b class="num">€1,120</b></div>
+              <div class="bar" style="height:57.5%" title="Sat 14 Nov: €689.70 · 5 orders"><b class="num">€690</b></div>
+              <div class="bar" style="height:80%" title="Sun 15 Nov: €959.60 · 8 orders"><b class="num">€960</b></div>
+            </div>
+          </div>
+          <div class="xlabels" aria-hidden="true"><span>Mon 9</span><span>Tue 10</span><span>Wed 11</span><span>Thu 12</span><span>Fri 13</span><span>Sat 14</span><span>Sun 15</span></div>
+        </figure>
+      </div>
+    </section>
+  </div>
+</div>

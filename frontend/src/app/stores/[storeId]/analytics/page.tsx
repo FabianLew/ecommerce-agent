@@ -4,7 +4,8 @@ import { notFound } from "next/navigation";
 import { DailyBars } from "@/components/DailyBars";
 import { MetricCard, metricText } from "@/components/MetricCard";
 import { PageHeading } from "@/components/PageHeading";
-import { formatInstant } from "@/i18n/format";
+import { formatCount, formatInstant } from "@/i18n/format";
+import { Callout } from "@/components/ui/Callout";
 import { INTL_TAGS, type Locale } from "@/i18n/locale";
 import type { Messages } from "@/i18n/messages";
 import { getLocale, getMessages } from "@/i18n/server";
@@ -46,6 +47,7 @@ export default async function AnalyticsPage({
   return (
     <>
       <PageHeading>{messages.sections.analytics}</PageHeading>
+      <div className="toolbar">
       <nav className="tabs" aria-label={messages.sections.analytics}>
         {(["sales", "products"] as const).map((item) => (
           <Link key={item} href={link({ tab: item, sort: undefined, offset: undefined })} className="tab"
@@ -54,16 +56,20 @@ export default async function AnalyticsPage({
           </Link>
         ))}
       </nav>
-      <form method="get" action={path} className="form inline-form" data-testid="analytics-period">
+      <form method="get" action={path} className="period-form" data-testid="analytics-period"
+        aria-label={t.periodTitle}>
         <input type="hidden" name="tab" value={tab} />
-        <label>
-          {t.from} <input type="date" name="from" defaultValue={from} />
-        </label>
-        <label>
-          {t.to} <input type="date" name="to" defaultValue={to} />
-        </label>
+        <div className="field">
+          <label htmlFor="period-from">{t.from}</label>
+          <input id="period-from" type="date" name="from" defaultValue={from} />
+        </div>
+        <div className="field">
+          <label htmlFor="period-to">{t.to}</label>
+          <input id="period-to" type="date" name="to" defaultValue={to} />
+        </div>
         <button type="submit" className="button secondary">{t.apply}</button>
       </form>
+      </div>
       {tab === "sales" ? (
         <Sales storeId={storeId} from={from} to={to} locale={locale} t={t} path={path} />
       ) : (
@@ -75,17 +81,22 @@ export default async function AnalyticsPage({
 
 type Meta = { from: string; to: string; timezone: string; coveredFrom?: string; coveredUntil?: string; fullyCovered: boolean };
 
+function formatDay(day: string, locale: Locale): string {
+  return new Intl.DateTimeFormat(INTL_TAGS[locale], { dateStyle: "medium", timeZone: "UTC" })
+    .format(new Date(`${day}T00:00:00Z`));
+}
+
 function Coverage({ meta, locale, t }: { meta: Meta; locale: Locale; t: Messages["analytics"] }) {
   return (
     <>
-      <p className="muted">{t.period(meta.from, meta.to, meta.timezone)}</p>
+      <p className="muted period-line">{t.period(formatDay(meta.from, locale), formatDay(meta.to, locale), meta.timezone)}</p>
       {!meta.coveredFrom ? (
-        <p className="form-message warning" data-testid="analytics-uncovered">{t.uncovered}</p>
+        <Callout tone="warning" role="note" data-testid="analytics-uncovered">{t.uncovered}</Callout>
       ) : !meta.fullyCovered ? (
-        <p className="form-message warning" data-testid="analytics-partial">
+        <Callout tone="warning" role="note" data-testid="analytics-partial">
           {t.partial(formatInstant(meta.coveredFrom, meta.timezone, locale),
             formatInstant(meta.coveredUntil, meta.timezone, locale))}
-        </p>
+        </Callout>
       ) : null}
     </>
   );
@@ -101,7 +112,7 @@ async function Sales({ storeId, from, to, locale, t, path }: {
   redirectIfUnauthenticated(response.status, path);
   if (!data) {
     if (response.status === 400) {
-      return <p className="form-message error">{t.uncovered}</p>;
+      return <Callout tone="warning" role="note">{t.uncovered}</Callout>;
     }
     notFound();
   }
@@ -124,18 +135,19 @@ async function Sales({ storeId, from, to, locale, t, path }: {
             label: point.netSales == null ? t.trendNoData : `${money.format(Number(point.netSales))} · ${point.count}`,
           }))}
         />
-        <details>
+        <details className="disclosure">
           <summary>{t.showTable}</summary>
           <table className="data-table">
             <thead>
-              <tr><th>{t.day}</th><th>{t.netSales}</th><th>{t.orders}</th></tr>
+              <tr><th scope="col">{t.day}</th><th scope="col" className="numeric">{t.netSales}</th>
+                <th scope="col" className="numeric">{t.orders}</th></tr>
             </thead>
             <tbody>
               {data.series.map((point) => (
                 <tr key={point.day}>
-                  <td>{point.day}</td>
-                  <td>{point.netSales == null ? t.quality.UNAVAILABLE : money.format(Number(point.netSales))}</td>
-                  <td>{point.count ?? "—"}</td>
+                  <td>{formatDay(point.day, locale)}</td>
+                  <td className="numeric">{point.netSales == null ? t.quality.UNAVAILABLE : money.format(Number(point.netSales))}</td>
+                  <td className="numeric">{point.netSales == null ? "—" : formatCount(point.count, locale)}</td>
                 </tr>
               ))}
             </tbody>
@@ -164,18 +176,22 @@ async function Products({ storeId, from, to, locale, t, query, link, path }: {
   return (
     <>
       <Coverage meta={data.meta} locale={locale} t={t} />
-      <p>
-        {t.sortBy}:{" "}
-        {SORTS.map((item) => (
-          <Link key={item} href={link({ sort: item })} aria-current={item === sort ? "true" : undefined}
-            className="tab">{t.sorts[item]}</Link>
-        ))}
-      </p>
+      <div className="sort-row">
+        <span className="muted">{t.sortBy}</span>
+        <nav className="tabs" aria-label={t.sortLabel}>
+          {SORTS.map((item) => (
+            <Link key={item} href={link({ sort: item })} aria-current={item === sort ? "true" : undefined}
+              className="tab">{t.sorts[item]}</Link>
+          ))}
+        </nav>
+      </div>
       {data.items.length === 0 ? <p className="muted">{t.noProducts}</p> : (
+        <div className="card table-card">
         <table className="data-table" data-testid="products-table">
           <thead>
-            <tr><th>{t.product}</th><th>{t.units}</th><th>{t.netSales}</th><th>{t.stock}</th>
-              <th>{t.metricNames.days_of_cover}</th></tr>
+            <tr><th scope="col">{t.product}</th><th scope="col" className="numeric">{t.units}</th>
+              <th scope="col" className="numeric">{t.netSales}</th><th scope="col" className="numeric">{t.stock}</th>
+              <th scope="col" className="numeric">{t.metricNames.days_of_cover}</th></tr>
           </thead>
           <tbody>
             {data.items.map((row) => (
@@ -186,16 +202,17 @@ async function Products({ storeId, from, to, locale, t, query, link, path }: {
                     {row.variant.sku ? `${row.variant.sku} · ` : ""}{row.variant.productName} – {row.variant.name}
                   </Link>
                 </td>
-                <td>{row.units ?? t.quality.UNAVAILABLE}</td>
-                <td>{row.netSales == null ? t.quality.UNAVAILABLE : money.format(Number(row.netSales))}</td>
-                <td>{row.availableToSell ?? "—"}</td>
-                <td title={row.daysOfCover.missingComponents.map((r) => t.reasons[r] ?? r).join("; ")}>
+                <td className="numeric">{row.units == null ? t.quality.UNAVAILABLE : formatCount(row.units, locale)}</td>
+                <td className="numeric">{row.netSales == null ? t.quality.UNAVAILABLE : money.format(Number(row.netSales))}</td>
+                <td className="numeric">{row.availableToSell == null ? "—" : formatCount(row.availableToSell, locale)}</td>
+                <td className="numeric" title={row.daysOfCover.missingComponents.map((r) => t.reasons[r] ?? r).join("; ")}>
                   {metricText(row.daysOfCover, locale, t)}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       )}
       <div className="form-actions inline-form">
         {offset > 0 ? <Link className="button secondary" href={link({ sort, offset: String(Math.max(0, offset - 50)) })}>
